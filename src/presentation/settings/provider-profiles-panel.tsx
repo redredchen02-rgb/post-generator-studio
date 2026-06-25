@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { CheckCircle2, FlaskConical, Loader2, Pencil, Plus, Save, Trash2, XCircle } from "lucide-react";
+import { CheckCircle2, FlaskConical, KeyRound, Loader2, Pencil, Plus, Save, Trash2, XCircle } from "lucide-react";
 import { useForm, useWatch } from "react-hook-form";
 import type { ProviderKind, ProviderProfile } from "@/domain/schemas";
 import { providerKindSchema, providerProfileCreateSchema } from "@/domain/schemas";
@@ -118,6 +118,19 @@ export function ProviderProfilesPanel({
       notify("Provider profile deleted");
     } catch (err) {
       notify(err instanceof Error ? err.message : "Delete failed");
+    }
+  }
+
+  async function handleClearApiKey(id: string): Promise<void> {
+    try {
+      await fetchJson<ProviderProfile>(`/api/provider-profiles/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ clearApiKey: true }),
+      });
+      await refresh();
+      notify("API key cleared");
+    } catch (err) {
+      notify(err instanceof Error ? err.message : "Clear key failed");
     }
   }
 
@@ -241,6 +254,12 @@ export function ProviderProfilesPanel({
                 )}
                 Test
               </Button>
+              {profile.keyMasked ? (
+                <Button variant="outline" size="sm" onClick={() => void handleClearApiKey(profile.id)}>
+                  <KeyRound className="h-4 w-4" />
+                  Clear Key
+                </Button>
+              ) : null}
               <Button variant="destructive" size="sm" onClick={() => void remove(profile.id)}>
                 <Trash2 className="h-4 w-4" />
                 Delete
