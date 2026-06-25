@@ -1,0 +1,128 @@
+import { AppErrorException } from "@postgen/domain";
+import type { GenerationOptions } from "@postgen/domain";
+import type {
+  GenerationEvent,
+  NormalizedGenerationRequest,
+  ProviderCapabilities,
+  ProviderModel,
+  ProviderProfile,
+} from "@postgen/domain";
+import { BaseAdapter, type RequestBuildResult, type ChunkParseResult } from "./base-adapter";
+
+type ChatCompletionChunk = {
+  choices?: Array<{
+    delta?: { content?: string };
+    finish_reason?: string | null;
+  }>;
+  model?: string;
+  usage?: {
+    prompt_tokens?: number;
+    completion_tokens?: number;
+    total_tokens?: number;
+  };
+};
+
+type ModelsResponse = {
+  data?: Array<{ id: string; name?: string }>;
+};
+
+export type OpenAICompatibleAdapterOptions = {
+  id: string;
+  defaultBaseUrl: string;
+  requiresApiKey: boolean;
+  extraHeaders?: Record<string, string>;
+};
+
+export class OpenAICompatibleAdapter extends BaseAdapter {
+  readonly id: string;
+  private readonly defaultBaseUrl: string;
+  private readonly extraHeaders: Record<string, string>;
+
+  constructor(options: OpenAICompatibleAdapterOptions) {
+    super();
+    this.id = options.id;
+    this.defaultBaseUrl = options.defaultBaseUrl;
+    this.supportsApiKey = options.requiresApiKey;
+    this.extraHeaders = options.extraHeaders || {};
+  }
+
+  capabilities(): ProviderCapabilities {
+    return {
+      ...super.capabilities(),
+      supportsModelList: true,
+    };
+  }
+
+  protected async buildRequest(
+    request: NormalizedGenerationRequest,
+    config: ProviderProfile,
+    options?: GenerationOptions,
+  ): Promise<RequestBuildResult> {
+    return {
+      url: `${this.baseUrl(config)}/v1/chat/completions`,
+      init: {
+        method: "POST",
+        headers: this.headers(options?.apiKey),
+        body: JSON.stringify({
+          model: request.model,
+          messages: [
+            { role: "system", content: request.systemPrompt },
+            { role: "user", content: request.userPrompt },
+          ],
+          temperature: request.temperature,
+          max_tokens: request.maxTokens,
+          stream: request.stream,
+          stream_options: { include_usage: true },
+        }),
+      },
+    };
+  }
+
+  protected parseChunk(raw: unknown, _request: NormalizedGenerationRequest): ChunkParseResult {
+    if (typeof raw !== 'object' || raw === null) {
+      throw new AppErrorException({ code: "PROVIDER_PARSE_ERROR", message: "Unexpected OpenAI chunk structure" });
+    }
+    const parsed = raw as ChatCompletionChunk;
+    const events: GenerationEvent[] = [];
+    const token = parsed.choices?.[0]?.delta?.content;
+    if (token) {
+      events.push({ type: "token", value: token });
+    }
+    if (parsed.model || parsed.usage) {
+      events.push({
+        type: "metadata",
+        model: parsed.model,
+        inputTokens: parsed.usage?.prompt_tokens,
+        outputTokens: parsed.usage?.completion_tokens,
+      });
+    }
+    return { events };
+  }
+
+  async listModels(config: ProviderProfile, options?: GenerationOptions): Promise<ProviderModel[]> {
+    if (this.supportsApiKey && !options?.apiKey) {
+      return [];
+    }
+    const response = await fetch(`${this.baseUrl(config)}/v1/models`, {
+      signal: options?.abortSignal,
+      headers: this.headers(options?.apiKey),
+    });
+    if (!response.ok) {
+      return [];
+    }
+    const parsed = (await response.json()) as ModelsResponse;
+    return (parsed.data || []).map((model) => ({ id: model.id, name: model.name }));
+  }
+
+  private baseUrl(config: ProviderProfile): string {
+    return (config.baseUrl || this.defaultBaseUrl).replace(/\/$/, "");
+  }
+
+  private headers(apiKey?: string): Record<string, string> {
+    return {
+      "Content-Type": "application/json",
+      ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+      ...this.extraHeaders,
+    };
+  }
+}
