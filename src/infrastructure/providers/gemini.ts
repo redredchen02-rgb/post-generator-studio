@@ -1,10 +1,11 @@
-import type { GenerationOptions } from "@/domain/ports/provider";
-import type {
-  GenerationEvent,
-  NormalizedGenerationRequest,
-  ProviderCapabilities,
-  ProviderModel,
-  ProviderProfile,
+import type { CompletionResult, GenerationOptions } from "@/domain/ports/provider";
+import {
+  AppErrorException,
+  type GenerationEvent,
+  type NormalizedGenerationRequest,
+  type ProviderCapabilities,
+  type ProviderModel,
+  type ProviderProfile,
 } from "@/domain/schemas";
 import { BaseAdapter, type RequestBuildResult, type ChunkParseResult } from "@/infrastructure/providers/base-adapter";
 
@@ -28,6 +29,7 @@ export class GeminiAdapter extends BaseAdapter {
     return {
       ...super.capabilities(),
       supportsModelList: true,
+      supportsCompletion: true,
     };
   }
 
@@ -73,6 +75,44 @@ export class GeminiAdapter extends BaseAdapter {
       });
     }
     return { events };
+  }
+
+  protected async buildCompletionRequest(
+    request: NormalizedGenerationRequest,
+    config: ProviderProfile,
+    options?: GenerationOptions,
+  ): Promise<RequestBuildResult> {
+    // Non-streaming uses :generateContent (no ?alt=sse) rather than :streamGenerateContent.
+    const baseUrl = (config.baseUrl || "https://generativelanguage.googleapis.com").replace(/\/$/, "");
+    return {
+      url: `${baseUrl}/v1beta/models/${encodeURIComponent(request.model)}:generateContent?key=${encodeURIComponent(options?.apiKey || "")}`,
+      init: {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: request.systemPrompt }] },
+          contents: [{ role: "user", parts: [{ text: request.userPrompt }] }],
+          generationConfig: {
+            temperature: request.temperature,
+            maxOutputTokens: request.maxTokens,
+          },
+        }),
+      },
+    };
+  }
+
+  protected parseCompletion(raw: unknown): CompletionResult {
+    const parsed = raw as GeminiChunk;
+    const parts = parsed.candidates?.[0]?.content?.parts ?? [];
+    const content = parts.map((part) => part.text ?? "").join("");
+    if (!content) {
+      throw new AppErrorException({ code: "COMPLETION_FAILED", message: `${this.id} 返回了非预期的补全结构` });
+    }
+    return {
+      content,
+      inputTokens: parsed.usageMetadata?.promptTokenCount,
+      outputTokens: parsed.usageMetadata?.candidatesTokenCount,
+    };
   }
 
   async listModels(config: ProviderProfile, options?: GenerationOptions): Promise<ProviderModel[]> {

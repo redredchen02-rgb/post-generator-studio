@@ -1,6 +1,11 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { GeminiAdapter } from "@/infrastructure/providers/gemini";
-import type { GenerationEvent, ProviderProfile } from "@/domain/schemas";
+import {
+  BaseAdapter,
+  type ChunkParseResult,
+  type RequestBuildResult,
+} from "@/infrastructure/providers/base-adapter";
+import type { GenerationEvent, NormalizedGenerationRequest, ProviderProfile } from "@/domain/schemas";
 
 function makeProfile(): ProviderProfile {
   return {
@@ -97,5 +102,50 @@ describe("BaseAdapter hardening (via GeminiAdapter)", () => {
     expect(events).toContainEqual({ type: "token", value: "Hi" });
     expect(events).toContainEqual({ type: "complete" });
     expect(events.some((e) => e.type === "error")).toBe(false);
+  });
+});
+
+// A bare adapter that does not opt into completion (supportsCompletion defaults false).
+class NoCompletionAdapter extends BaseAdapter {
+  readonly id = "no-completion";
+  protected async buildRequest(): Promise<RequestBuildResult> {
+    return { url: "http://x", init: { method: "POST" } };
+  }
+  protected parseChunk(): ChunkParseResult {
+    return { events: [] };
+  }
+}
+
+describe("BaseAdapter.complete capability gate", () => {
+  it("throws when the adapter does not advertise completion support", async () => {
+    const adapter = new NoCompletionAdapter();
+    expect(adapter.capabilities().supportsCompletion).toBe(false);
+    await expect(adapter.complete(request, makeProfile())).rejects.toThrow("不支持一次性补全");
+  });
+});
+
+describe("GeminiAdapter.complete (non-streaming)", () => {
+  it("hits :generateContent and returns the parsed full text", async () => {
+    let capturedUrl = "";
+    let capturedBody: NormalizedGenerationRequest | undefined;
+    global.fetch = (async (url: string, init?: RequestInit) => {
+      capturedUrl = String(url);
+      capturedBody = init?.body ? JSON.parse(String(init.body)) : undefined;
+      return new Response(
+        JSON.stringify({
+          candidates: [{ content: { parts: [{ text: "FULL TEXT" }] } }],
+          usageMetadata: { promptTokenCount: 3, candidatesTokenCount: 9 },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    }) as typeof fetch;
+
+    const result = await new GeminiAdapter().complete(request, makeProfile(), { apiKey: "k" });
+    expect(capturedUrl).toContain(":generateContent");
+    expect(capturedUrl).not.toContain("alt=sse");
+    expect(capturedBody).toBeDefined();
+    expect(result.content).toBe("FULL TEXT");
+    expect(result.inputTokens).toBe(3);
+    expect(result.outputTokens).toBe(9);
   });
 });

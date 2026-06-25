@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { Copy, Database, KeyRound, Layers, Loader2 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { loadBootstrap } from "@/presentation/lib/api";
 import { useApi } from "@/presentation/lib/use-api";
 import { ProviderProfilesPanel } from "./provider-profiles-panel";
@@ -21,6 +22,7 @@ export function Header({ title, description }: { title: string; description: str
 }
 
 export function SettingsWorkspace(): React.ReactElement {
+  const t = useTranslations("Settings");
   const [tab, setTab] = React.useState<SettingsTab>("providers");
   const [message, setMessage] = React.useState<string | null>(null);
   const { data: bootstrap, loading, isRefetching, error, refetch } = useApi(loadBootstrap);
@@ -34,10 +36,10 @@ export function SettingsWorkspace(): React.ReactElement {
     <main className="mx-auto grid max-w-[1480px] gap-4 px-4 py-4 lg:grid-cols-[240px_minmax(0,1fr)]">
       <aside className="app-surface h-fit rounded-lg p-3">
         <nav className="grid gap-1">
-          <TabButton active={tab === "providers"} onClick={() => setTab("providers")} icon={<KeyRound className="h-4 w-4" />} label="Provider Profiles" />
-          <TabButton active={tab === "templates"} onClick={() => setTab("templates")} icon={<Copy className="h-4 w-4" />} label="Prompt Templates" />
-          <TabButton active={tab === "presets"} onClick={() => setTab("presets")} icon={<Layers className="h-4 w-4" />} label="Generation Presets" />
-          <TabButton active={tab === "storage"} onClick={() => setTab("storage")} icon={<Database className="h-4 w-4" />} label="Storage & Security" />
+          <TabButton active={tab === "providers"} onClick={() => setTab("providers")} icon={<KeyRound className="h-4 w-4" />} label={t("tabs.providers")} />
+          <TabButton active={tab === "templates"} onClick={() => setTab("templates")} icon={<Copy className="h-4 w-4" />} label={t("tabs.templates")} />
+          <TabButton active={tab === "presets"} onClick={() => setTab("presets")} icon={<Layers className="h-4 w-4" />} label={t("tabs.presets")} />
+          <TabButton active={tab === "storage"} onClick={() => setTab("storage")} icon={<Database className="h-4 w-4" />} label={t("tabs.storage")} />
         </nav>
       </aside>
       <section className="app-surface min-h-[calc(100vh-6.5rem)] rounded-lg p-4">
@@ -46,11 +48,11 @@ export function SettingsWorkspace(): React.ReactElement {
         {isRefetching ? (
           <div className="mb-4 flex items-center gap-2 text-xs text-muted-foreground">
             <Loader2 className="h-3 w-3 animate-spin" />
-            刷新中...
+            {t("refreshing")}
           </div>
         ) : null}
         {loading ? (
-          <div className="flex h-full items-center justify-center text-sm text-muted-foreground">加载中...</div>
+          <div className="flex h-full items-center justify-center text-sm text-muted-foreground">{t("loading")}</div>
         ) : bootstrap ? (
           <>
             {tab === "providers" ? <ProviderProfilesPanel profiles={bootstrap.providerProfiles} refresh={refetch} notify={notify} /> : null}

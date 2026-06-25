@@ -1,6 +1,6 @@
 {
   "name": "post-generator-studio",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "private": true,
   "packageManager": "pnpm@10.33.0",
   "scripts": {
@@ -33,6 +33,7 @@
     "drizzle-orm": "^0.36.4",
     "lucide-react": "^0.468.0",
     "next": "^15.1.0",
+    "next-intl": "^4.13.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-hook-form": "^7.54.2",

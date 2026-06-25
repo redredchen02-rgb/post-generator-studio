@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { Loader2, Play, Square } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { Button } from "@/presentation/components/ui/button";
 import { Field } from "@/presentation/components/ui/field";
 import { Input } from "@/presentation/components/ui/input";
@@ -42,25 +43,26 @@ type InputPanelProps = {
 };
 
 export function InputPanel(props: InputPanelProps): React.ReactElement {
+  const t = useTranslations("Generation");
   const customVars = getCustomVars(props.selectedTemplate);
 
   return (
     <section className="app-surface grid h-fit gap-4 rounded-lg p-4 slide-up">
       <div>
-        <h1 className="text-lg font-semibold">Generate</h1>
-        <p className="text-sm text-muted-foreground">输入主题，选择 Preset，然后开始流式生成。</p>
+        <h1 className="text-lg font-semibold">{t("title")}</h1>
+        <p className="text-sm text-muted-foreground">{t("subtitle")}</p>
       </div>
-      <Field label="Title">
+      <Field label={t("titleLabel")}>
         <Input value={props.title} onChange={(e) => props.onTitleChange(e.target.value)} />
       </Field>
-      <Field label="Event Summary">
+      <Field label={t("eventSummaryLabel")}>
         <Textarea
           value={props.eventSummary}
           onChange={(e) => props.onEventSummaryChange(e.target.value)}
           className="min-h-48"
         />
       </Field>
-      <Field label="Preset Selector">
+      <Field label={t("presetSelectorLabel")}>
         <NativeSelect value={props.presetId} onChange={(e) => props.onPresetIdChange(e.target.value)}>
           {props.bootstrap.generationPresets.map((preset) => (
             <option key={preset.id} value={preset.id}>
@@ -69,7 +71,7 @@ export function InputPanel(props: InputPanelProps): React.ReactElement {
           ))}
         </NativeSelect>
       </Field>
-      <Field label="Provider Override">
+      <Field label={t("providerOverrideLabel")}>
         <NativeSelect
           value={props.selectedProfileId ?? ""}
           onChange={(e) => props.onProfileIdChange(e.target.value)}
@@ -86,7 +88,7 @@ export function InputPanel(props: InputPanelProps): React.ReactElement {
       </Field>
       {customVars.length > 0 && (
         <div className="grid gap-3 rounded-lg border p-3">
-          <span className="text-sm font-medium">Template Variables</span>
+          <span className="text-sm font-medium">{t("templateVariablesLabel")}</span>
           {customVars.map((varName) => (
             <Field key={varName} label={varName}>
               <Input
@@ -101,11 +103,11 @@ export function InputPanel(props: InputPanelProps): React.ReactElement {
       <div className="grid grid-cols-2 gap-2">
         <Button disabled={props.isGenerating} onClick={props.onGenerate}>
           {props.isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-          Generate
+          {t("generateBtn")}
         </Button>
         <Button variant="outline" disabled={!props.isGenerating} onClick={props.onCancel}>
           <Square className="h-4 w-4" />
-          Cancel
+          {t("cancelBtn")}
         </Button>
       </div>
     </section>

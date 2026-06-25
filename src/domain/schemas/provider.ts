@@ -41,6 +41,7 @@ export const providerCapabilitiesSchema = z.object({
   supportsModelList: z.boolean(),
   requiresApiKey: z.boolean(),
   supportsSystemPrompt: z.boolean(),
+  supportsCompletion: z.boolean(),
 });
 export type ProviderCapabilities = z.infer<typeof providerCapabilitiesSchema>;
 

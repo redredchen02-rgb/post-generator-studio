@@ -4,6 +4,7 @@ import * as React from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Pencil, Plus, Save, Trash2 } from "lucide-react";
 import { useForm } from "react-hook-form";
+import { useTranslations } from "next-intl";
 import type { GenerationPreset, PromptTemplate, ProviderProfile } from "@/domain/schemas";
 import { generationPresetCreateSchema } from "@/domain/schemas";
 import { ALL_PIPELINE_STEPS } from "@/domain/pipeline-steps";
@@ -44,6 +45,7 @@ export function GenerationPresetsPanel({
   refresh: () => Promise<void>;
   notify: (message: string) => void;
 }): React.ReactElement {
+  const t = useTranslations("Settings.presets");
   const [editingId, setEditingId] = React.useState<string | null>(null);
   const form = useForm<PresetForm>({
     resolver: zodResolver(generationPresetCreateSchema),
@@ -88,18 +90,18 @@ export function GenerationPresetsPanel({
           method: "PATCH",
           body: JSON.stringify(values),
         });
-        notify("Generation preset updated");
+        notify(t("updatedMsg"));
         cancelEdit();
       } else {
         await fetchJson<GenerationPreset>("/api/generation-presets", {
           method: "POST",
           body: JSON.stringify(values),
         });
-        notify("Generation preset saved");
+        notify(t("savedMsg"));
       }
       await refresh();
     } catch (err) {
-      notify(err instanceof Error ? err.message : "Save failed");
+      notify(err instanceof Error ? err.message : t("saveFailed"));
     }
   }
 
@@ -108,32 +110,32 @@ export function GenerationPresetsPanel({
       await fetch(`/api/generation-presets/${id}`, { method: "DELETE" });
       if (editingId === id) cancelEdit();
       await refresh();
-      notify("Generation preset deleted");
+      notify(t("deletedMsg"));
     } catch (err) {
-      notify(err instanceof Error ? err.message : "Delete failed");
+      notify(err instanceof Error ? err.message : t("deleteFailed"));
     }
   }
 
   return (
     <div className="grid gap-6">
-      <Header title="Generation Presets" description="组合 Provider、Prompt、输出语言、参数和 Pipeline。" />
+      <Header title={t("title")} description={t("subtitle")} />
       <form className="grid gap-3 rounded-lg border p-4" onSubmit={form.handleSubmit((values) => void submit(values))}>
         {editingId ? (
           <div className="flex items-center justify-between rounded-md bg-muted px-3 py-2">
             <span className="text-sm font-medium">
-              Editing: {presets.find((p) => p.id === editingId)?.name}
+              {t("editing")} {presets.find((p) => p.id === editingId)?.name}
             </span>
             <Button type="button" variant="ghost" size="sm" onClick={cancelEdit}>
               <Plus className="h-4 w-4 rotate-45" />
-              New
+              {t("newBtn")}
             </Button>
           </div>
         ) : null}
         <div className="grid gap-3 md:grid-cols-2">
-          <Field label="Name">
+          <Field label={t("nameLabel")}>
             <Input {...form.register("name")} />
           </Field>
-          <Field label="Provider Profile">
+          <Field label={t("providerProfileLabel")}>
             <NativeSelect {...form.register("providerProfileId")}>
               {providers.map((provider) => (
                 <option key={provider.id} value={provider.id}>
@@ -142,7 +144,7 @@ export function GenerationPresetsPanel({
               ))}
             </NativeSelect>
           </Field>
-          <Field label="Prompt Template">
+          <Field label={t("promptTemplateLabel")}>
             <NativeSelect {...form.register("promptTemplateId")}>
               {templates.map((template) => (
                 <option key={template.id} value={template.id}>
@@ -151,16 +153,16 @@ export function GenerationPresetsPanel({
               ))}
             </NativeSelect>
           </Field>
-          <Field label="Locale">
+          <Field label={t("localeLabel")}>
             <Input {...form.register("locale")} />
           </Field>
-          <Field label="Temperature">
+          <Field label={t("temperatureLabel")}>
             <Input type="number" step="0.1" {...form.register("temperature", { valueAsNumber: true })} />
           </Field>
-          <Field label="Max Tokens">
+          <Field label={t("maxTokensLabel")}>
             <Input type="number" {...form.register("maxTokens", { valueAsNumber: true })} />
           </Field>
-          <Field label="Output Format">
+          <Field label={t("outputFormatLabel")}>
             <NativeSelect {...form.register("outputFormat")}>
               <option value="markdown">markdown</option>
               <option value="plain_text">plain_text</option>
@@ -169,12 +171,12 @@ export function GenerationPresetsPanel({
           </Field>
           <label className="flex items-center gap-2 pt-6 text-sm">
             <input type="checkbox" {...form.register("isDefault")} />
-            Default Preset
+            {t("defaultPresetLabel")}
           </label>
         </div>
         <Button className="w-fit" type="submit">
           <Save className="h-4 w-4" />
-          {editingId ? "Update Preset" : "Save Preset"}
+          {editingId ? t("updateBtn") : t("saveBtn")}
         </Button>
       </form>
       <div className="grid gap-2">
@@ -188,17 +190,17 @@ export function GenerationPresetsPanel({
             <div>
               <h3 className="font-medium">{preset.name}</h3>
               <p className="text-sm text-muted-foreground">
-                {preset.locale} · {preset.outputFormat} · {preset.isDefault ? "default" : "custom"}
+                {preset.locale} · {preset.outputFormat} · {preset.isDefault ? t("defaultLabel") : t("customLabel")}
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
               <Button variant="outline" size="sm" onClick={() => loadForEdit(preset)}>
                 <Pencil className="h-4 w-4" />
-                Edit
+                {t("editBtn")}
               </Button>
               <Button variant="destructive" size="sm" onClick={() => void remove(preset.id)}>
                 <Trash2 className="h-4 w-4" />
-                Delete
+                {t("deleteBtn")}
               </Button>
             </div>
           </div>

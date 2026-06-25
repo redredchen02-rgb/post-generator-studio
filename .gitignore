@@ -4,6 +4,11 @@ dist/
 coverage/
 playwright-report/
 test-results/
+.pnpm-store/
+.context/
+.mimocode/
+.omo/
+TODOS.md
 .env
 .env.local
 .env.*.local

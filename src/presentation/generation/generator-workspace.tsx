@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { Loader2 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { useUiStore } from "@/presentation/store/ui-store";
 import { useProviderStore } from "@/presentation/store/provider-store";
 import { useVarMemoryStore } from "@/presentation/store/var-memory-store";
@@ -20,6 +21,7 @@ const sampleTitle = "台湾男子连续30天挑战AI创业";
 const sampleSummary = "- 连续30天开发AI产品\n- 使用 Claude Code 与 OpenAI Agent\n- 每天公开开发日志\n- 获得大量关注";
 
 export function GeneratorWorkspace(): React.ReactElement {
+  const t = useTranslations("Generation");
   const searchParams = useSearchParams();
   const bootstrap = useBootstrapStore((s) => s.data);
   const bootstrapLoading = useBootstrapStore((s) => s.loading);
@@ -112,13 +114,13 @@ export function GeneratorWorkspace(): React.ReactElement {
     setProviderError(null);
     if (effectiveProviderId && bootstrap) {
       const profile = bootstrap.providerProfiles.find((p) => p.id === effectiveProviderId);
-      if (!profile) { setProviderError("Provider profile not found"); return; }
-      if (!profile.enabled) { setProviderError("Provider is not enabled"); return; }
+      if (!profile) { setProviderError(t("providerNotFound")); return; }
+      if (!profile.enabled) { setProviderError(t("providerDisabled")); return; }
       try {
         const result = await testProviderProfile(effectiveProviderId);
         if (!result.ok) { setProviderError(result.message); return; }
       } catch (err) {
-        setProviderError(err instanceof Error ? err.message : "Provider check failed");
+        setProviderError(err instanceof Error ? err.message : t("providerCheckFailed"));
         return;
       }
     }
@@ -140,18 +142,18 @@ export function GeneratorWorkspace(): React.ReactElement {
     try {
       const { saveGenerationContent: save } = await import("@/presentation/lib/api");
       await save(activeGeneration.id, content);
-      setStatus("Saved to history");
-    } catch { setStatus("Save failed"); }
+      setStatus(t("savedToHistory"));
+    } catch { setStatus(t("saveFailed")); }
   }
 
   async function copyMarkdown(): Promise<void> {
     await navigator.clipboard.writeText(content);
-    setStatus("Markdown copied");
+    setStatus(t("markdownCopied"));
   }
 
   async function copyPlainText(): Promise<void> {
     await navigator.clipboard.writeText(stripMarkdown(content));
-    setStatus("Plain text copied");
+    setStatus(t("plainTextCopied"));
   }
 
   function exportLocal(format: "md" | "txt"): void {
@@ -164,7 +166,7 @@ export function GeneratorWorkspace(): React.ReactElement {
     link.download = `${title || "generation"}_${ts}.${format}`;
     link.click();
     URL.revokeObjectURL(link.href);
-    setStatus(`Exported .${format}`);
+    setStatus(t("exported", { format }));
   }
 
   if (bootstrapLoading && !bootstrap) {
@@ -178,7 +180,7 @@ export function GeneratorWorkspace(): React.ReactElement {
   if (!bootstrap) {
     return (
       <main className="mx-auto flex max-w-[1680px] items-center justify-center px-4 py-16 text-muted-foreground">
-        Failed to load app data
+        {t("failedToLoad")}
       </main>
     );
   }

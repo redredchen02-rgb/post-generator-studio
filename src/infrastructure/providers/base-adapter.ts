@@ -1,11 +1,12 @@
-import type { GenerationOptions, LLMProviderAdapter } from "@/domain/ports/provider";
-import type {
-  GenerationEvent,
-  NormalizedGenerationRequest,
-  ProviderCapabilities,
-  ProviderModel,
-  ProviderProfile,
-  ProviderValidationResult,
+import type { CompletionResult, GenerationOptions, LLMProviderAdapter } from "@/domain/ports/provider";
+import {
+  AppErrorException,
+  type GenerationEvent,
+  type NormalizedGenerationRequest,
+  type ProviderCapabilities,
+  type ProviderModel,
+  type ProviderProfile,
+  type ProviderValidationResult,
 } from "@/domain/schemas";
 import { parseServerSentEvents, parseJsonLines, providerFailure, responseError } from "@/infrastructure/providers/streaming";
 
@@ -20,12 +21,22 @@ export type ChunkParseResult = {
 };
 
 const DEFAULT_PROVIDER_TIMEOUT_MS = 120_000;
+// One-shot completions are short (a paragraph rewrite, a score) — fail faster
+// than the long streaming timeout so a hung relay doesn't block the editor.
+const DEFAULT_COMPLETION_TIMEOUT_MS = 60_000;
 
 /** Provider request timeout; override with POST_GENERATOR_PROVIDER_TIMEOUT_MS. */
 function providerTimeoutMs(): number {
   const raw = process.env.POST_GENERATOR_PROVIDER_TIMEOUT_MS;
   const parsed = raw ? Number(raw) : Number.NaN;
   return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_PROVIDER_TIMEOUT_MS;
+}
+
+/** Completion timeout; override with POST_GENERATOR_COMPLETION_TIMEOUT_MS. */
+function completionTimeoutMs(): number {
+  const raw = process.env.POST_GENERATOR_COMPLETION_TIMEOUT_MS;
+  const parsed = raw ? Number(raw) : Number.NaN;
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_COMPLETION_TIMEOUT_MS;
 }
 
 /**
@@ -70,6 +81,7 @@ export abstract class BaseAdapter implements LLMProviderAdapter {
       supportsModelList: false,
       requiresApiKey: this.supportsApiKey,
       supportsSystemPrompt: true,
+      supportsCompletion: false,
     };
   }
 
@@ -122,6 +134,68 @@ export abstract class BaseAdapter implements LLMProviderAdapter {
     }
 
     yield* this.streamResponse(response, request);
+  }
+
+  /**
+   * One-shot non-streaming completion. Adapters opt in via
+   * `capabilities().supportsCompletion` and implement `parseCompletion`;
+   * `buildCompletionRequest` defaults to the streaming request with `stream:false`.
+   */
+  async complete(
+    request: NormalizedGenerationRequest,
+    config: ProviderProfile,
+    options?: GenerationOptions,
+  ): Promise<CompletionResult> {
+    if (!this.capabilities().supportsCompletion) {
+      throw new AppErrorException({ code: "COMPLETION_UNSUPPORTED", message: `${this.id} 不支持一次性补全` });
+    }
+    const validation = await this.validateConfig(config, options);
+    if (!validation.ok) {
+      throw new AppErrorException(validation.error ?? { code: "PROVIDER_INVALID", message: `${this.id} 配置无效` });
+    }
+
+    const { url, init } = await this.buildCompletionRequest({ ...request, stream: false }, config, options);
+    const timeout = AbortSignal.timeout(completionTimeoutMs());
+    const signal = combineSignals(options?.abortSignal, timeout);
+
+    let response: Response;
+    try {
+      response = await fetch(url, { ...init, signal });
+    } catch (err) {
+      if (timeout.aborted) {
+        throw new AppErrorException({ code: "COMPLETION_TIMEOUT", message: `${this.id} 补全请求超时` });
+      }
+      throw new AppErrorException({
+        code: "COMPLETION_FAILED",
+        message: err instanceof Error ? err.message : `${this.id} 网络错误`,
+      });
+    }
+
+    if (!response.ok) {
+      throw new AppErrorException({ code: "COMPLETION_FAILED", message: await providerFailure(response) });
+    }
+
+    let raw: unknown;
+    try {
+      raw = await response.json();
+    } catch {
+      throw new AppErrorException({ code: "COMPLETION_FAILED", message: `${this.id} 返回了无法解析的响应` });
+    }
+    return this.parseCompletion(raw);
+  }
+
+  /** Override when the non-streaming endpoint differs from the streaming one (e.g. Gemini). */
+  protected buildCompletionRequest(
+    request: NormalizedGenerationRequest,
+    config: ProviderProfile,
+    options?: GenerationOptions,
+  ): Promise<RequestBuildResult> {
+    return this.buildRequest(request, config, options);
+  }
+
+  /** Parse a full (non-streaming) provider response. Implemented by completion-capable adapters. */
+  protected parseCompletion(_raw: unknown): CompletionResult {
+    throw new AppErrorException({ code: "COMPLETION_UNSUPPORTED", message: `${this.id} 未实现补全解析` });
   }
 
   /**

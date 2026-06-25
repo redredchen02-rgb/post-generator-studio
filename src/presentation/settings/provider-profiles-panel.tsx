@@ -4,6 +4,7 @@ import * as React from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CheckCircle2, FlaskConical, KeyRound, Loader2, Pencil, Plus, Save, Trash2, XCircle } from "lucide-react";
 import { useForm, useWatch } from "react-hook-form";
+import { useTranslations } from "next-intl";
 import type { ProviderKind, ProviderProfile } from "@/domain/schemas";
 import { providerKindSchema, providerProfileCreateSchema } from "@/domain/schemas";
 import type { z } from "zod";
@@ -22,7 +23,9 @@ const PROVIDER_DEFAULTS: Record<ProviderKind, { baseUrl?: string; model: string;
   gemini: { model: "gemini-2.0-flash", requiresApiKey: true },
   ollama: { baseUrl: "http://localhost:11434", model: "llama3.2", requiresApiKey: false },
   openrouter: { baseUrl: "https://openrouter.ai/api/v1", model: "openrouter/auto", requiresApiKey: true },
-  "openai-compatible": { baseUrl: "http://localhost:8000", model: "", requiresApiKey: false },
+  // Hosted OpenAI-compatible relays (proxies/gateways) usually require a key; the
+  // field stays optional via the schema so local no-auth relays can leave it blank.
+  "openai-compatible": { baseUrl: "http://localhost:8000", model: "", requiresApiKey: true },
 };
 
 const CREATE_DEFAULTS: ProviderForm = {
@@ -45,6 +48,8 @@ export function ProviderProfilesPanel({
   refresh: () => Promise<void>;
   notify: (message: string) => void;
 }): React.ReactElement {
+  const t = useTranslations("Settings.providers");
+  const tCommon = useTranslations("Common");
   const [editingId, setEditingId] = React.useState<string | null>(null);
   const [testStatus, setTestStatus] = React.useState<Record<string, "idle" | "testing" | "ok" | "error">>({});
   const [testMessage, setTestMessage] = React.useState<Record<string, string>>({});
@@ -94,7 +99,7 @@ export function ProviderProfilesPanel({
           method: "PATCH",
           body: JSON.stringify(patch),
         });
-        notify("Provider profile updated");
+        notify(t("updatedMsg"));
         cancelEdit();
       } else {
         await fetchJson<ProviderProfile>("/api/provider-profiles", {
@@ -102,11 +107,11 @@ export function ProviderProfilesPanel({
           body: JSON.stringify(values),
         });
         form.reset(CREATE_DEFAULTS);
-        notify("Provider profile saved");
+        notify(t("savedMsg"));
       }
       await refresh();
     } catch (err) {
-      notify(err instanceof Error ? err.message : "Save failed");
+      notify(err instanceof Error ? err.message : t("saveFailed"));
     }
   }
 
@@ -115,9 +120,9 @@ export function ProviderProfilesPanel({
       await fetch(`/api/provider-profiles/${id}`, { method: "DELETE" });
       if (editingId === id) cancelEdit();
       await refresh();
-      notify("Provider profile deleted");
+      notify(t("deletedMsg"));
     } catch (err) {
-      notify(err instanceof Error ? err.message : "Delete failed");
+      notify(err instanceof Error ? err.message : t("deleteFailed"));
     }
   }
 
@@ -128,9 +133,9 @@ export function ProviderProfilesPanel({
         body: JSON.stringify({ clearApiKey: true }),
       });
       await refresh();
-      notify("API key cleared");
+      notify(t("keyClearedMsg"));
     } catch (err) {
-      notify(err instanceof Error ? err.message : "Clear key failed");
+      notify(err instanceof Error ? err.message : t("clearKeyFailed"));
     }
   }
 
@@ -155,24 +160,24 @@ export function ProviderProfilesPanel({
 
   return (
     <div className="grid gap-6">
-      <Header title="Provider Profiles" description="新增、测试、启停模型供应商。API Key 只会保存到服务端密文文件。" />
+      <Header title={t("title")} description={t("subtitle")} />
       <form className="grid gap-3 rounded-lg border p-4" onSubmit={form.handleSubmit((values) => void submit(values))}>
         {editingId ? (
           <div className="flex items-center justify-between rounded-md bg-muted px-3 py-2">
             <span className="text-sm font-medium">
-              Editing: {profiles.find((p) => p.id === editingId)?.name}
+              {t("editing")} {profiles.find((p) => p.id === editingId)?.name}
             </span>
             <Button type="button" variant="ghost" size="sm" onClick={cancelEdit}>
               <Plus className="h-4 w-4 rotate-45" />
-              New
+              {t("newBtn")}
             </Button>
           </div>
         ) : null}
         <div className="grid gap-3 md:grid-cols-2">
-          <Field label="Name">
+          <Field label={t("nameLabel")}>
             <Input {...form.register("name")} />
           </Field>
-          <Field label="Provider">
+          <Field label={t("providerLabel")}>
             <NativeSelect {...form.register("providerKind")}>
               {providerKindSchema.options.map((kind: ProviderKind) => (
                 <option key={kind} value={kind}>
@@ -181,35 +186,35 @@ export function ProviderProfilesPanel({
               ))}
             </NativeSelect>
           </Field>
-          <Field label="Base URL">
+          <Field label={t("baseUrlLabel")}>
             <Input {...form.register("baseUrl")} />
           </Field>
-          <Field label="Model">
+          <Field label={t("modelLabel")}>
             <Input {...form.register("model")} />
           </Field>
           {requiresApiKey ? (
-            <Field label={editingId ? "API Key (leave blank to keep existing)" : "API Key"}>
+            <Field label={editingId ? t("apiKeyEditLabel") : t("apiKeyLabel")}>
               <Input
                 type="password"
-                placeholder={editingId ? "[saved — type to replace]" : ""}
+                placeholder={editingId ? t("apiKeyPlaceholder") : ""}
                 {...form.register("apiKey")}
               />
             </Field>
           ) : null}
-          <Field label="Temperature">
+          <Field label={t("temperatureLabel")}>
             <Input type="number" step="0.1" {...form.register("defaultTemperature", { valueAsNumber: true })} />
           </Field>
-          <Field label="Max Tokens">
+          <Field label={t("maxTokensLabel")}>
             <Input type="number" {...form.register("defaultMaxTokens", { valueAsNumber: true })} />
           </Field>
           <label className="flex items-center gap-2 pt-6 text-sm">
             <input type="checkbox" {...form.register("enabled")} />
-            Enabled
+            {t("enabledLabel")}
           </label>
         </div>
         <Button className="w-fit" type="submit">
           <Save className="h-4 w-4" />
-          {editingId ? "Update Provider" : "Save Provider"}
+          {editingId ? t("updateBtn") : t("saveBtn")}
         </Button>
       </form>
       <div className="grid gap-2">
@@ -223,8 +228,8 @@ export function ProviderProfilesPanel({
             <div>
               <h3 className="font-medium">{profile.name}</h3>
               <p className="text-sm text-muted-foreground">
-                {profile.providerKind} · {profile.model} · {profile.enabled ? "enabled" : "disabled"} ·{" "}
-                {profile.keyMasked || "no key"}
+                {profile.providerKind} · {profile.model} · {profile.enabled ? tCommon("enabled") : tCommon("disabled")} ·{" "}
+                {profile.keyMasked || tCommon("noKey")}
               </p>
               {testMessage[profile.id] ? (
                 <p className={`mt-1 text-xs ${testStatus[profile.id] === "ok" ? "text-green-600 dark:text-green-400" : "text-destructive"}`}>
@@ -235,7 +240,7 @@ export function ProviderProfilesPanel({
             <div className="flex flex-wrap gap-2">
               <Button variant="outline" size="sm" onClick={() => loadForEdit(profile)}>
                 <Pencil className="h-4 w-4" />
-                Edit
+                {t("editBtn")}
               </Button>
               <Button
                 variant="outline"
@@ -252,17 +257,17 @@ export function ProviderProfilesPanel({
                 ) : (
                   <FlaskConical className="h-4 w-4" />
                 )}
-                Test
+                {t("testBtn")}
               </Button>
               {profile.keyMasked ? (
                 <Button variant="outline" size="sm" onClick={() => void handleClearApiKey(profile.id)}>
                   <KeyRound className="h-4 w-4" />
-                  Clear Key
+                  {t("clearKeyBtn")}
                 </Button>
               ) : null}
               <Button variant="destructive" size="sm" onClick={() => void remove(profile.id)}>
                 <Trash2 className="h-4 w-4" />
-                Delete
+                {t("deleteBtn")}
               </Button>
             </div>
           </div>
