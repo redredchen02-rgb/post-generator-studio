@@ -72,3 +72,7 @@ export async function fetchPromptPreview(params: {
 export async function testProviderProfile(id: string): Promise<{ ok: boolean; message: string }> {
   return fetchJson(`/api/provider-profiles/${id}/test`, { method: "POST" });
 }
+
+export async function deleteGenerationRecord(id: string): Promise<void> {
+  await fetch(`/api/generations/${id}`, { method: "DELETE" });
+}

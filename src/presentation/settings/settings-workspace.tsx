@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Copy, Database, KeyRound, Layers } from "lucide-react";
+import { Copy, Database, KeyRound, Layers, Loader2 } from "lucide-react";
 import { loadBootstrap } from "@/presentation/lib/api";
 import { useApi } from "@/presentation/lib/use-api";
 import { ProviderProfilesPanel } from "./provider-profiles-panel";
@@ -23,7 +23,7 @@ export function Header({ title, description }: { title: string; description: str
 export function SettingsWorkspace(): React.ReactElement {
   const [tab, setTab] = React.useState<SettingsTab>("providers");
   const [message, setMessage] = React.useState<string | null>(null);
-  const { data: bootstrap, loading, error, refetch } = useApi(loadBootstrap);
+  const { data: bootstrap, loading, isRefetching, error, refetch } = useApi(loadBootstrap);
 
   function notify(value: string): void {
     setMessage(value);
@@ -43,6 +43,12 @@ export function SettingsWorkspace(): React.ReactElement {
       <section className="app-surface min-h-[calc(100vh-6.5rem)] rounded-lg p-4">
         {message ? <div className="mb-4 rounded-md bg-secondary p-3 text-sm text-secondary-foreground">{message}</div> : null}
         {error ? <div className="mb-4 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm">{error}</div> : null}
+        {isRefetching ? (
+          <div className="mb-4 flex items-center gap-2 text-xs text-muted-foreground">
+            <Loader2 className="h-3 w-3 animate-spin" />
+            刷新中...
+          </div>
+        ) : null}
         {loading ? (
           <div className="flex h-full items-center justify-center text-sm text-muted-foreground">加载中...</div>
         ) : bootstrap ? (

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { errorResponse } from "@/application/errors";
-import { getGeneration, updateGenerationContent } from "@/application/generation/generation-service";
+import { deleteGeneration, getGeneration, updateGenerationContent } from "@/application/generation/generation-service";
 import type { RouteContext } from "@/app/api/types";
 
 export const runtime = "nodejs";
@@ -22,6 +22,16 @@ export async function PATCH(request: Request, context: RouteContext): Promise<Ne
       return NextResponse.json({ error: "outputContent is required" }, { status: 400 });
     }
     return NextResponse.json(await updateGenerationContent(id, body.outputContent));
+  } catch (error) {
+    return errorResponse(error);
+  }
+}
+
+export async function DELETE(_request: Request, context: RouteContext): Promise<NextResponse> {
+  try {
+    const { id } = await context.params;
+    await deleteGeneration(id);
+    return new NextResponse(null, { status: 204 });
   } catch (error) {
     return errorResponse(error);
   }

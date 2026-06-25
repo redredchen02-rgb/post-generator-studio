@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { FlaskConical, Save, Trash2 } from "lucide-react";
+import { FlaskConical, Pencil, Plus, Save, Trash2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import type { ProviderKind, ProviderProfile } from "@/domain/schemas";
 import { providerKindSchema, providerProfileCreateSchema } from "@/domain/schemas";
@@ -16,6 +16,17 @@ import { Header } from "./settings-workspace";
 
 type ProviderForm = z.infer<typeof providerProfileCreateSchema>;
 
+const CREATE_DEFAULTS: ProviderForm = {
+  name: "OpenAI Compatible",
+  providerKind: "openai-compatible",
+  baseUrl: "http://localhost:8000",
+  model: "local-model",
+  apiKey: "",
+  defaultTemperature: 0.7,
+  defaultMaxTokens: 3000,
+  enabled: false,
+};
+
 export function ProviderProfilesPanel({
   profiles,
   refresh,
@@ -25,47 +36,93 @@ export function ProviderProfilesPanel({
   refresh: () => Promise<void>;
   notify: (message: string) => void;
 }): React.ReactElement {
+  const [editingId, setEditingId] = React.useState<string | null>(null);
   const form = useForm<ProviderForm>({
     resolver: zodResolver(providerProfileCreateSchema),
-    defaultValues: {
-      name: "OpenAI Compatible",
-      providerKind: "openai-compatible",
-      baseUrl: "http://localhost:8000",
-      model: "local-model",
-      apiKey: "",
-      defaultTemperature: 0.7,
-      defaultMaxTokens: 3000,
-      enabled: false,
-    },
+    defaultValues: CREATE_DEFAULTS,
   });
 
-  async function submit(values: ProviderForm): Promise<void> {
-    await fetchJson<ProviderProfile>("/api/provider-profiles", {
-      method: "POST",
-      body: JSON.stringify(values),
+  function loadForEdit(profile: ProviderProfile): void {
+    setEditingId(profile.id);
+    form.reset({
+      name: profile.name,
+      providerKind: profile.providerKind,
+      baseUrl: profile.baseUrl ?? "",
+      model: profile.model,
+      apiKey: "",
+      defaultTemperature: profile.defaultTemperature,
+      defaultMaxTokens: profile.defaultMaxTokens,
+      enabled: profile.enabled,
     });
-    form.reset({ ...values, apiKey: "" });
-    await refresh();
-    notify("Provider profile saved");
+  }
+
+  function cancelEdit(): void {
+    setEditingId(null);
+    form.reset(CREATE_DEFAULTS);
+  }
+
+  async function submit(values: ProviderForm): Promise<void> {
+    try {
+      if (editingId) {
+        const patch: Record<string, unknown> = { ...values };
+        if (!values.apiKey) delete patch.apiKey;
+        await fetchJson<ProviderProfile>(`/api/provider-profiles/${editingId}`, {
+          method: "PATCH",
+          body: JSON.stringify(patch),
+        });
+        notify("Provider profile updated");
+        cancelEdit();
+      } else {
+        await fetchJson<ProviderProfile>("/api/provider-profiles", {
+          method: "POST",
+          body: JSON.stringify(values),
+        });
+        form.reset(CREATE_DEFAULTS);
+        notify("Provider profile saved");
+      }
+      await refresh();
+    } catch (err) {
+      notify(err instanceof Error ? err.message : "Save failed");
+    }
   }
 
   async function remove(id: string): Promise<void> {
-    await fetch(`/api/provider-profiles/${id}`, { method: "DELETE" });
-    await refresh();
-    notify("Provider profile deleted");
+    try {
+      await fetch(`/api/provider-profiles/${id}`, { method: "DELETE" });
+      if (editingId === id) cancelEdit();
+      await refresh();
+      notify("Provider profile deleted");
+    } catch (err) {
+      notify(err instanceof Error ? err.message : "Delete failed");
+    }
   }
 
   async function test(id: string): Promise<void> {
-    const result = await fetchJson<{ ok: boolean; message: string }>(`/api/provider-profiles/${id}/test`, {
-      method: "POST",
-    });
-    notify(result.message);
+    try {
+      const result = await fetchJson<{ ok: boolean; message: string }>(`/api/provider-profiles/${id}/test`, {
+        method: "POST",
+      });
+      notify(result.message);
+    } catch (err) {
+      notify(err instanceof Error ? err.message : "Test failed");
+    }
   }
 
   return (
     <div className="grid gap-6">
       <Header title="Provider Profiles" description="新增、测试、启停模型供应商。API Key 只会保存到服务端密文文件。" />
       <form className="grid gap-3 rounded-lg border p-4" onSubmit={form.handleSubmit((values) => void submit(values))}>
+        {editingId ? (
+          <div className="flex items-center justify-between rounded-md bg-muted px-3 py-2">
+            <span className="text-sm font-medium">
+              Editing: {profiles.find((p) => p.id === editingId)?.name}
+            </span>
+            <Button type="button" variant="ghost" size="sm" onClick={cancelEdit}>
+              <Plus className="h-4 w-4 rotate-45" />
+              New
+            </Button>
+          </div>
+        ) : null}
         <div className="grid gap-3 md:grid-cols-2">
           <Field label="Name">
             <Input {...form.register("name")} />
@@ -85,8 +142,12 @@ export function ProviderProfilesPanel({
           <Field label="Model">
             <Input {...form.register("model")} />
           </Field>
-          <Field label="API Key">
-            <Input type="password" {...form.register("apiKey")} />
+          <Field label={editingId ? "API Key (leave blank to keep existing)" : "API Key"}>
+            <Input
+              type="password"
+              placeholder={editingId ? "[saved — type to replace]" : ""}
+              {...form.register("apiKey")}
+            />
           </Field>
           <Field label="Temperature">
             <Input type="number" step="0.1" {...form.register("defaultTemperature", { valueAsNumber: true })} />
@@ -101,19 +162,29 @@ export function ProviderProfilesPanel({
         </div>
         <Button className="w-fit" type="submit">
           <Save className="h-4 w-4" />
-          Save Provider
+          {editingId ? "Update Provider" : "Save Provider"}
         </Button>
       </form>
       <div className="grid gap-2">
         {profiles.map((profile) => (
-          <div key={profile.id} className="grid gap-3 rounded-lg border p-4 md:grid-cols-[1fr_auto]">
+          <div
+            key={profile.id}
+            className={`grid gap-3 rounded-lg border p-4 md:grid-cols-[1fr_auto] ${
+              editingId === profile.id ? "border-primary" : ""
+            }`}
+          >
             <div>
               <h3 className="font-medium">{profile.name}</h3>
               <p className="text-sm text-muted-foreground">
-                {profile.providerKind} · {profile.model} · {profile.enabled ? "enabled" : "disabled"} · {profile.keyMasked || "no key"}
+                {profile.providerKind} · {profile.model} · {profile.enabled ? "enabled" : "disabled"} ·{" "}
+                {profile.keyMasked || "no key"}
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
+              <Button variant="outline" size="sm" onClick={() => loadForEdit(profile)}>
+                <Pencil className="h-4 w-4" />
+                Edit
+              </Button>
               <Button variant="outline" size="sm" onClick={() => void test(profile.id)}>
                 <FlaskConical className="h-4 w-4" />
                 Test

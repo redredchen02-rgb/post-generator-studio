@@ -228,6 +228,12 @@ describe("Generations API", () => {
       status: "completed",
       outputContent: "# Hello",
     }),
+    updateGenerationContent: vi.fn().mockResolvedValue({
+      id: "gen_1",
+      title: "Test",
+      status: "completed",
+      outputContent: "updated content",
+    }),
     cancelGeneration: vi.fn().mockResolvedValue({ cancelled: true }),
   }));
 
@@ -237,6 +243,28 @@ describe("Generations API", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.id).toBe("gen_1");
+  });
+
+  it("PATCH /api/generations/[id] updates output content", async () => {
+    const { PATCH } = await import("@/app/api/generations/[id]/route");
+    const req = new Request("http://localhost", {
+      method: "PATCH",
+      body: JSON.stringify({ outputContent: "updated content" }),
+    });
+    const res = await PATCH(req, routeContext("gen_1"));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.outputContent).toBe("updated content");
+  });
+
+  it("PATCH /api/generations/[id] returns 400 when outputContent missing", async () => {
+    const { PATCH } = await import("@/app/api/generations/[id]/route");
+    const req = new Request("http://localhost", {
+      method: "PATCH",
+      body: JSON.stringify({}),
+    });
+    const res = await PATCH(req, routeContext("gen_1"));
+    expect(res.status).toBe(400);
   });
 
   it("POST /api/generations/[id]/cancel cancels generation", async () => {

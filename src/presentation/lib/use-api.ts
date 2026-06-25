@@ -6,30 +6,40 @@ type UseApiState<T> = {
   data: T | null;
   error: string | null;
   loading: boolean;
+  isRefetching: boolean;
 };
 
-export function useApi<T>(fetcher: () => Promise<T>): UseApiState<T> & { refetch: () => Promise<void> } {
+export function useApi<T>(
+  fetcher: () => Promise<T>,
+): UseApiState<T> & { refetch: () => Promise<void> } {
   const [state, setState] = React.useState<UseApiState<T>>({
     data: null,
     error: null,
     loading: true,
+    isRefetching: false,
   });
   const mountedRef = React.useRef(true);
 
   const load = React.useCallback(async () => {
-    setState((s) => ({ ...s, loading: true, error: null }));
+    setState((s) => ({
+      ...s,
+      loading: s.data === null,
+      isRefetching: s.data !== null,
+      error: null,
+    }));
     try {
       const data = await fetcher();
       if (mountedRef.current) {
-        setState({ data, error: null, loading: false });
+        setState({ data, error: null, loading: false, isRefetching: false });
       }
     } catch (err) {
       if (mountedRef.current) {
-        setState({
-          data: null,
+        setState((s) => ({
+          ...s,
           error: err instanceof Error ? err.message : "加载失败",
           loading: false,
-        });
+          isRefetching: false,
+        }));
       }
     }
   }, [fetcher]);

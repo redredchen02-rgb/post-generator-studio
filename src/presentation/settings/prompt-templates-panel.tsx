@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Copy, Save } from "lucide-react";
+import { Copy, Pencil, Plus, Save, Trash2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import type { PromptTemplate } from "@/domain/schemas";
 import { promptTemplateCreateSchema } from "@/domain/schemas";
@@ -17,6 +17,16 @@ import { Header } from "./settings-workspace";
 
 type TemplateForm = z.infer<typeof promptTemplateCreateSchema>;
 
+const CREATE_DEFAULTS: TemplateForm = {
+  name: "Custom Template",
+  description: "",
+  systemPrompt: "你是一名资深内容编辑。",
+  userPromptTemplate: "标题：{{TITLE}}\n\n事件：{{EVENT_SUMMARY}}\n\n日期：{{DATE}}",
+  supportedVariables: ["TITLE", "EVENT_SUMMARY", "DATE", "TIME", "LOCALE"],
+  outputFormat: "markdown",
+  isDefault: false,
+};
+
 export function PromptTemplatesPanel({
   templates,
   refresh,
@@ -26,43 +36,95 @@ export function PromptTemplatesPanel({
   refresh: () => Promise<void>;
   notify: (message: string) => void;
 }): React.ReactElement {
+  const [editingId, setEditingId] = React.useState<string | null>(null);
   const form = useForm<TemplateForm>({
     resolver: zodResolver(promptTemplateCreateSchema),
-    defaultValues: {
-      name: "Custom Template",
-      description: "",
-      systemPrompt: "你是一名资深内容编辑。",
-      userPromptTemplate: "标题：{{TITLE}}\n\n事件：{{EVENT_SUMMARY}}\n\n日期：{{DATE}}",
-      supportedVariables: ["TITLE", "EVENT_SUMMARY", "DATE", "TIME", "LOCALE"],
-      outputFormat: "markdown",
-      isDefault: false,
-    },
+    defaultValues: CREATE_DEFAULTS,
   });
   const [preview, setPreview] = React.useState<{ systemPrompt: string; userPrompt: string } | null>(null);
 
-  async function submit(values: TemplateForm): Promise<void> {
-    await fetchJson<PromptTemplate>("/api/prompt-templates", {
-      method: "POST",
-      body: JSON.stringify(values),
+  function loadForEdit(template: PromptTemplate): void {
+    setEditingId(template.id);
+    setPreview(null);
+    form.reset({
+      name: template.name,
+      description: template.description ?? "",
+      systemPrompt: template.systemPrompt,
+      userPromptTemplate: template.userPromptTemplate,
+      supportedVariables: template.supportedVariables,
+      outputFormat: template.outputFormat,
+      isDefault: template.isDefault,
     });
-    await refresh();
-    notify("Prompt template saved");
+  }
+
+  function cancelEdit(): void {
+    setEditingId(null);
+    setPreview(null);
+    form.reset(CREATE_DEFAULTS);
+  }
+
+  async function submit(values: TemplateForm): Promise<void> {
+    try {
+      if (editingId) {
+        await fetchJson<PromptTemplate>(`/api/prompt-templates/${editingId}`, {
+          method: "PATCH",
+          body: JSON.stringify(values),
+        });
+        notify("Prompt template updated");
+        cancelEdit();
+      } else {
+        await fetchJson<PromptTemplate>("/api/prompt-templates", {
+          method: "POST",
+          body: JSON.stringify(values),
+        });
+        notify("Prompt template saved");
+      }
+      await refresh();
+    } catch (err) {
+      notify(err instanceof Error ? err.message : "Save failed");
+    }
+  }
+
+  async function remove(id: string): Promise<void> {
+    try {
+      await fetch(`/api/prompt-templates/${id}`, { method: "DELETE" });
+      if (editingId === id) cancelEdit();
+      await refresh();
+      notify("Prompt template deleted");
+    } catch (err) {
+      notify(err instanceof Error ? err.message : "Delete failed");
+    }
   }
 
   async function previewRendered(): Promise<void> {
-    const values = form.getValues();
-    setPreview(
-      await fetchJson<{ systemPrompt: string; userPrompt: string }>("/api/prompt-templates/preview", {
-        method: "POST",
-        body: JSON.stringify(values),
-      }),
-    );
+    try {
+      const values = form.getValues();
+      setPreview(
+        await fetchJson<{ systemPrompt: string; userPrompt: string }>("/api/prompt-templates/preview", {
+          method: "POST",
+          body: JSON.stringify(values),
+        }),
+      );
+    } catch (err) {
+      notify(err instanceof Error ? err.message : "Preview failed");
+    }
   }
 
   return (
     <div className="grid gap-6">
       <Header title="Prompt Templates" description="管理版本化模板和受控变量。" />
       <form className="grid gap-3 rounded-lg border p-4" onSubmit={form.handleSubmit((values) => void submit(values))}>
+        {editingId ? (
+          <div className="flex items-center justify-between rounded-md bg-muted px-3 py-2">
+            <span className="text-sm font-medium">
+              Editing: {templates.find((t) => t.id === editingId)?.name}
+            </span>
+            <Button type="button" variant="ghost" size="sm" onClick={cancelEdit}>
+              <Plus className="h-4 w-4 rotate-45" />
+              New
+            </Button>
+          </div>
+        ) : null}
         <div className="grid gap-3 md:grid-cols-2">
           <Field label="Name">
             <Input {...form.register("name")} />
@@ -87,7 +149,7 @@ export function PromptTemplatesPanel({
         <div className="flex flex-wrap gap-2">
           <Button type="submit">
             <Save className="h-4 w-4" />
-            Save Template
+            {editingId ? "Update Template" : "Save Template"}
           </Button>
           <Button type="button" variant="outline" onClick={() => void previewRendered()}>
             <Copy className="h-4 w-4" />
@@ -104,12 +166,29 @@ export function PromptTemplatesPanel({
       ) : null}
       <div className="grid gap-2">
         {templates.map((template) => (
-          <div key={template.id} className="rounded-lg border p-4">
-            <h3 className="font-medium">{template.name}</h3>
-            <p className="text-sm text-muted-foreground">
-              v{template.version} · {template.outputFormat} · {template.isDefault ? "default" : "custom"} ·{" "}
-              {template.supportedVariables.join(", ")}
-            </p>
+          <div
+            key={template.id}
+            className={`grid gap-3 rounded-lg border p-4 md:grid-cols-[1fr_auto] ${
+              editingId === template.id ? "border-primary" : ""
+            }`}
+          >
+            <div>
+              <h3 className="font-medium">{template.name}</h3>
+              <p className="text-sm text-muted-foreground">
+                v{template.version} · {template.outputFormat} · {template.isDefault ? "default" : "custom"} ·{" "}
+                {template.supportedVariables.join(", ")}
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" size="sm" onClick={() => loadForEdit(template)}>
+                <Pencil className="h-4 w-4" />
+                Edit
+              </Button>
+              <Button variant="destructive" size="sm" onClick={() => void remove(template.id)}>
+                <Trash2 className="h-4 w-4" />
+                Delete
+              </Button>
+            </div>
           </div>
         ))}
       </div>

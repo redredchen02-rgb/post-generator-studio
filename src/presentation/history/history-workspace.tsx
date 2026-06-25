@@ -2,16 +2,22 @@
 
 import * as React from "react";
 import ReactMarkdown from "react-markdown";
-import { ChevronDown, ChevronRight, Download, RefreshCw } from "lucide-react";
+import { ChevronDown, ChevronRight, Download, RefreshCw, Trash2 } from "lucide-react";
 import type { Generation } from "@/domain/schemas";
 import { Button } from "@/presentation/components/ui/button";
-import { loadGenerations } from "@/presentation/lib/api";
+import { deleteGenerationRecord, loadGenerations } from "@/presentation/lib/api";
 import { useApi } from "@/presentation/lib/use-api";
 
 export function HistoryWorkspace(): React.ReactElement {
   const { data: generations, loading, error, refetch } = useApi(loadGenerations);
   const [selected, setSelected] = React.useState<Generation | null>(null);
   const [promptOpen, setPromptOpen] = React.useState(false);
+
+  async function handleDelete(generation: Generation): Promise<void> {
+    await deleteGenerationRecord(generation.id);
+    if (selected?.id === generation.id) setSelected(null);
+    await refetch();
+  }
 
   React.useEffect(() => {
     if (generations && !selected) {
@@ -43,19 +49,32 @@ export function HistoryWorkspace(): React.ReactElement {
             <div className="flex items-center justify-center p-8 text-sm text-muted-foreground">暂无生成记录</div>
           ) : (
             generations.map((generation) => (
-              <button
+              <div
                 key={generation.id}
-                type="button"
-                className={`rounded-lg border p-3 text-left transition-colors hover:bg-muted ${
+                className={`group flex items-start gap-2 rounded-lg border p-3 transition-colors hover:bg-muted ${
                   selected?.id === generation.id ? "border-primary bg-muted" : ""
                 }`}
-                onClick={() => setSelected(generation)}
               >
-                <div className="font-medium">{generation.title}</div>
-                <div className="text-xs text-muted-foreground">
-                  {generation.status} · {new Date(generation.createdAt).toLocaleString()}
-                </div>
-              </button>
+                <button
+                  type="button"
+                  className="min-w-0 flex-1 text-left"
+                  onClick={() => setSelected(generation)}
+                >
+                  <div className="font-medium">{generation.title}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {generation.status} · {new Date(generation.createdAt).toLocaleString()}
+                  </div>
+                </button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
+                  aria-label="Delete generation"
+                  onClick={() => void handleDelete(generation)}
+                >
+                  <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
+                </Button>
+              </div>
             ))
           )}
         </div>
