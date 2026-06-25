@@ -9,3 +9,5 @@ test-results/
 .env.*.local
 data/
 *.log
+*.tsbuildinfo
+next-env.d.ts
