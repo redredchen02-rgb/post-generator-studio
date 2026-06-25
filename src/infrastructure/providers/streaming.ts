@@ -30,11 +30,22 @@ export async function* parseJsonLines(response: Response): AsyncIterable<unknown
       if (!trimmed) {
         continue;
       }
-      yield JSON.parse(trimmed) as unknown;
+      yield safeJsonParse(trimmed);
     }
   }
-  if (buffer.trim()) {
-    yield JSON.parse(buffer.trim()) as unknown;
+  const tail = buffer.trim();
+  if (tail) {
+    yield safeJsonParse(tail);
+  }
+}
+
+// On malformed JSON, yield the raw string. The caller's chunk guard treats a
+// non-object value as an observable error instead of throwing out of the stream.
+function safeJsonParse(text: string): unknown {
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return text;
   }
 }
 

@@ -18,8 +18,9 @@ const PAGE_SIZE = 10;
  */
 export function resolveSelected<T extends { id: string }>(items: T[], current: T | null): T | null {
   if (items.length === 0) return null;
-  if (current && items.some((item) => item.id === current.id)) return current;
-  return items[0];
+  // Return the matching item from the new list (not the stale `current`
+  // reference) so a refreshed/edited record shows current data.
+  return (current && items.find((item) => item.id === current.id)) || items[0];
 }
 
 export function HistoryWorkspace(): React.ReactElement {

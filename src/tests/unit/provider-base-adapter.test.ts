@@ -75,6 +75,17 @@ describe("BaseAdapter hardening (via GeminiAdapter)", () => {
     expect(events.some((e) => e.type === "error")).toBe(true);
   });
 
+  it("surfaces an observable error for a malformed JSON-lines chunk and stops", async () => {
+    // Non-event-stream content-type routes through the JSON-lines parser.
+    global.fetch = (async () =>
+      new Response('{"candidates":[]}\n{not valid json\n', {
+        status: 200,
+        headers: { "Content-Type": "application/x-ndjson" },
+      })) as typeof fetch;
+    const events = await collect(new GeminiAdapter());
+    expect(events.some((e) => e.type === "error")).toBe(true);
+  });
+
   it("still streams tokens normally on the happy path", async () => {
     global.fetch = (async () =>
       sse(

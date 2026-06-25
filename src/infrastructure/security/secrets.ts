@@ -15,9 +15,9 @@ type SecretEnvelope = {
 };
 
 /**
- * In-memory LRU cache for decrypted secrets.
+ * In-memory cache for decrypted secrets.
  * Avoids repeated fs.readFile + AES-256-GCM decryption for the same key.
- * TTL: 5 minutes; LRU max: 100 entries.
+ * TTL: 5 minutes; capped at 100 entries with insertion-order (FIFO) eviction.
  */
 const CACHE_TTL_MS = 5 * 60 * 1000;
 const CACHE_MAX = 100;

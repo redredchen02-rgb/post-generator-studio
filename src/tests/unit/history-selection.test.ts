@@ -23,4 +23,13 @@ describe("resolveSelected (history stale-selected guard)", () => {
   it("clears the selection when the list becomes empty", () => {
     expect(resolveSelected([], { id: "a" })).toBeNull();
   });
+
+  it("returns the fresh list item, not the stale current reference", () => {
+    const stale = { id: "a", title: "old" };
+    const fresh = { id: "a", title: "new" };
+    const result = resolveSelected([fresh], stale);
+    // Same id, but the returned object must be the refreshed one from the list.
+    expect(result).toBe(fresh);
+    expect(result).not.toBe(stale);
+  });
 });

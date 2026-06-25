@@ -6,6 +6,7 @@ import { Pencil, Plus, Save, Trash2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import type { GenerationPreset, PromptTemplate, ProviderProfile } from "@/domain/schemas";
 import { generationPresetCreateSchema } from "@/domain/schemas";
+import { ALL_PIPELINE_STEPS } from "@/domain/pipeline-steps";
 import type { z } from "zod";
 import { Button } from "@/presentation/components/ui/button";
 import { Field } from "@/presentation/components/ui/field";
@@ -16,8 +17,6 @@ import { Header } from "./settings-workspace";
 
 type PresetForm = z.infer<typeof generationPresetCreateSchema>;
 
-const PIPELINE_STEPS = ["build-context", "render-prompt", "clean-content", "format-output"] as const;
-
 function makeDefaults(providers: ProviderProfile[], templates: PromptTemplate[]): PresetForm {
   return {
     name: "New Preset",
@@ -27,7 +26,7 @@ function makeDefaults(providers: ProviderProfile[], templates: PromptTemplate[])
     maxTokens: 3000,
     locale: "zh-CN",
     outputFormat: "markdown",
-    enabledPipelineSteps: [...PIPELINE_STEPS],
+    enabledPipelineSteps: [...ALL_PIPELINE_STEPS],
     isDefault: false,
   };
 }
