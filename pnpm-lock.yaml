@@ -133,6 +133,19 @@ importers:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@22.20.0)(jsdom@25.0.1)
 
+  packages/application:
+    dependencies:
+      '@postgen/domain':
+        specifier: workspace:*
+        version: link:../domain
+    devDependencies:
+      tsup:
+        specifier: ^8.3.0
+        version: 8.5.1(jiti@1.21.7)(postcss@8.5.15)(tsx@4.22.4)(typescript@5.9.3)(yaml@2.9.0)
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+
   packages/domain:
     dependencies:
       zod:
@@ -142,6 +155,34 @@ importers:
       tsup:
         specifier: ^8.3.0
         version: 8.5.1(jiti@1.21.7)(postcss@8.5.15)(tsx@4.22.4)(typescript@5.9.3)(yaml@2.9.0)
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+
+  packages/infrastructure:
+    dependencies:
+      '@postgen/domain':
+        specifier: workspace:*
+        version: link:../domain
+      better-sqlite3:
+        specifier: ^11.10.0
+        version: 11.10.0
+      drizzle-orm:
+        specifier: ^0.36.4
+        version: 0.36.4(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@11.10.0)(react@19.2.7)
+    devDependencies:
+      '@types/better-sqlite3':
+        specifier: ^7.6.12
+        version: 7.6.13
+      drizzle-kit:
+        specifier: ^0.28.1
+        version: 0.28.1
+      tsup:
+        specifier: ^8.3.0
+        version: 8.5.1(jiti@1.21.7)(postcss@8.5.15)(tsx@4.22.4)(typescript@5.9.3)(yaml@2.9.0)
+      tsx:
+        specifier: ^4.19.2
+        version: 4.22.4
       typescript:
         specifier: ^5.7.2
         version: 5.9.3
