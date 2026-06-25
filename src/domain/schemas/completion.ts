@@ -12,11 +12,3 @@ export const completionRequestSchema = z.object({
   providerProfileId: z.string().optional(),
 });
 export type CompletionRequest = z.infer<typeof completionRequestSchema>;
-
-export const completionResultSchema = z.object({
-  content: z.string(),
-  model: z.string().optional(),
-  inputTokens: z.number().int().optional(),
-  outputTokens: z.number().int().optional(),
-});
-export type CompletionResultDto = z.infer<typeof completionResultSchema>;
