@@ -1,0 +1,10 @@
+import { Hono } from "hono";
+import { withRoute } from "../with-route.js";
+const pt = new Hono();
+pt.get("/", withRoute(async (c, s) => c.json(await s.prompt.listPromptTemplates())));
+pt.post("/", withRoute(async (c, s) => c.json(await s.prompt.createPromptTemplate(await c.req.json()), { status: 201 })));
+pt.get("/:id", withRoute(async (c, s) => c.json(await s.prompt.getPromptTemplate(c.req.param("id")))));
+pt.patch("/:id", withRoute(async (c, s) => c.json(await s.prompt.updatePromptTemplate(c.req.param("id"), await c.req.json()))));
+pt.delete("/:id", withRoute(async (c, s) => { await s.prompt.deletePromptTemplate(c.req.param("id")); return c.json({ ok: true }); }));
+pt.post("/preview", withRoute(async (c, s) => c.json(await s.prompt.previewPrompt(await c.req.json()))));
+export default pt;
