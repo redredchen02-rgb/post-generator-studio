@@ -60,12 +60,16 @@ export function GeneratorWorkspace(): React.ReactElement {
   const { content, status, error, activeGeneration, metadata, isGenerating, generate, cancel, setContent, setStatus } =
     useGenerationStream();
 
+  const handleGenerate = React.useCallback(async (regenerate = false): Promise<void> => {
+    await generate({ title, eventSummary, presetId, providerProfileId, regenerate, customVariables: customVarValues });
+  }, [generate, title, eventSummary, presetId, providerProfileId, customVarValues]);
+
   const bindings = React.useMemo(
     () => [
       { key: "Enter", ctrl: true, handler: () => { if (!isGenerating) void handleGenerate(false); } },
       { key: "Escape", handler: () => { if (isGenerating) void cancel(); } },
     ],
-    [isGenerating],
+    [isGenerating, handleGenerate, cancel],
   );
   useKeyboard(bindings);
 
@@ -130,10 +134,6 @@ export function GeneratorWorkspace(): React.ReactElement {
     return () => clearTimeout(timer);
   }, [title, eventSummary, templateId, customVarValues]);
 
-  async function handleGenerate(regenerate = false): Promise<void> {
-    await generate({ title, eventSummary, presetId, providerProfileId, regenerate, customVariables: customVarValues });
-  }
-
   async function saveToHistory(): Promise<void> {
     if (!activeGeneration) return;
     try {
@@ -195,9 +195,9 @@ export function GeneratorWorkspace(): React.ReactElement {
         </Field>
         <Field label="Provider Override">
           <NativeSelect value={providerProfileId} onChange={(event) => setProviderProfileId(event.target.value)}>
-            {bootstrap?.providerProfiles.map((provider) => (
+            {bootstrap?.providerProfiles.filter((p) => p.enabled).map((provider) => (
               <option key={provider.id} value={provider.id}>
-                {provider.name} {provider.enabled ? "" : "(disabled)"}
+                {provider.name}
               </option>
             ))}
           </NativeSelect>

@@ -31,12 +31,12 @@ export function HistoryWorkspace(): React.ReactElement {
   }
 
   React.useEffect(() => {
-    if (generations.length > 0 && !selected) {
-      setSelected(generations[0]);
-    } else if (generations.length === 0) {
+    if (generations.length === 0) {
       setSelected(null);
+    } else {
+      setSelected((prev) => generations.some((g) => g.id === prev?.id) ? prev : generations[0]);
     }
-  }, [generations, selected]);
+  }, [generations]);
 
   React.useEffect(() => {
     setPromptOpen(false);
