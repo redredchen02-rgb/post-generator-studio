@@ -61,9 +61,14 @@ export async function fetchPromptPreview(params: {
   templateId?: string;
   title: string;
   eventSummary: string;
+  customVariables?: Record<string, string>;
 }): Promise<{ systemPrompt: string; userPrompt: string }> {
   return fetchJson("/api/prompt-templates/preview", {
     method: "POST",
     body: JSON.stringify(params),
   });
+}
+
+export async function testProviderProfile(id: string): Promise<{ ok: boolean; message: string }> {
+  return fetchJson(`/api/provider-profiles/${id}/test`, { method: "POST" });
 }

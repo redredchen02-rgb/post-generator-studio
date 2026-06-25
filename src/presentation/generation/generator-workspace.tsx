@@ -19,13 +19,31 @@ import { Field } from "@/presentation/components/ui/field";
 import { Input } from "@/presentation/components/ui/input";
 import { NativeSelect } from "@/presentation/components/ui/native-select";
 import { Textarea } from "@/presentation/components/ui/textarea";
-import { fetchPromptPreview, loadBootstrap, saveGenerationContent, type BootstrapData } from "@/presentation/lib/api";
+import {
+  fetchPromptPreview,
+  loadBootstrap,
+  saveGenerationContent,
+  testProviderProfile,
+  type BootstrapData,
+} from "@/presentation/lib/api";
 import { useUiStore } from "@/presentation/store/ui-store";
 import { stripMarkdown } from "@/lib/utils";
+import { extractTemplateVariables } from "@/application/prompt/renderer";
 import { useGenerationStream } from "./use-generation-stream";
+
+const STANDARD_VARS = new Set(["TITLE", "EVENT_SUMMARY", "DATE", "TIME", "LOCALE"]);
 
 const sampleTitle = "台湾男子连续30天挑战AI创业";
 const sampleSummary = "- 连续30天开发AI产品\n- 使用 Claude Code 与 OpenAI Agent\n- 每天公开开发日志\n- 获得大量关注";
+
+function getCustomVars(template: { systemPrompt: string; userPromptTemplate: string } | undefined): string[] {
+  if (!template) return [];
+  const all = [
+    ...extractTemplateVariables(template.systemPrompt),
+    ...extractTemplateVariables(template.userPromptTemplate),
+  ];
+  return [...new Set(all)].filter((v) => !STANDARD_VARS.has(v));
+}
 
 export function GeneratorWorkspace(): React.ReactElement {
   const [bootstrap, setBootstrap] = React.useState<BootstrapData | null>(null);
@@ -33,6 +51,8 @@ export function GeneratorWorkspace(): React.ReactElement {
   const [eventSummary, setEventSummary] = React.useState(sampleSummary);
   const [presetId, setPresetId] = React.useState("");
   const [providerProfileId, setProviderProfileId] = React.useState("");
+  const [customVarValues, setCustomVarValues] = React.useState<Record<string, string>>({});
+  const [providerError, setProviderError] = React.useState<string | null>(null);
   const [promptPreview, setPromptPreview] = React.useState<{ systemPrompt: string; userPrompt: string } | null>(null);
   const [promptPreviewOpen, setPromptPreviewOpen] = React.useState(false);
   const { rawMode, setRawMode, editorFontSize, setEditorFontSize } = useUiStore();
@@ -60,19 +80,38 @@ export function GeneratorWorkspace(): React.ReactElement {
   );
   const selectedTemplate = bootstrap?.promptTemplates.find((template) => template.id === selectedPreset?.promptTemplateId);
   const templateId = selectedPreset?.promptTemplateId;
+  const customVars = getCustomVars(selectedTemplate);
 
+  // Provider pre-flight check
+  const effectiveProviderId = providerProfileId || selectedPreset?.providerProfileId;
+  React.useEffect(() => {
+    if (!effectiveProviderId) return;
+    setProviderError(null);
+    testProviderProfile(effectiveProviderId)
+      .then((result) => {
+        if (!result.ok) setProviderError(result.message);
+      })
+      .catch(() => null);
+  }, [effectiveProviderId]);
+
+  // Reset custom var values when template changes
+  React.useEffect(() => {
+    setCustomVarValues({});
+  }, [templateId]);
+
+  // Live prompt preview (debounced)
   React.useEffect(() => {
     if (!templateId) return;
     const timer = setTimeout(() => {
-      fetchPromptPreview({ templateId, title, eventSummary })
+      fetchPromptPreview({ templateId, title, eventSummary, customVariables: customVarValues })
         .then(setPromptPreview)
         .catch(() => null);
     }, 400);
     return () => clearTimeout(timer);
-  }, [title, eventSummary, templateId]);
+  }, [title, eventSummary, templateId, customVarValues]);
 
   async function handleGenerate(regenerate = false): Promise<void> {
-    await generate({ title, eventSummary, presetId, providerProfileId, regenerate });
+    await generate({ title, eventSummary, presetId, providerProfileId, regenerate, customVariables: customVarValues });
   }
 
   async function saveToHistory(): Promise<void> {
@@ -140,7 +179,26 @@ export function GeneratorWorkspace(): React.ReactElement {
               </option>
             ))}
           </NativeSelect>
+          {providerError && (
+            <p className="mt-1 text-xs text-destructive">{providerError}</p>
+          )}
         </Field>
+        {customVars.length > 0 && (
+          <div className="grid gap-3 rounded-lg border p-3">
+            <span className="text-sm font-medium">Template Variables</span>
+            {customVars.map((varName) => (
+              <Field key={varName} label={varName}>
+                <Input
+                  value={customVarValues[varName] ?? ""}
+                  onChange={(event) =>
+                    setCustomVarValues((prev) => ({ ...prev, [varName]: event.target.value }))
+                  }
+                  placeholder={`Value for {{${varName}}}`}
+                />
+              </Field>
+            ))}
+          </div>
+        )}
         <div className="grid grid-cols-2 gap-2">
           <Button disabled={isGenerating} onClick={() => void handleGenerate(false)}>
             {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}

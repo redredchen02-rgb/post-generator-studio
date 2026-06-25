@@ -22,7 +22,7 @@ export const buildContextStep: PipelineStep<GenerationRequest, ContextPayload> =
   async execute(context, input) {
     return {
       request: input,
-      variables: resolvePromptVariables(input, context.preset),
+      variables: { ...resolvePromptVariables(input, context.preset), ...input.customVariables },
     };
   },
 };

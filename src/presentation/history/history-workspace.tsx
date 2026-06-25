@@ -6,34 +6,22 @@ import { ChevronDown, ChevronRight, Download, RefreshCw } from "lucide-react";
 import type { Generation } from "@/domain/schemas";
 import { Button } from "@/presentation/components/ui/button";
 import { loadGenerations } from "@/presentation/lib/api";
+import { useApi } from "@/presentation/lib/use-api";
 
 export function HistoryWorkspace(): React.ReactElement {
-  const [generations, setGenerations] = React.useState<Generation[]>([]);
+  const { data: generations, loading, error, refetch } = useApi(loadGenerations);
   const [selected, setSelected] = React.useState<Generation | null>(null);
-  const [error, setError] = React.useState<string | null>(null);
-  const [loading, setLoading] = React.useState(true);
   const [promptOpen, setPromptOpen] = React.useState(false);
+
+  React.useEffect(() => {
+    if (generations && !selected) {
+      setSelected(generations[0] || null);
+    }
+  }, [generations, selected]);
 
   React.useEffect(() => {
     setPromptOpen(false);
   }, [selected?.id]);
-
-  async function refresh(): Promise<void> {
-    try {
-      setLoading(true);
-      const data = await loadGenerations();
-      setGenerations(data);
-      setSelected((current) => current || data[0] || null);
-    } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : "加载历史记录失败");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  React.useEffect(() => {
-    void refresh();
-  }, []);
 
   return (
     <main className="mx-auto grid max-w-[1480px] gap-4 px-4 py-4 lg:grid-cols-[360px_minmax(0,1fr)]">
@@ -43,7 +31,7 @@ export function HistoryWorkspace(): React.ReactElement {
             <h1 className="text-lg font-semibold">History</h1>
             <p className="text-sm text-muted-foreground">重新打开已保存的生成记录。</p>
           </div>
-          <Button variant="outline" size="icon" aria-label="Refresh history" onClick={() => void refresh()}>
+          <Button variant="outline" size="icon" aria-label="Refresh history" onClick={() => void refetch()}>
             <RefreshCw className="h-4 w-4" />
           </Button>
         </div>
@@ -51,7 +39,7 @@ export function HistoryWorkspace(): React.ReactElement {
         <div className="grid max-h-[calc(100vh-13rem)] gap-2 overflow-auto">
           {loading ? (
             <div className="flex items-center justify-center p-8 text-sm text-muted-foreground">加载中...</div>
-          ) : generations.length === 0 ? (
+          ) : !generations || generations.length === 0 ? (
             <div className="flex items-center justify-center p-8 text-sm text-muted-foreground">暂无生成记录</div>
           ) : (
             generations.map((generation) => (

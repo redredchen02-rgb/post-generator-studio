@@ -44,10 +44,10 @@ export async function deletePromptTemplate(id: string): Promise<void> {
 
 export async function previewPrompt(input: unknown): Promise<{ systemPrompt: string; userPrompt: string }> {
   const parsed = promptPreviewRequestSchema.parse(input);
-  const variables = resolvePromptVariables(
-    { title: parsed.title, eventSummary: parsed.eventSummary },
-    { locale: parsed.locale },
-  );
+  const variables = {
+    ...resolvePromptVariables({ title: parsed.title, eventSummary: parsed.eventSummary }, { locale: parsed.locale }),
+    ...parsed.customVariables,
+  };
   let systemPrompt = parsed.systemPrompt || "";
   let userPromptTemplate = parsed.userPromptTemplate || "";
   if (parsed.templateId) {

@@ -39,8 +39,9 @@ export function useGenerationStream() {
       presetId: string;
       providerProfileId?: string;
       regenerate?: boolean;
+      customVariables?: Record<string, string>;
     }) => {
-      const { title, eventSummary, presetId, providerProfileId, regenerate } = params;
+      const { title, eventSummary, presetId, providerProfileId, regenerate, customVariables } = params;
       if (!presetId) {
         setState((s) => ({ ...s, error: "请选择 Generation Preset" }));
         return;
@@ -65,6 +66,7 @@ export function useGenerationStream() {
           presetId,
           providerProfileId: providerProfileId || undefined,
           idempotencyKey: regenerate ? undefined : crypto.randomUUID(),
+          customVariables: customVariables && Object.keys(customVariables).length > 0 ? customVariables : undefined,
         }),
       });
 
