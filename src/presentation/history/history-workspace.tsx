@@ -11,6 +11,17 @@ import { useApi } from "@/presentation/lib/use-api";
 
 const PAGE_SIZE = 10;
 
+/**
+ * Resolve which item should stay selected when the list changes: keep the
+ * current selection if it is still present, otherwise fall back to the first
+ * item (or null when the list is empty). Pure so it can be unit-tested directly.
+ */
+export function resolveSelected<T extends { id: string }>(items: T[], current: T | null): T | null {
+  if (items.length === 0) return null;
+  if (current && items.some((item) => item.id === current.id)) return current;
+  return items[0];
+}
+
 export function HistoryWorkspace(): React.ReactElement {
   const [search, setSearch] = React.useState("");
   const [offset, setOffset] = React.useState(0);
@@ -30,13 +41,12 @@ export function HistoryWorkspace(): React.ReactElement {
     await refetch();
   }
 
+  // Keep `selected` consistent with the current list: drop a selection that is
+  // no longer present (after search filter or delete) and fall back to the first
+  // item, or null when the list is empty.
   React.useEffect(() => {
-    if (generations.length > 0 && !selected) {
-      setSelected(generations[0]);
-    } else if (generations.length === 0) {
-      setSelected(null);
-    }
-  }, [generations, selected]);
+    setSelected((current) => resolveSelected(generations, current));
+  }, [generations]);
 
   React.useEffect(() => {
     setPromptOpen(false);
