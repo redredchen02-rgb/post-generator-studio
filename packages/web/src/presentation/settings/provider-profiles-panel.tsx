@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { FlaskConical, Pencil, Plus, Save, Trash2 } from "lucide-react";
+import { FlaskConical, KeyRound, Pencil, Plus, Save, Trash2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import type { ProviderKind, ProviderProfile } from "@postgen/domain";
 import { providerKindSchema, providerProfileCreateSchema } from "@postgen/domain";
@@ -99,6 +99,16 @@ export function ProviderProfilesPanel({
     }
   }
 
+  async function clearKey(id: string): Promise<void> {
+    try {
+      await client.updateProviderProfile(id, { clearApiKey: true });
+      await refresh();
+      notify("API key cleared");
+    } catch (err) {
+      notify(err instanceof Error ? err.message : "Clear failed");
+    }
+  }
+
   return (
     <div className="grid gap-6">
       <Header title="Provider Profiles" description="新增、测试、启停模型供应商。API Key 只会保存到服务端密文文件。" />
@@ -151,10 +161,18 @@ export function ProviderProfilesPanel({
             Enabled
           </label>
         </div>
-        <Button className="w-fit" type="submit">
-          <Save className="h-4 w-4" />
-          {editingId ? "Update Provider" : "Save Provider"}
-        </Button>
+        <div className="flex gap-2">
+          <Button className="w-fit" type="submit">
+            <Save className="h-4 w-4" />
+            {editingId ? "Update Provider" : "Save Provider"}
+          </Button>
+          {editingId && profiles.find((p) => p.id === editingId)?.keyMasked ? (
+            <Button className="w-fit" type="button" variant="outline" onClick={() => void clearKey(editingId)}>
+              <KeyRound className="h-4 w-4" />
+              Clear API Key
+            </Button>
+          ) : null}
+        </div>
       </form>
       <div className="grid gap-2">
         {profiles.map((profile) => (
