@@ -3,7 +3,10 @@ export type SSEMessage = {
   data: string;
 };
 
-export async function* parseSSEStream(body: ReadableStream<Uint8Array>): AsyncIterable<SSEMessage> {
+export async function* parseSSEStream(body: ReadableStream<Uint8Array> | null): AsyncIterable<SSEMessage> {
+  if (!body) {
+    return;
+  }
   const reader = body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";

@@ -92,7 +92,10 @@ export abstract class BaseAdapter implements LLMProviderAdapter {
       for await (const raw of parseJsonLines(response)) {
         const { events, done } = this.parseChunk(raw, request);
         yield* events;
-        if (done) return;
+        if (done) {
+          yield { type: "complete" };
+          return;
+        }
       }
     } else {
       for await (const data of parseServerSentEvents(response)) {
@@ -102,7 +105,10 @@ export abstract class BaseAdapter implements LLMProviderAdapter {
         }
         const { events, done } = this.parseChunk(JSON.parse(data), request);
         yield* events;
-        if (done) return;
+        if (done) {
+          yield { type: "complete" };
+          return;
+        }
       }
     }
 
