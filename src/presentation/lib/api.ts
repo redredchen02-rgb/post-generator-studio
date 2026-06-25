@@ -56,3 +56,14 @@ export async function saveGenerationContent(id: string, outputContent: string): 
     body: JSON.stringify({ outputContent }),
   });
 }
+
+export async function fetchPromptPreview(params: {
+  templateId?: string;
+  title: string;
+  eventSummary: string;
+}): Promise<{ systemPrompt: string; userPrompt: string }> {
+  return fetchJson("/api/prompt-templates/preview", {
+    method: "POST",
+    body: JSON.stringify(params),
+  });
+}

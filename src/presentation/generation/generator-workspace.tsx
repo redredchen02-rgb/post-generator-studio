@@ -3,6 +3,8 @@
 import * as React from "react";
 import ReactMarkdown from "react-markdown";
 import {
+  ChevronDown,
+  ChevronRight,
   Clipboard,
   Download,
   FileText,
@@ -17,7 +19,7 @@ import { Field } from "@/presentation/components/ui/field";
 import { Input } from "@/presentation/components/ui/input";
 import { NativeSelect } from "@/presentation/components/ui/native-select";
 import { Textarea } from "@/presentation/components/ui/textarea";
-import { loadBootstrap, saveGenerationContent, type BootstrapData } from "@/presentation/lib/api";
+import { fetchPromptPreview, loadBootstrap, saveGenerationContent, type BootstrapData } from "@/presentation/lib/api";
 import { useUiStore } from "@/presentation/store/ui-store";
 import { stripMarkdown } from "@/lib/utils";
 import { useGenerationStream } from "./use-generation-stream";
@@ -31,6 +33,8 @@ export function GeneratorWorkspace(): React.ReactElement {
   const [eventSummary, setEventSummary] = React.useState(sampleSummary);
   const [presetId, setPresetId] = React.useState("");
   const [providerProfileId, setProviderProfileId] = React.useState("");
+  const [promptPreview, setPromptPreview] = React.useState<{ systemPrompt: string; userPrompt: string } | null>(null);
+  const [promptPreviewOpen, setPromptPreviewOpen] = React.useState(false);
   const { rawMode, setRawMode, editorFontSize, setEditorFontSize } = useUiStore();
   const { content, status, error, activeGeneration, metadata, isGenerating, generate, cancel, setContent, setStatus } =
     useGenerationStream();
@@ -55,6 +59,17 @@ export function GeneratorWorkspace(): React.ReactElement {
     (provider) => provider.id === (providerProfileId || selectedPreset?.providerProfileId),
   );
   const selectedTemplate = bootstrap?.promptTemplates.find((template) => template.id === selectedPreset?.promptTemplateId);
+  const templateId = selectedPreset?.promptTemplateId;
+
+  React.useEffect(() => {
+    if (!templateId) return;
+    const timer = setTimeout(() => {
+      fetchPromptPreview({ templateId, title, eventSummary })
+        .then(setPromptPreview)
+        .catch(() => null);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [title, eventSummary, templateId]);
 
   async function handleGenerate(regenerate = false): Promise<void> {
     await generate({ title, eventSummary, presetId, providerProfileId, regenerate });
@@ -236,6 +251,34 @@ export function GeneratorWorkspace(): React.ReactElement {
         </div>
         <div className="rounded-md bg-secondary p-3 text-sm text-secondary-foreground">
           {metadata.outputTokens ? `${metadata.outputTokens} output tokens` : "Token usage appears when providers report it."}
+        </div>
+        <div className="border-t pt-3">
+          <button
+            type="button"
+            className="flex w-full items-center justify-between text-sm font-medium"
+            onClick={() => setPromptPreviewOpen((v) => !v)}
+          >
+            Prompt Preview
+            {promptPreviewOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+          </button>
+          {promptPreviewOpen && (
+            <div className="mt-3 grid gap-3">
+              {promptPreview ? (
+                <>
+                  <div className="grid gap-1">
+                    <span className="text-xs uppercase text-muted-foreground">System</span>
+                    <pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded bg-muted p-2 text-xs">{promptPreview.systemPrompt}</pre>
+                  </div>
+                  <div className="grid gap-1">
+                    <span className="text-xs uppercase text-muted-foreground">User</span>
+                    <pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded bg-muted p-2 text-xs">{promptPreview.userPrompt}</pre>
+                  </div>
+                </>
+              ) : (
+                <p className="text-xs text-muted-foreground">Loading preview...</p>
+              )}
+            </div>
+          )}
         </div>
       </aside>
     </main>

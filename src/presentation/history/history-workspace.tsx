@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import ReactMarkdown from "react-markdown";
-import { Download, RefreshCw } from "lucide-react";
+import { ChevronDown, ChevronRight, Download, RefreshCw } from "lucide-react";
 import type { Generation } from "@/domain/schemas";
 import { Button } from "@/presentation/components/ui/button";
 import { loadGenerations } from "@/presentation/lib/api";
@@ -12,6 +12,11 @@ export function HistoryWorkspace(): React.ReactElement {
   const [selected, setSelected] = React.useState<Generation | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(true);
+  const [promptOpen, setPromptOpen] = React.useState(false);
+
+  React.useEffect(() => {
+    setPromptOpen(false);
+  }, [selected?.id]);
 
   async function refresh(): Promise<void> {
     try {
@@ -96,6 +101,34 @@ export function HistoryWorkspace(): React.ReactElement {
               <h3 className="text-sm font-medium">Event Summary</h3>
               <pre className="whitespace-pre-wrap text-sm text-muted-foreground">{selected.eventSummary}</pre>
             </div>
+            {(selected.renderedSystemPrompt || selected.renderedUserPrompt) && (
+              <div className="grid gap-2 rounded-lg border p-3">
+                <button
+                  type="button"
+                  className="flex w-full items-center justify-between text-sm font-medium"
+                  onClick={() => setPromptOpen((v) => !v)}
+                >
+                  Prompt Used
+                  {promptOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                </button>
+                {promptOpen && (
+                  <div className="grid gap-3 pt-1">
+                    {selected.renderedSystemPrompt && (
+                      <div className="grid gap-1">
+                        <span className="text-xs uppercase text-muted-foreground">System</span>
+                        <pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded bg-muted p-2 text-xs">{selected.renderedSystemPrompt}</pre>
+                      </div>
+                    )}
+                    {selected.renderedUserPrompt && (
+                      <div className="grid gap-1">
+                        <span className="text-xs uppercase text-muted-foreground">User</span>
+                        <pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded bg-muted p-2 text-xs">{selected.renderedUserPrompt}</pre>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
             <article className="prose prose-neutral max-w-none dark:prose-invert">
               <ReactMarkdown>{selected.outputContent || selected.errorMessage || "无输出内容"}</ReactMarkdown>
             </article>
@@ -107,4 +140,3 @@ export function HistoryWorkspace(): React.ReactElement {
     </main>
   );
 }
-
