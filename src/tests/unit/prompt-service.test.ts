@@ -6,7 +6,7 @@ import {
   updatePromptTemplate,
   deletePromptTemplate,
   previewPrompt,
-} from "@/application/prompts/prompt-service";
+} from "@/application/prompt/prompt-service";
 
 describe("prompt-service", () => {
   it("creates and retrieves a template", async () => {

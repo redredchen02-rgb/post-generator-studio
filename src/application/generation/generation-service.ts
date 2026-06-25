@@ -32,6 +32,14 @@ export async function getGeneration(id: string): Promise<Generation> {
   return generation;
 }
 
+export async function updateGenerationContent(id: string, outputContent: string): Promise<Generation> {
+  const generation = await getStorage().generations.get(id);
+  if (!generation) {
+    throw new AppErrorException({ code: "NOT_FOUND", message: "生成记录不存在" });
+  }
+  return getStorage().generations.update(id, { outputContent });
+}
+
 export async function cancelGeneration(id: string): Promise<{ cancelled: boolean }> {
   const cancelled = cancelGenerationController(id);
   if (cancelled) {

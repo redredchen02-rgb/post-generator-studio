@@ -55,10 +55,8 @@ const defaultUserPromptTemplate = `请根据以下信息生成完整文章。
 const pipelineSteps = JSON.stringify([
   "build-context",
   "render-prompt",
-  "generate-content",
   "clean-content",
   "format-output",
-  "persist-generation",
 ]);
 
 export async function seedDefaults(db: BetterSQLite3Database<typeof schemaType>): Promise<void> {

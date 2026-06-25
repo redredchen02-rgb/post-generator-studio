@@ -89,7 +89,7 @@ describe("Provider Profiles API", () => {
 describe("Prompt Templates API", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  vi.mock("@/application/prompts/prompt-service", () => ({
+  vi.mock("@/application/prompt/prompt-service", () => ({
     listPromptTemplates: vi.fn().mockResolvedValue([{ id: "t1", name: "Test Template" }]),
     getPromptTemplate: vi.fn().mockResolvedValue({ id: "t1", name: "Test Template" }),
     createPromptTemplate: vi.fn().mockImplementation((input) =>

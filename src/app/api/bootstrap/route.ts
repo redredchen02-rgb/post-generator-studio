@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { errorResponse } from "@/application/errors";
 import { listGenerationPresets } from "@/application/presets/preset-service";
-import { listPromptTemplates } from "@/application/prompts/prompt-service";
+import { listPromptTemplates } from "@/application/prompt/prompt-service";
 import { listProviderProfiles } from "@/application/providers/provider-service";
 import { listPipelineSteps } from "@/plugins/pipeline/registry";
 

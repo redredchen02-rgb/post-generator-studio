@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { errorResponse } from "@/application/errors";
-import { createPromptTemplate, listPromptTemplates } from "@/application/prompts/prompt-service";
+import { createPromptTemplate, listPromptTemplates } from "@/application/prompt/prompt-service";
 import { parseBody } from "@/app/api/parse-body";
 
 export const runtime = "nodejs";

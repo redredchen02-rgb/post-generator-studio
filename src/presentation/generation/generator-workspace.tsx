@@ -17,7 +17,7 @@ import { Field } from "@/presentation/components/ui/field";
 import { Input } from "@/presentation/components/ui/input";
 import { NativeSelect } from "@/presentation/components/ui/native-select";
 import { Textarea } from "@/presentation/components/ui/textarea";
-import { loadBootstrap, type BootstrapData } from "@/presentation/lib/api";
+import { loadBootstrap, saveGenerationContent, type BootstrapData } from "@/presentation/lib/api";
 import { useUiStore } from "@/presentation/store/ui-store";
 import { stripMarkdown } from "@/lib/utils";
 import { useGenerationStream } from "./use-generation-stream";
@@ -58,6 +58,16 @@ export function GeneratorWorkspace(): React.ReactElement {
 
   async function handleGenerate(regenerate = false): Promise<void> {
     await generate({ title, eventSummary, presetId, providerProfileId, regenerate });
+  }
+
+  async function saveToHistory(): Promise<void> {
+    if (!activeGeneration) return;
+    try {
+      await saveGenerationContent(activeGeneration.id, content);
+      setStatus("Saved to history");
+    } catch {
+      setStatus("Save failed");
+    }
   }
 
   async function copyMarkdown(): Promise<void> {
@@ -191,7 +201,7 @@ export function GeneratorWorkspace(): React.ReactElement {
               <Download className="h-4 w-4" />
               .txt
             </Button>
-            <Button variant="outline" size="sm" disabled={!activeGeneration} onClick={() => setStatus("Saved to history")}>
+            <Button variant="outline" size="sm" disabled={!activeGeneration} onClick={() => void saveToHistory()}>
               <Save className="h-4 w-4" />
               Save
             </Button>

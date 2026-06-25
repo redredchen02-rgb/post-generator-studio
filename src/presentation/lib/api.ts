@@ -49,3 +49,10 @@ export async function loadBootstrap(): Promise<BootstrapData> {
 export async function loadGenerations(): Promise<Generation[]> {
   return fetchJson<Generation[]>("/api/generations?limit=50");
 }
+
+export async function saveGenerationContent(id: string, outputContent: string): Promise<Generation> {
+  return fetchJson<Generation>(`/api/generations/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify({ outputContent }),
+  });
+}

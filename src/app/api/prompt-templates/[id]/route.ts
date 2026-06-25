@@ -4,7 +4,7 @@ import {
   deletePromptTemplate,
   getPromptTemplate,
   updatePromptTemplate,
-} from "@/application/prompts/prompt-service";
+} from "@/application/prompt/prompt-service";
 import type { RouteContext } from "@/app/api/types";
 import { parseBody } from "@/app/api/parse-body";
 
