@@ -5,7 +5,7 @@ import { getStorage } from "@/infrastructure/storage/sqlite-storage";
 import { createId } from "@/lib/utils";
 
 async function createStreamingGeneration(): Promise<string> {
-  const id = createId();
+  const id = createId("gen");
   await getStorage().generations.create({
     id,
     title: "Cancel test",
