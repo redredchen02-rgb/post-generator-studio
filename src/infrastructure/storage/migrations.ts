@@ -77,6 +77,17 @@ CREATE TABLE IF NOT EXISTS generations (
   total_tokens INTEGER,
   started_at TEXT,
   completed_at TEXT,
+  created_at TEXT NOT NULL,
+  active_draft_id TEXT
+);
+
+CREATE TABLE IF NOT EXISTS generation_drafts (
+  id TEXT PRIMARY KEY,
+  generation_id TEXT NOT NULL REFERENCES generations(id) ON DELETE CASCADE,
+  label TEXT,
+  content TEXT NOT NULL,
+  kind TEXT NOT NULL DEFAULT 'snapshot',
+  source TEXT NOT NULL DEFAULT 'edited',
   created_at TEXT NOT NULL
 );
 `;
@@ -97,14 +108,21 @@ export async function runMigrations(): Promise<void> {
   const database = new Database(getDatabasePath());
   try {
     database.pragma("journal_mode = WAL");
+    database.pragma("foreign_keys = ON");
     database.exec(INITIAL_SQL);
     // Add indexes for query performance
     database.exec("CREATE INDEX IF NOT EXISTS generations_status_idx ON generations(status)");
     database.exec("CREATE INDEX IF NOT EXISTS generations_created_at_idx ON generations(created_at)");
+    database.exec("CREATE INDEX IF NOT EXISTS generation_drafts_generation_id_idx ON generation_drafts(generation_id)");
     // Migration: add custom_variable_defaults column if missing
     const columns = database.prepare("PRAGMA table_info(prompt_templates)").all() as Array<{ name: string }>;
     if (!columns.some((c) => c.name === "custom_variable_defaults")) {
       database.exec("ALTER TABLE prompt_templates ADD COLUMN custom_variable_defaults TEXT NOT NULL DEFAULT '{}'");
+    }
+    // Migration: add active_draft_id to generations for existing installs (nullable, no default = instant).
+    const genColumns = database.prepare("PRAGMA table_info(generations)").all() as Array<{ name: string }>;
+    if (!genColumns.some((c) => c.name === "active_draft_id")) {
+      database.exec("ALTER TABLE generations ADD COLUMN active_draft_id TEXT");
     }
   } finally {
     database.close();

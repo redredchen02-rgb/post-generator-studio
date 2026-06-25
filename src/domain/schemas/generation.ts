@@ -25,8 +25,25 @@ export const generationSchema = z.object({
   startedAt: z.string().optional(),
   completedAt: z.string().optional(),
   createdAt: z.string(),
+  activeDraftId: z.string().optional(),
 });
 export type Generation = z.infer<typeof generationSchema>;
+
+export const draftKindSchema = z.enum(["working", "snapshot"]);
+export const draftSourceSchema = z.enum(["generated", "edited", "rewrite"]);
+
+export const generationDraftSchema = z.object({
+  id: z.string(),
+  generationId: z.string(),
+  label: z.string().optional(),
+  content: z.string(),
+  kind: draftKindSchema,
+  source: draftSourceSchema,
+  createdAt: z.string(),
+});
+export type GenerationDraft = z.infer<typeof generationDraftSchema>;
+export type DraftKind = z.infer<typeof draftKindSchema>;
+export type DraftSource = z.infer<typeof draftSourceSchema>;
 
 export const generationRequestSchema = z.object({
   title: z.string().min(1, "Title is required"),

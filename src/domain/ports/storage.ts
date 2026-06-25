@@ -1,5 +1,8 @@
 import type {
+  DraftKind,
+  DraftSource,
   Generation,
+  GenerationDraft,
   GenerationPreset,
   GenerationPresetCreate,
   GenerationPresetUpdate,
@@ -38,6 +41,15 @@ export type GenerationUpdateInput = Partial<{
   completedAt: string;
 }>;
 
+export type GenerationDraftCreateInput = {
+  id: string;
+  generationId: string;
+  content: string;
+  kind: DraftKind;
+  source: DraftSource;
+  label?: string;
+};
+
 export interface ProviderProfileRepository {
   list(): Promise<ProviderProfile[]>;
   get(id: string): Promise<ProviderProfile | null>;
@@ -74,10 +86,25 @@ export interface GenerationRepository {
   delete(id: string): Promise<void>;
 }
 
+export interface GenerationDraftRepository {
+  /** Drafts for a generation, oldest first. */
+  listByGeneration(generationId: string): Promise<GenerationDraft[]>;
+  get(id: string): Promise<GenerationDraft | null>;
+  /** Insert a draft; when setActive is true, point the generation at it in the same transaction. */
+  create(input: GenerationDraftCreateInput, setActive?: boolean): Promise<GenerationDraft>;
+  /** In-place content update for the working draft (autosave). */
+  updateContent(id: string, content: string): Promise<GenerationDraft>;
+  /** Repoint generations.activeDraftId (null to clear). */
+  setActive(generationId: string, draftId: string | null): Promise<void>;
+  /** Delete a draft; if it was the active one, reset the pointer in the same transaction. */
+  delete(id: string): Promise<void>;
+}
+
 export interface StoragePort {
   providerProfiles: ProviderProfileRepository;
   promptTemplates: PromptTemplateRepository;
   generationPresets: GenerationPresetRepository;
   generations: GenerationRepository;
+  generationDrafts: GenerationDraftRepository;
 }
 
