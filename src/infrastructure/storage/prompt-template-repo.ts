@@ -2,7 +2,7 @@ import { desc, eq } from "drizzle-orm";
 import { createId, nowIso, parseJson } from "@/lib/utils";
 import { promptTemplateSchema, type PromptTemplate, type PromptTemplateCreate, type PromptTemplateUpdate } from "@/domain/schemas";
 import type { PromptTemplateRepository } from "@/domain/ports/storage";
-import { AppErrorException } from "@/domain/schemas";
+import { notFound } from "@/infrastructure/storage/repo-utils";
 import { getDb } from "@/infrastructure/storage/db";
 import { promptTemplates, promptTemplateVersions } from "@/infrastructure/storage/schema";
 
@@ -16,16 +16,13 @@ function templateFromRow(row: TemplateRow): PromptTemplate {
     systemPrompt: row.systemPrompt,
     userPromptTemplate: row.userPromptTemplate,
     supportedVariables: parseJson<string[]>(row.supportedVariables, []),
+    customVariableDefaults: parseJson<Record<string, string>>(row.customVariableDefaults, {}),
     outputFormat: row.outputFormat,
     version: row.version,
     isDefault: row.isDefault,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   });
-}
-
-function notFound(entity: string): never {
-  throw new AppErrorException({ code: "NOT_FOUND", message: `${entity} not found` });
 }
 
 export class SqlitePromptTemplateRepository implements PromptTemplateRepository {
@@ -54,6 +51,7 @@ export class SqlitePromptTemplateRepository implements PromptTemplateRepository 
       systemPrompt: input.systemPrompt,
       userPromptTemplate: input.userPromptTemplate,
       supportedVariables: JSON.stringify(input.supportedVariables),
+      customVariableDefaults: JSON.stringify(input.customVariableDefaults ?? {}),
       outputFormat: input.outputFormat,
       version: 1,
       isDefault: input.isDefault,
@@ -91,6 +89,7 @@ export class SqlitePromptTemplateRepository implements PromptTemplateRepository 
         systemPrompt: input.systemPrompt ?? existing.systemPrompt,
         userPromptTemplate: input.userPromptTemplate ?? existing.userPromptTemplate,
         supportedVariables: JSON.stringify(input.supportedVariables ?? existing.supportedVariables),
+        customVariableDefaults: JSON.stringify(input.customVariableDefaults ?? existing.customVariableDefaults ?? {}),
         outputFormat: input.outputFormat ?? existing.outputFormat,
         version: nextVersion,
         isDefault: input.isDefault ?? existing.isDefault,

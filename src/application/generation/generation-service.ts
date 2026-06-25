@@ -1,5 +1,6 @@
+import { PIPELINE_STEPS } from "@/domain/pipeline-steps";
 import { createId, nowIso } from "@/lib/utils";
-import type { Generation, GenerationEvent } from "@/domain/schemas";
+import type { Generation, GenerationEvent, NormalizedGenerationRequest } from "@/domain/schemas";
 import { AppErrorException, generationRequestSchema } from "@/domain/schemas";
 import { getStorage } from "@/infrastructure/storage/sqlite-storage";
 import { readSecret } from "@/infrastructure/security/secrets";
@@ -8,6 +9,14 @@ import { logger } from "@/infrastructure/logging/logger";
 import { buildContextStep, cleanContentStep, formatOutputStep, renderPromptStep } from "@/plugins/pipeline/registry";
 import type { PipelineContext } from "@/domain/ports/pipeline";
 import { registerGenerationController, releaseGenerationController, cancelGenerationController } from "@/application/generation/cancel-registry";
+import type { StoragePort } from "@/domain/ports/storage";
+import { getOrThrow } from "@/application/crud-helpers";
+
+class CachedGenerationError extends Error {
+  constructor(public generation: Generation) {
+    super("Cached generation");
+  }
+}
 
 export type GenerationStreamEvent =
   | { type: "generation"; generation: Generation }
@@ -20,31 +29,21 @@ function redactSnapshot(profile: Record<string, unknown>): Record<string, unknow
   return { ...rest, keyMasked: profile.keyMasked ? String(profile.keyMasked) : undefined };
 }
 
-export async function listGenerations(limit?: number): Promise<Generation[]> {
-  return getStorage().generations.list(limit);
+export async function listGenerations(opts?: { search?: string; offset?: number; limit?: number }): Promise<{ items: Generation[]; total: number }> {
+  return getStorage().generations.list(opts);
 }
 
 export async function getGeneration(id: string): Promise<Generation> {
-  const generation = await getStorage().generations.get(id);
-  if (!generation) {
-    throw new AppErrorException({ code: "NOT_FOUND", message: "生成记录不存在" });
-  }
-  return generation;
+  return getOrThrow(getStorage().generations, id, "生成记录不存在");
 }
 
 export async function updateGenerationContent(id: string, outputContent: string): Promise<Generation> {
-  const generation = await getStorage().generations.get(id);
-  if (!generation) {
-    throw new AppErrorException({ code: "NOT_FOUND", message: "生成记录不存在" });
-  }
+  await getOrThrow(getStorage().generations, id, "生成记录不存在");
   return getStorage().generations.update(id, { outputContent });
 }
 
 export async function deleteGeneration(id: string): Promise<void> {
-  const generation = await getStorage().generations.get(id);
-  if (!generation) {
-    throw new AppErrorException({ code: "NOT_FOUND", message: "生成记录不存在" });
-  }
+  await getOrThrow(getStorage().generations, id, "生成记录不存在");
   await getStorage().generations.delete(id);
 }
 
@@ -60,17 +59,20 @@ export async function cancelGeneration(id: string): Promise<{ cancelled: boolean
   return { cancelled };
 }
 
-export async function* streamGeneration(input: unknown): AsyncIterable<GenerationStreamEvent> {
+type ValidatedRequest = {
+  request: ReturnType<typeof generationRequestSchema.parse>;
+  preset: NonNullable<Awaited<ReturnType<StoragePort["generationPresets"]["get"]>>>;
+  provider: NonNullable<Awaited<ReturnType<StoragePort["providerProfiles"]["get"]>>>;
+  template: NonNullable<Awaited<ReturnType<StoragePort["promptTemplates"]["get"]>>>;
+};
+
+async function validateGenerationRequest(input: unknown): Promise<ValidatedRequest> {
   const request = generationRequestSchema.parse(input);
   const existing = request.idempotencyKey
     ? await getStorage().generations.getByIdempotencyKey(request.idempotencyKey)
     : null;
   if (existing?.status === "completed" && existing.outputContent) {
-    yield { type: "generation", generation: existing };
-    yield { type: "token", value: existing.outputContent };
-    yield { type: "complete" };
-    yield { type: "final", generation: existing, content: existing.outputContent };
-    return;
+    throw new CachedGenerationError(existing);
   }
 
   const preset = await getStorage().generationPresets.get(request.presetId);
@@ -88,8 +90,14 @@ export async function* streamGeneration(input: unknown): AsyncIterable<Generatio
   if (!template) {
     throw new AppErrorException({ code: "TEMPLATE_NOT_FOUND", message: "Prompt Template 不存在" });
   }
+  return { request, preset, provider, template };
+}
 
-  const controller = new AbortController();
+async function prepareGeneration(
+  validated: ValidatedRequest,
+  controller: AbortController,
+) {
+  const { request, preset, provider, template } = validated;
   const generationId = createId("generation");
   const context: PipelineContext = {
     generationId,
@@ -100,10 +108,10 @@ export async function* streamGeneration(input: unknown): AsyncIterable<Generatio
     abortSignal: controller.signal,
   };
   const enabledSteps = new Set(preset.enabledPipelineSteps);
-  const contextPayload = enabledSteps.has("build-context")
+  const contextPayload = enabledSteps.has(PIPELINE_STEPS.BUILD_CONTEXT)
     ? await buildContextStep.execute(context, request)
     : { request, variables: {} };
-  const rendered = enabledSteps.has("render-prompt")
+  const rendered = enabledSteps.has(PIPELINE_STEPS.RENDER_PROMPT)
     ? await renderPromptStep.execute(context, contextPayload)
     : {
         request: contextPayload.request,
@@ -131,13 +139,33 @@ export async function* streamGeneration(input: unknown): AsyncIterable<Generatio
     model: provider.model,
     providerKind: provider.providerKind,
   });
+  return { generation, context, rendered, enabledSteps };
+}
+
+export async function* streamGeneration(input: unknown): AsyncIterable<GenerationStreamEvent> {
+  let validated: ValidatedRequest;
+  try {
+    validated = await validateGenerationRequest(input);
+  } catch (e) {
+    if (e instanceof CachedGenerationError) {
+      yield { type: "generation", generation: e.generation };
+      yield { type: "token", value: e.generation.outputContent! };
+      yield { type: "complete" };
+      yield { type: "final", generation: e.generation, content: e.generation.outputContent! };
+      return;
+    }
+    throw e;
+  }
+
+  const controller = new AbortController();
+  const { generation, context, rendered, enabledSteps } = await prepareGeneration(validated, controller);
 
   registerGenerationController(generation.id, controller);
   yield { type: "generation", generation };
 
-  const adapter = getProviderAdapter(provider.providerKind);
-  const apiKey = await readSecret(provider.apiKeyRef);
-  const validation = await adapter.validateConfig(provider, { apiKey, abortSignal: controller.signal });
+  const adapter = getProviderAdapter(validated.provider.providerKind);
+  const apiKey = await readSecret(validated.provider.apiKeyRef) ?? "";
+  const validation = await adapter.validateConfig(validated.provider, { apiKey, abortSignal: controller.signal });
   if (!validation.ok) {
     const failed = await getStorage().generations.update(generation.id, {
       status: "failed",
@@ -150,11 +178,24 @@ export async function* streamGeneration(input: unknown): AsyncIterable<Generatio
     return;
   }
 
+  yield* streamToProvider(adapter, validated, generation, context, rendered, enabledSteps, apiKey, controller);
+}
+
+async function* streamToProvider(
+  adapter: ReturnType<typeof getProviderAdapter>,
+  validated: ValidatedRequest,
+  generation: Generation,
+  context: PipelineContext,
+  rendered: { normalizedRequest: NormalizedGenerationRequest },
+  enabledSteps: Set<string>,
+  apiKey: string,
+  controller: AbortController,
+): AsyncIterable<GenerationStreamEvent> {
   let accumulated = "";
   let metadata: Partial<Pick<Generation, "model" | "inputTokens" | "outputTokens" | "totalTokens">> = {};
   try {
     await getStorage().generations.update(generation.id, { status: "streaming", startedAt: nowIso() });
-    for await (const event of adapter.generate(rendered.normalizedRequest, provider, {
+    for await (const event of adapter.generate(rendered.normalizedRequest, validated.provider, {
       apiKey,
       abortSignal: controller.signal,
     })) {
@@ -184,12 +225,12 @@ export async function* streamGeneration(input: unknown): AsyncIterable<Generatio
         return;
       } else {
         let formatted = accumulated;
-        if (enabledSteps.has("clean-content")) {
-          const cleaned = await cleanContentStep.execute(context, { content: accumulated, title: request.title });
-          formatted = enabledSteps.has("format-output")
+        if (enabledSteps.has(PIPELINE_STEPS.CLEAN_CONTENT)) {
+          const cleaned = await cleanContentStep.execute(context, { content: accumulated, title: validated.request.title });
+          formatted = enabledSteps.has(PIPELINE_STEPS.FORMAT_OUTPUT)
             ? await formatOutputStep.execute(context, cleaned)
             : cleaned;
-        } else if (enabledSteps.has("format-output")) {
+        } else if (enabledSteps.has(PIPELINE_STEPS.FORMAT_OUTPUT)) {
           formatted = await formatOutputStep.execute(context, accumulated);
         }
         const completed = await getStorage().generations.update(generation.id, {

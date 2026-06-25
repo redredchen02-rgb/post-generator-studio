@@ -1,57 +1,34 @@
 "use client";
 
 import * as React from "react";
-import ReactMarkdown from "react-markdown";
-import {
-  ChevronDown,
-  ChevronRight,
-  Clipboard,
-  Download,
-  FileText,
-  Loader2,
-  Play,
-  RotateCcw,
-  Save,
-  Square,
-} from "lucide-react";
-import { Button } from "@/presentation/components/ui/button";
-import { Field } from "@/presentation/components/ui/field";
-import { Input } from "@/presentation/components/ui/input";
-import { NativeSelect } from "@/presentation/components/ui/native-select";
-import { Textarea } from "@/presentation/components/ui/textarea";
-import {
-  fetchPromptPreview,
-  loadBootstrap,
-  saveGenerationContent,
-  testProviderProfile,
-  type BootstrapData,
-} from "@/presentation/lib/api";
+import { Loader2 } from "lucide-react";
 import { useUiStore } from "@/presentation/store/ui-store";
-import { stripMarkdown } from "@/lib/utils";
-import { extractTemplateVariables } from "@/application/prompt/renderer";
+import { useProviderStore } from "@/presentation/store/provider-store";
+import { useVarMemoryStore } from "@/presentation/store/var-memory-store";
+import { useBootstrapStore } from "@/presentation/store/bootstrap-store";
 import { useGenerationStream } from "./use-generation-stream";
 import { useKeyboard } from "@/presentation/lib/use-keyboard";
-
-const STANDARD_VARS = new Set(["TITLE", "EVENT_SUMMARY", "DATE", "TIME", "LOCALE"]);
+import { useSearchParams } from "next/navigation";
+import { testProviderProfile } from "@/presentation/lib/api";
+import { computePromptPreview } from "@/presentation/lib/preview-prompt";
+import { stripMarkdown } from "@/lib/utils";
+import { InputPanel } from "./input-panel";
+import { OutputPanel } from "./output-panel";
+import { ConfigSidebar } from "./config-sidebar";
 
 const sampleTitle = "台湾男子连续30天挑战AI创业";
 const sampleSummary = "- 连续30天开发AI产品\n- 使用 Claude Code 与 OpenAI Agent\n- 每天公开开发日志\n- 获得大量关注";
 
-function getCustomVars(template: { systemPrompt: string; userPromptTemplate: string } | undefined): string[] {
-  if (!template) return [];
-  const all = [
-    ...extractTemplateVariables(template.systemPrompt),
-    ...extractTemplateVariables(template.userPromptTemplate),
-  ];
-  return [...new Set(all)].filter((v) => !STANDARD_VARS.has(v));
-}
-
 export function GeneratorWorkspace(): React.ReactElement {
-  const [bootstrap, setBootstrap] = React.useState<BootstrapData | null>(null);
-  const [title, setTitle] = React.useState(sampleTitle);
-  const [eventSummary, setEventSummary] = React.useState(sampleSummary);
+  const searchParams = useSearchParams();
+  const bootstrap = useBootstrapStore((s) => s.data);
+  const bootstrapLoading = useBootstrapStore((s) => s.loading);
+  const fetchBootstrap = useBootstrapStore((s) => s.fetchIfNeeded);
+
+  const [title, setTitle] = React.useState(searchParams.get("title") || sampleTitle);
+  const [eventSummary, setEventSummary] = React.useState(searchParams.get("summary") || sampleSummary);
   const [presetId, setPresetId] = React.useState("");
-  const [providerProfileId, setProviderProfileId] = React.useState("");
+  const { selectedProfileId, setSelectedProfile } = useProviderStore();
   const [customVarValues, setCustomVarValues] = React.useState<Record<string, string>>({});
   const [providerError, setProviderError] = React.useState<string | null>(null);
   const [promptPreview, setPromptPreview] = React.useState<{ systemPrompt: string; userPrompt: string } | null>(null);
@@ -60,78 +37,111 @@ export function GeneratorWorkspace(): React.ReactElement {
   const { content, status, error, activeGeneration, metadata, isGenerating, generate, cancel, setContent, setStatus } =
     useGenerationStream();
 
+  const handleGenerateRef = React.useRef(handleGenerate);
+  handleGenerateRef.current = handleGenerate;
+  const cancelRef = React.useRef(cancel);
+  cancelRef.current = cancel;
+
   const bindings = React.useMemo(
     () => [
-      { key: "Enter", ctrl: true, handler: () => { if (!isGenerating) void handleGenerate(false); } },
-      { key: "Escape", handler: () => { if (isGenerating) void cancel(); } },
+      { key: "Enter", ctrl: true, handler: () => { if (!isGenerating) void handleGenerateRef.current(false); } },
+      { key: "Escape", handler: () => { if (isGenerating) void cancelRef.current(); } },
     ],
     [isGenerating],
   );
   useKeyboard(bindings);
 
+  // Initial bootstrap load
+  React.useEffect(() => { void fetchBootstrap(); }, [fetchBootstrap]);
+
+  // Set default preset once bootstrap is loaded
   React.useEffect(() => {
-    loadBootstrap()
-      .then((data) => {
-        setBootstrap(data);
-        const defaultPreset = data.generationPresets.find((preset) => preset.isDefault) || data.generationPresets[0];
-        if (defaultPreset) {
-          setPresetId(defaultPreset.id);
-          setProviderProfileId(defaultPreset.providerProfileId);
-        }
-      })
-      .catch((loadError: unknown) => {
-        setStatus(loadError instanceof Error ? loadError.message : "Failed to load app data");
-      });
-  }, [setStatus]);
+    if (!bootstrap) return;
+    if (presetId) return;
+    const defaultPreset = bootstrap.generationPresets.find((p) => p.isDefault) || bootstrap.generationPresets[0];
+    if (defaultPreset) {
+      setPresetId(defaultPreset.id);
+      const storedId = useProviderStore.getState().selectedProfileId;
+      const enabledProfiles = bootstrap.providerProfiles.filter((p) => p.enabled);
+      if (!storedId || !enabledProfiles.some((p) => p.id === storedId)) {
+        setSelectedProfile(defaultPreset.providerProfileId);
+      }
+    }
+  }, [bootstrap, presetId, setSelectedProfile]);
+
+  // SWR refresh on visibility change
+  React.useEffect(() => {
+    function handleVisibilityChange() {
+      if (document.visibilityState !== "visible") return;
+      void fetchBootstrap();
+    }
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, [fetchBootstrap]);
 
   const selectedPreset = bootstrap?.generationPresets.find((preset) => preset.id === presetId);
   const selectedProvider = bootstrap?.providerProfiles.find(
-    (provider) => provider.id === (providerProfileId || selectedPreset?.providerProfileId),
+    (provider) => provider.id === (selectedProfileId ?? selectedPreset?.providerProfileId),
   );
   const selectedTemplate = bootstrap?.promptTemplates.find((template) => template.id === selectedPreset?.promptTemplateId);
   const templateId = selectedPreset?.promptTemplateId;
-  const customVars = getCustomVars(selectedTemplate);
+  const effectiveProviderId = selectedProfileId ?? selectedPreset?.providerProfileId;
 
-  // Provider pre-flight check
-  const effectiveProviderId = providerProfileId || selectedPreset?.providerProfileId;
+  // Pre-fill custom var values per template
   React.useEffect(() => {
-    if (!effectiveProviderId) return;
-    setProviderError(null);
-    testProviderProfile(effectiveProviderId)
-      .then((result) => {
-        if (!result.ok) setProviderError(result.message);
-      })
-      .catch(() => null);
-  }, [effectiveProviderId]);
+    if (!templateId) { setCustomVarValues({}); return; }
+    const memory = useVarMemoryStore.getState().varMemory[templateId] ?? {};
+    const defaults = selectedTemplate?.customVariableDefaults ?? {};
+    setCustomVarValues({ ...defaults, ...memory });
+  }, [templateId, selectedTemplate?.customVariableDefaults]);
 
-  // Reset custom var values when template changes
+  // Live prompt preview — client-side (no API call)
   React.useEffect(() => {
-    setCustomVarValues({});
-  }, [templateId]);
-
-  // Live prompt preview (debounced)
-  React.useEffect(() => {
-    if (!templateId) return;
+    if (!templateId || !selectedTemplate) { setPromptPreview(null); return; }
     const timer = setTimeout(() => {
-      fetchPromptPreview({ templateId, title, eventSummary, customVariables: customVarValues })
-        .then(setPromptPreview)
-        .catch(() => null);
+      const result = computePromptPreview({
+        template: selectedTemplate, title, eventSummary,
+        locale: selectedPreset?.locale, customVariables: customVarValues,
+      });
+      setPromptPreview({ systemPrompt: result.systemPrompt, userPrompt: result.userPrompt });
     }, 400);
     return () => clearTimeout(timer);
-  }, [title, eventSummary, templateId, customVarValues]);
+  }, [title, eventSummary, templateId, selectedTemplate, selectedPreset?.locale, customVarValues]);
 
   async function handleGenerate(regenerate = false): Promise<void> {
-    await generate({ title, eventSummary, presetId, providerProfileId, regenerate, customVariables: customVarValues });
+    setProviderError(null);
+    if (effectiveProviderId && bootstrap) {
+      const profile = bootstrap.providerProfiles.find((p) => p.id === effectiveProviderId);
+      if (!profile) { setProviderError("Provider profile not found"); return; }
+      if (!profile.enabled) { setProviderError("Provider is not enabled"); return; }
+      try {
+        const result = await testProviderProfile(effectiveProviderId);
+        if (!result.ok) { setProviderError(result.message); return; }
+      } catch (err) {
+        setProviderError(err instanceof Error ? err.message : "Provider check failed");
+        return;
+      }
+    }
+    await generate({
+      title, eventSummary, presetId,
+      providerProfileId: effectiveProviderId ?? "", regenerate,
+      customVariables: customVarValues,
+      onSuccess: (vars) => {
+        if (!templateId) return;
+        for (const [k, v] of Object.entries(vars)) {
+          useVarMemoryStore.getState().setVar(templateId, k, v);
+        }
+      },
+    });
   }
 
   async function saveToHistory(): Promise<void> {
     if (!activeGeneration) return;
     try {
-      await saveGenerationContent(activeGeneration.id, content);
+      const { saveGenerationContent: save } = await import("@/presentation/lib/api");
+      await save(activeGeneration.id, content);
       setStatus("Saved to history");
-    } catch {
-      setStatus("Save failed");
-    }
+    } catch { setStatus("Save failed"); }
   }
 
   async function copyMarkdown(): Promise<void> {
@@ -149,215 +159,80 @@ export function GeneratorWorkspace(): React.ReactElement {
     const blob = new Blob([body], { type: format === "md" ? "text/markdown" : "text/plain" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    link.download = `${title || "generation"}.${format}`;
+    const now = new Date();
+    const ts = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}_${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}`;
+    link.download = `${title || "generation"}_${ts}.${format}`;
     link.click();
     URL.revokeObjectURL(link.href);
     setStatus(`Exported .${format}`);
   }
 
+  if (bootstrapLoading && !bootstrap) {
+    return (
+      <main className="mx-auto flex max-w-[1680px] items-center justify-center px-4 py-16">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </main>
+    );
+  }
+
+  if (!bootstrap) {
+    return (
+      <main className="mx-auto flex max-w-[1680px] items-center justify-center px-4 py-16 text-muted-foreground">
+        Failed to load app data
+      </main>
+    );
+  }
+
   return (
     <main className="mx-auto grid max-w-[1680px] gap-4 px-4 py-4 lg:grid-cols-[320px_minmax(0,1fr)_320px]">
-      <section className="app-surface grid h-fit gap-4 rounded-lg p-4 slide-up">
-        <div>
-          <h1 className="text-lg font-semibold">Generate</h1>
-          <p className="text-sm text-muted-foreground">输入主题，选择 Preset，然后开始流式生成。</p>
-        </div>
-        <Field label="Title">
-          <Input value={title} onChange={(event) => setTitle(event.target.value)} />
-        </Field>
-        <Field label="Event Summary">
-          <Textarea
-            value={eventSummary}
-            onChange={(event) => setEventSummary(event.target.value)}
-            className="min-h-48"
-          />
-        </Field>
-        <Field label="Preset Selector">
-          <NativeSelect value={presetId} onChange={(event) => setPresetId(event.target.value)}>
-            {bootstrap?.generationPresets.map((preset) => (
-              <option key={preset.id} value={preset.id}>
-                {preset.name}
-              </option>
-            ))}
-          </NativeSelect>
-        </Field>
-        <Field label="Provider Override">
-          <NativeSelect value={providerProfileId} onChange={(event) => setProviderProfileId(event.target.value)}>
-            {bootstrap?.providerProfiles.map((provider) => (
-              <option key={provider.id} value={provider.id}>
-                {provider.name} {provider.enabled ? "" : "(disabled)"}
-              </option>
-            ))}
-          </NativeSelect>
-          {providerError && (
-            <p className="mt-1 text-xs text-destructive">{providerError}</p>
-          )}
-        </Field>
-        {customVars.length > 0 && (
-          <div className="grid gap-3 rounded-lg border p-3">
-            <span className="text-sm font-medium">Template Variables</span>
-            {customVars.map((varName) => (
-              <Field key={varName} label={varName}>
-                <Input
-                  value={customVarValues[varName] ?? ""}
-                  onChange={(event) =>
-                    setCustomVarValues((prev) => ({ ...prev, [varName]: event.target.value }))
-                  }
-                  placeholder={`Value for {{${varName}}}`}
-                />
-              </Field>
-            ))}
-          </div>
-        )}
-        <div className="grid grid-cols-2 gap-2">
-          <Button disabled={isGenerating} onClick={() => void handleGenerate(false)}>
-            {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-            Generate
-          </Button>
-          <Button variant="outline" disabled={!isGenerating} onClick={() => void cancel()}>
-            <Square className="h-4 w-4" />
-            Cancel
-          </Button>
-        </div>
-      </section>
-
-      <section className="app-surface grid min-h-[calc(100vh-6.5rem)] grid-rows-[auto_auto_minmax(0,1fr)_auto] gap-3 rounded-lg p-4 slide-up" style={{ animationDelay: "0.1s" }}>
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <h2 className="text-lg font-semibold">Output</h2>
-            <p className="text-sm text-muted-foreground">{status}</p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Button variant={rawMode ? "default" : "outline"} size="sm" onClick={() => setRawMode(true)}>
-              <FileText className="h-4 w-4" />
-              Raw
-            </Button>
-            <Button variant={!rawMode ? "default" : "outline"} size="sm" onClick={() => setRawMode(false)}>
-              <FileText className="h-4 w-4" />
-              Preview
-            </Button>
-          </div>
-        </div>
-        {error ? <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm">{error}</div> : null}
-        <div className="min-h-0 overflow-hidden rounded-md border bg-background">
-          {rawMode ? (
-            <Textarea
-              value={content}
-              onChange={(event) => setContent(event.target.value)}
-              placeholder="Streaming content will appear here..."
-              className="h-full min-h-[540px] resize-none border-0 font-mono shadow-none focus-visible:ring-0"
-              style={{ fontSize: editorFontSize }}
-            />
-          ) : (
-            <article className="prose prose-neutral max-w-none overflow-auto p-4 dark:prose-invert">
-              <ReactMarkdown>{content || "Streaming content will appear here..."}</ReactMarkdown>
-            </article>
-          )}
-        </div>
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <span>Font</span>
-            <input
-              aria-label="Editor font size"
-              type="range"
-              min="13"
-              max="20"
-              value={editorFontSize}
-              onChange={(event) => setEditorFontSize(Number(event.target.value))}
-            />
-            <span>{editorFontSize}px</span>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button variant="outline" size="sm" disabled={!content} onClick={() => void copyMarkdown()}>
-              <Clipboard className="h-4 w-4" />
-              Copy Markdown
-            </Button>
-            <Button variant="outline" size="sm" disabled={!content} onClick={() => void copyPlainText()}>
-              <Clipboard className="h-4 w-4" />
-              Copy Plain Text
-            </Button>
-            <Button variant="outline" size="sm" disabled={!content} onClick={() => exportLocal("md")}>
-              <Download className="h-4 w-4" />
-              .md
-            </Button>
-            <Button variant="outline" size="sm" disabled={!content} onClick={() => exportLocal("txt")}>
-              <Download className="h-4 w-4" />
-              .txt
-            </Button>
-            <Button variant="outline" size="sm" disabled={!activeGeneration} onClick={() => void saveToHistory()}>
-              <Save className="h-4 w-4" />
-              Save
-            </Button>
-            <Button variant="secondary" size="sm" disabled={isGenerating} onClick={() => void handleGenerate(true)}>
-              <RotateCcw className="h-4 w-4" />
-              Regenerate
-            </Button>
-          </div>
-        </div>
-      </section>
-
-      <aside className="app-surface grid h-fit gap-4 rounded-lg p-4 slide-up" style={{ animationDelay: "0.2s" }}>
-        <div>
-          <h2 className="text-lg font-semibold">Current Config</h2>
-          <p className="text-sm text-muted-foreground">常用配置可在这里快速确认。</p>
-        </div>
-        <ConfigRow label="Provider" value={selectedProvider?.name || "None"} />
-        <ConfigRow label="Model" value={selectedProvider?.model || "None"} />
-        <ConfigRow label="Temperature" value={String(selectedPreset?.temperature ?? selectedProvider?.defaultTemperature ?? "-")} />
-        <ConfigRow label="Max Tokens" value={String(selectedPreset?.maxTokens ?? selectedProvider?.defaultMaxTokens ?? "-")} />
-        <ConfigRow label="Prompt Template" value={selectedTemplate?.name || "None"} />
-        <ConfigRow label="Output Format" value={selectedPreset?.outputFormat || "markdown"} />
-        <div className="grid gap-2">
-          <span className="text-sm font-medium">Pipeline Steps</span>
-          <div className="flex flex-wrap gap-1">
-            {(selectedPreset?.enabledPipelineSteps || []).map((step) => (
-              <span key={step} className="rounded bg-muted px-2 py-1 text-xs text-muted-foreground">
-                {step}
-              </span>
-            ))}
-          </div>
-        </div>
-        <div className="rounded-md bg-secondary p-3 text-sm text-secondary-foreground">
-          {metadata.outputTokens ? `${metadata.outputTokens} output tokens` : "Token usage appears when providers report it."}
-        </div>
-        <div className="border-t pt-3">
-          <button
-            type="button"
-            className="flex w-full items-center justify-between text-sm font-medium"
-            onClick={() => setPromptPreviewOpen((v) => !v)}
-          >
-            Prompt Preview
-            {promptPreviewOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-          </button>
-          {promptPreviewOpen && (
-            <div className="mt-3 grid gap-3">
-              {promptPreview ? (
-                <>
-                  <div className="grid gap-1">
-                    <span className="text-xs uppercase text-muted-foreground">System</span>
-                    <pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded bg-muted p-2 text-xs">{promptPreview.systemPrompt}</pre>
-                  </div>
-                  <div className="grid gap-1">
-                    <span className="text-xs uppercase text-muted-foreground">User</span>
-                    <pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded bg-muted p-2 text-xs">{promptPreview.userPrompt}</pre>
-                  </div>
-                </>
-              ) : (
-                <p className="text-xs text-muted-foreground">Loading preview...</p>
-              )}
-            </div>
-          )}
-        </div>
-      </aside>
+      <InputPanel
+        bootstrap={bootstrap}
+        title={title}
+        eventSummary={eventSummary}
+        presetId={presetId}
+        selectedProfileId={selectedProfileId}
+        customVarValues={customVarValues}
+        providerError={providerError}
+        isGenerating={isGenerating}
+        selectedTemplate={selectedTemplate}
+        selectedPreset={selectedPreset}
+        onTitleChange={setTitle}
+        onEventSummaryChange={setEventSummary}
+        onPresetIdChange={setPresetId}
+        onProfileIdChange={setSelectedProfile}
+        onCustomVarChange={(varName, value) =>
+          setCustomVarValues((prev) => ({ ...prev, [varName]: value }))
+        }
+        onGenerate={() => void handleGenerate(false)}
+        onCancel={() => void cancel()}
+      />
+      <OutputPanel
+        content={content}
+        status={status}
+        error={error}
+        rawMode={rawMode}
+        editorFontSize={editorFontSize}
+        isGenerating={isGenerating}
+        activeGeneration={activeGeneration}
+        onRawModeChange={setRawMode}
+        onContentChange={setContent}
+        onCopyMarkdown={copyMarkdown}
+        onCopyPlainText={copyPlainText}
+        onExportMd={() => exportLocal("md")}
+        onExportTxt={() => exportLocal("txt")}
+        onSave={saveToHistory}
+        onRegenerate={() => void handleGenerate(true)}
+        onFontSizeChange={setEditorFontSize}
+      />
+      <ConfigSidebar
+        selectedProvider={selectedProvider}
+        selectedPreset={selectedPreset}
+        selectedTemplate={selectedTemplate}
+        metadata={metadata}
+        promptPreview={promptPreview}
+        promptPreviewOpen={promptPreviewOpen}
+        onPromptPreviewToggle={() => setPromptPreviewOpen((v) => !v)}
+      />
     </main>
-  );
-}
-
-function ConfigRow({ label, value }: { label: string; value: string }): React.ReactElement {
-  return (
-    <div className="grid gap-1 border-b pb-2 last:border-0">
-      <span className="text-xs uppercase text-muted-foreground">{label}</span>
-      <span className="break-words text-sm font-medium">{value}</span>
-    </div>
   );
 }

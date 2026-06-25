@@ -5,21 +5,17 @@ import {
   promptTemplateUpdateSchema,
   type PromptTemplate,
 } from "@/domain/schemas";
-import { AppErrorException } from "@/domain/schemas";
 import { getStorage } from "@/infrastructure/storage/sqlite-storage";
 import { assertSupportedVariables, renderTemplate } from "@/application/prompt/renderer";
 import { resolvePromptVariables } from "@/application/prompt/variables";
+import { getOrThrow } from "@/application/crud-helpers";
 
 export async function listPromptTemplates(): Promise<PromptTemplate[]> {
   return getStorage().promptTemplates.list();
 }
 
 export async function getPromptTemplate(id: string): Promise<PromptTemplate> {
-  const template = await getStorage().promptTemplates.get(id);
-  if (!template) {
-    throw new AppErrorException({ code: "NOT_FOUND", message: "提示词模板不存在" });
-  }
-  return template;
+  return getOrThrow(getStorage().promptTemplates, id, "提示词模板不存在");
 }
 
 export async function createPromptTemplate(input: unknown): Promise<PromptTemplate> {

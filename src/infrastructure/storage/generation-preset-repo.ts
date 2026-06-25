@@ -2,7 +2,7 @@ import { desc, eq } from "drizzle-orm";
 import { nowIso, parseJson } from "@/lib/utils";
 import { generationPresetSchema, type GenerationPreset, type GenerationPresetCreate, type GenerationPresetUpdate } from "@/domain/schemas";
 import type { GenerationPresetRepository } from "@/domain/ports/storage";
-import { AppErrorException } from "@/domain/schemas";
+import { notFound } from "@/infrastructure/storage/repo-utils";
 import { getDb } from "@/infrastructure/storage/db";
 import { generationPresets } from "@/infrastructure/storage/schema";
 
@@ -23,10 +23,6 @@ function presetFromRow(row: PresetRow): GenerationPreset {
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   });
-}
-
-function notFound(entity: string): never {
-  throw new AppErrorException({ code: "NOT_FOUND", message: `${entity} not found` });
 }
 
 export class SqliteGenerationPresetRepository implements GenerationPresetRepository {

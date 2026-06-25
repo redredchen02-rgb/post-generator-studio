@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { outputFormatSchema, providerKindSchema, generationStatusSchema } from "./enums";
+import { DEFAULT_ENABLED_STEPS } from "@/domain/pipeline-steps";
 
 const snapshotSchema = z.record(z.unknown());
 
@@ -39,6 +40,8 @@ export type GenerationRequest = z.infer<typeof generationRequestSchema>;
 
 export const generationListQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(30),
+  search: z.string().optional(),
+  offset: z.coerce.number().int().min(0).default(0),
 });
 
 export const normalizedGenerationRequestSchema = z.object({
@@ -88,12 +91,7 @@ export const generationPresetCreateSchema = z.object({
   maxTokens: z.number().int().min(1).max(200_000).optional(),
   locale: z.string().min(1).default("zh-CN"),
   outputFormat: outputFormatSchema.default("markdown"),
-  enabledPipelineSteps: z.array(z.string()).default([
-    "build-context",
-    "render-prompt",
-    "clean-content",
-    "format-output",
-  ]),
+  enabledPipelineSteps: z.array(z.string()).default([...DEFAULT_ENABLED_STEPS]),
   isDefault: z.boolean().default(false),
 });
 export type GenerationPresetCreate = z.infer<typeof generationPresetCreateSchema>;

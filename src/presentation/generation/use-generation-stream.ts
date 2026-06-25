@@ -31,6 +31,8 @@ export function useGenerationStream() {
     isGenerating: false,
   });
   const abortRef = React.useRef<AbortController | null>(null);
+  const activeGenerationRef = React.useRef(state.activeGeneration);
+  activeGenerationRef.current = state.activeGeneration;
 
   const generate = React.useCallback(
     async (params: {
@@ -40,6 +42,7 @@ export function useGenerationStream() {
       providerProfileId?: string;
       regenerate?: boolean;
       customVariables?: Record<string, string>;
+      onSuccess?: (vars: Record<string, string>) => void;
     }) => {
       const { title, eventSummary, presetId, providerProfileId, regenerate, customVariables } = params;
       if (!presetId) {
@@ -101,6 +104,9 @@ export function useGenerationStream() {
               content: payload.content,
               status: payload.generation.status === "completed" ? "Completed" : payload.generation.status,
             }));
+            if (payload.generation.status === "completed") {
+              params.onSuccess?.(params.customVariables ?? {});
+            }
           }
         }
       } catch (streamError) {
@@ -119,12 +125,13 @@ export function useGenerationStream() {
   );
 
   const cancel = React.useCallback(async () => {
-    if (state.activeGeneration) {
-      await fetch(`/api/generations/${state.activeGeneration.id}/cancel`, { method: "POST" });
+    const gen = activeGenerationRef.current;
+    if (gen) {
+      await fetch(`/api/generations/${gen.id}/cancel`, { method: "POST" });
     }
     abortRef.current?.abort();
     setState((s) => ({ ...s, isGenerating: false, status: "Cancelled" }));
-  }, [state.activeGeneration]);
+  }, []);
 
   const setContent = React.useCallback((content: string) => {
     setState((s) => ({ ...s, content }));

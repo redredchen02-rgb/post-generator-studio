@@ -68,8 +68,8 @@ export class GeminiAdapter extends BaseAdapter {
       events.push({
         type: "metadata",
         model: request.model,
-        inputTokens: parsed.usageMetadata.promptTokenCount,
-        outputTokens: parsed.usageMetadata.candidatesTokenCount,
+        inputTokens: parsed.usageMetadata?.promptTokenCount,
+        outputTokens: parsed.usageMetadata?.candidatesTokenCount,
       });
     }
     return { events };

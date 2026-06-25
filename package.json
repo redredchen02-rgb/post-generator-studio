@@ -1,6 +1,6 @@
 {
   "name": "post-generator-studio",
-  "version": "0.1.0",
+  "version": "0.0.1",
   "private": true,
   "packageManager": "pnpm@10.33.0",
   "scripts": {
@@ -66,7 +66,7 @@
     "vitest": "^2.1.8"
   },
   "lint-staged": {
-    "*.{ts,tsx}": "eslint --fix"
+    "*.{ts,tsx}": "sh scripts/eslint-fix.sh"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

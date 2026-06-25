@@ -59,6 +59,7 @@ pnpm dev
 | `POST_GENERATOR_HOME` | 数据根目录 | `~/.post-generator` |
 | `POST_GENERATOR_SECRET_KEY` | 加密密钥（64 字符 hex） | 自动派生 |
 | `POST_GENERATOR_DB_PATH` | 数据库路径 | `{HOME}/post-generator.db` |
+| `POST_GENERATOR_PROVIDER_TIMEOUT_MS` | Provider 请求超时（毫秒） | `120000` |
 
 ### Provider 配置
 

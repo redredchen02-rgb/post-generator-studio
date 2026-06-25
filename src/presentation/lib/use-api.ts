@@ -19,8 +19,13 @@ export function useApi<T>(
     isRefetching: false,
   });
   const mountedRef = React.useRef(true);
+  // Monotonic request id: only the most recently started load may commit its
+  // result, so a slow earlier fetch can't overwrite a newer one (search/offset
+  // changing rapidly).
+  const latestRequestRef = React.useRef(0);
 
   const load = React.useCallback(async () => {
+    const requestId = ++latestRequestRef.current;
     setState((s) => ({
       ...s,
       loading: s.data === null,
@@ -29,11 +34,11 @@ export function useApi<T>(
     }));
     try {
       const data = await fetcher();
-      if (mountedRef.current) {
+      if (mountedRef.current && requestId === latestRequestRef.current) {
         setState({ data, error: null, loading: false, isRefetching: false });
       }
     } catch (err) {
-      if (mountedRef.current) {
+      if (mountedRef.current && requestId === latestRequestRef.current) {
         setState((s) => ({
           ...s,
           error: err instanceof Error ? err.message : "加载失败",

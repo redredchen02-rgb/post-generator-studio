@@ -1,8 +1,8 @@
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, like, sql } from "drizzle-orm";
 import { nowIso, parseJson } from "@/lib/utils";
 import { generationSchema, type Generation } from "@/domain/schemas";
-import type { GenerationCreateInput, GenerationRepository, GenerationUpdateInput } from "@/domain/ports/storage";
-import { AppErrorException } from "@/domain/schemas";
+import type { GenerationCreateInput, GenerationListOpts, GenerationListResult, GenerationRepository, GenerationUpdateInput } from "@/domain/ports/storage";
+import { notFound } from "@/infrastructure/storage/repo-utils";
 import { getDb } from "@/infrastructure/storage/db";
 import { generations } from "@/infrastructure/storage/schema";
 
@@ -33,15 +33,20 @@ function generationFromRow(row: GenerationRow): Generation {
   });
 }
 
-function notFound(entity: string): never {
-  throw new AppErrorException({ code: "NOT_FOUND", message: `${entity} not found` });
-}
-
 export class SqliteGenerationRepository implements GenerationRepository {
-  async list(limit = 30): Promise<Generation[]> {
+  async list(opts: GenerationListOpts = {}): Promise<GenerationListResult> {
+    const { search, offset = 0, limit = 30 } = opts;
     const db = await getDb();
-    const rows = await db.select().from(generations).orderBy(desc(generations.createdAt)).limit(limit);
-    return rows.map(generationFromRow);
+    const filter = search ? like(generations.title, `%${search}%`) : undefined;
+    const [rows, [{ total }]] = await Promise.all([
+      filter
+        ? db.select().from(generations).where(filter).orderBy(desc(generations.createdAt)).limit(limit).offset(offset)
+        : db.select().from(generations).orderBy(desc(generations.createdAt)).limit(limit).offset(offset),
+      filter
+        ? db.select({ total: sql<number>`count(*)` }).from(generations).where(filter)
+        : db.select({ total: sql<number>`count(*)` }).from(generations),
+    ]);
+    return { items: rows.map(generationFromRow), total: Number(total) };
   }
 
   async get(id: string): Promise<Generation | null> {
@@ -85,17 +90,38 @@ export class SqliteGenerationRepository implements GenerationRepository {
     return created ?? notFound("Generation");
   }
 
+  /** Terminal statuses that cannot be overwritten by concurrent updates. */
+  private static readonly TERMINAL_STATUSES = new Set(["completed", "failed", "cancelled"] as const);
+
+  /** Allowed status transitions. If not listed, allow anything (e.g. queued → streaming). */
+  private static readonly ALLOWED_TRANSITIONS: Record<string, ReadonlySet<string>> = {
+    completed: new Set(["completed"]),
+    failed: new Set(["failed"]),
+    cancelled: new Set(["cancelled"]),
+  };
+
+  private static canTransition(from: string, to: string): boolean {
+    const allowed = SqliteGenerationRepository.ALLOWED_TRANSITIONS[from];
+    return allowed ? allowed.has(to) : true;
+  }
+
   async update(id: string, input: GenerationUpdateInput): Promise<Generation> {
     const existing = await this.get(id);
     if (!existing) {
       notFound("Generation");
+    }
+    const newStatus = input.status ?? existing.status;
+    if (!SqliteGenerationRepository.canTransition(existing.status, newStatus)) {
+      // Another request already moved this generation to a terminal state.
+      // Return the existing record unchanged (the caller will handle gracefully).
+      return existing;
     }
     const db = await getDb();
     await db
       .update(generations)
       .set({
         outputContent: input.outputContent ?? existing.outputContent ?? null,
-        status: input.status ?? existing.status,
+        status: newStatus,
         errorMessage: input.errorMessage ?? existing.errorMessage ?? null,
         model: input.model ?? existing.model ?? null,
         inputTokens: input.inputTokens ?? existing.inputTokens ?? null,

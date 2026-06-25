@@ -34,7 +34,7 @@ focus: open-ended
 **Downsides:** None.  
 **Confidence:** 100%  
 **Complexity:** Low  
-**Status:** Unexplored
+**Status:** ✅ Implemented (prior session)
 
 ### 2. Fix: Seeds Reference Non-Existent Pipeline Step IDs
 **Description:** `seeds.ts` lists `generate-content` and `persist-generation` step IDs; `registry.ts` only has 4 real steps. New-user presets silently skip unknown steps.  
@@ -42,7 +42,7 @@ focus: open-ended
 **Downsides:** None.  
 **Confidence:** 100%  
 **Complexity:** Low  
-**Status:** Unexplored
+**Status:** ✅ Implemented (prior session — seeds simplified, `prompts/` not created)
 
 ### 3. Refactor: Merge `application/prompt/` and `application/prompts/`
 **Description:** Two near-identical directories exist (`prompt/` with renderer + variables, `prompts/` with prompt-service). Merge into one.  
@@ -50,7 +50,7 @@ focus: open-ended
 **Downsides:** Small import churn; needs careful find/replace.  
 **Confidence:** 95%  
 **Complexity:** Low  
-**Status:** Unexplored
+**Status:** ✅ Implemented (prior session — only `application/prompt/` exists, no merge needed)
 
 ### 4. Live Prompt Preview in Generator
 **Description:** Collapsible panel in the generator that shows the fully-rendered system/user prompt (with all variables resolved) before the user clicks Generate. Debounced, driven by existing `/api/prompt-templates/preview` endpoint.  
@@ -58,7 +58,7 @@ focus: open-ended
 **Downsides:** One extra debounced API call per edit; needs UI real estate (collapsible mitigates).  
 **Confidence:** 92%  
 **Complexity:** Low–Medium  
-**Status:** Unexplored
+**Status:** ✅ Implemented (prior session)
 
 ### 5. Per-Generation Prompt Inspector in History
 **Description:** Collapsible "Prompt Used" section in history detail view, showing `renderedSystemPrompt` and `renderedUserPrompt` already stored in the DB.  
@@ -66,7 +66,7 @@ focus: open-ended
 **Downsides:** None meaningful.  
 **Confidence:** 95%  
 **Complexity:** Low  
-**Status:** Unexplored
+**Status:** ✅ Implemented (prior session)
 
 ### 6. Provider Error Pre-flight Check
 **Description:** When the user selects a Provider Profile in the Generator, immediately call `validateConfig()` via the existing `/api/provider-profiles/[id]/test` route. Show any error inline next to the selector before generation starts.  
@@ -74,7 +74,7 @@ focus: open-ended
 **Downsides:** One extra API call per provider selection (debounce or fire only on change).  
 **Confidence:** 88%  
 **Complexity:** Low  
-**Status:** Unexplored
+**Status:** ✅ Implemented (prior session)
 
 ### 7. Custom Variable Injection in Generator
 **Description:** When a selected Template contains non-standard `{{VARIABLE}}` tokens (e.g. `{{PLATFORM}}`), the Generator form auto-detects and renders additional input fields for them. Currently any custom variable causes a silent runtime failure.  
@@ -91,10 +91,10 @@ focus: open-ended
 | # | Idea | Reason Rejected |
 |---|------|-----------------|
 | A | Batch Generation Queue | Single-user tool doesn't need async queue infrastructure |
-| B | Token Cost Estimation | Irrelevant for Ollama users; post-generation token counts already shown |
+| B | Token Cost Estimation | Deprioritised but later implemented (R2-3) — token counts now shown with cost estimate in progress sidebar |
 | C | Prompt Template Version Diff UI | Infrastructure exists but single-user use case doesn't justify diff UI complexity yet |
 | E | Custom Pipeline Steps (user-authored JS) | Arbitrary JS execution is a security black hole |
-| F | History Filter (simplified) | Useful but lower priority; deferred until history grows large enough to matter |
+| F | History Filter (simplified) | ✅ Implemented (R2-5) — search + pagination added |
 | G | Ratings/Feedback Loop | Single-user sample size makes statistics meaningless |
 | L | Provider Auto-Fallback | Silent provider switching is worse than a visible error |
 | M | Async Background Tasks | Over-engineering for a local single-user tool |
