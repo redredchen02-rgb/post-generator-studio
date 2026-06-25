@@ -9,7 +9,7 @@ export class PostgenClient {
   private async fetchJson<T>(url: string, init?: RequestInit): Promise<T> { const response = await fetch(url, { ...init, headers: { "Content-Type": "application/json", ...(init?.headers || {}) } }); const data = await response.json(); if (!response.ok && data?.error) throw new PostgenClientError(data.error); return data as T; }
   async health(): Promise<{ ok: true }> { return this.fetchJson(`${this.baseUrl}/api/health`); }
   async bootstrap(): Promise<BootstrapData> { return this.fetchJson(`${this.baseUrl}/api/bootstrap`); }
-  async listGenerations(limit?: number): Promise<Generation[]> { return this.fetchJson(`${this.baseUrl}/api/generations${limit ? `?limit=${limit}` : ""}`); }
+  async listGenerations(opts?: { limit?: number; offset?: number; search?: string }): Promise<{ items: Generation[]; total: number }> { const params = new URLSearchParams(); if (opts?.limit != null) params.set("limit", String(opts.limit)); if (opts?.offset != null) params.set("offset", String(opts.offset)); if (opts?.search) params.set("search", opts.search); const qs = params.toString(); return this.fetchJson(`${this.baseUrl}/api/generations${qs ? `?${qs}` : ""}`); }
   async getGeneration(id: string): Promise<Generation> { return this.fetchJson(`${this.baseUrl}/api/generations/${id}`); }
   async cancelGeneration(id: string): Promise<{ cancelled: boolean }> { return this.fetchJson(`${this.baseUrl}/api/generations/${id}/cancel`, { method: "POST" }); }
   async deleteGeneration(id: string): Promise<void> { await this.fetchJson(`${this.baseUrl}/api/generations/${id}`, { method: "DELETE" }); }
