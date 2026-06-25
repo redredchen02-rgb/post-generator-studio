@@ -121,7 +121,7 @@ export function PromptTemplatesPanel({
 
   async function remove(id: string): Promise<void> {
     try {
-      await fetch(`/api/prompt-templates/${id}`, { method: "DELETE" });
+      await fetchJson(`/api/prompt-templates/${id}`, { method: "DELETE" });
       useVarMemoryStore.getState().clearTemplate(id);
       if (editingId === id) cancelEdit();
       await refresh();

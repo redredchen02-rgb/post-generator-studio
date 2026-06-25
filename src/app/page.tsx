@@ -3,7 +3,7 @@ import { GeneratorWorkspace } from "@/presentation/generation/generator-workspac
 
 export default function Page(): React.ReactElement {
   return (
-    <React.Suspense fallback={null}>
+    <React.Suspense fallback={<div className="flex h-screen items-center justify-center text-muted-foreground text-sm">Loading…</div>}>
       <GeneratorWorkspace />
     </React.Suspense>
   );

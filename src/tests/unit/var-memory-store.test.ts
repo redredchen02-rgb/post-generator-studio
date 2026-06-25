@@ -16,6 +16,11 @@ describe("useVarMemoryStore", () => {
     expect(useVarMemoryStore.getState().varMemory["tmpl-1"]).toBeUndefined();
   });
 
+  it("does not store whitespace-only values", () => {
+    useVarMemoryStore.getState().setVar("tmpl-1", "PLATFORM", "   ");
+    expect(useVarMemoryStore.getState().varMemory["tmpl-1"]).toBeUndefined();
+  });
+
   it("clearTemplate removes the templateId entry", () => {
     useVarMemoryStore.getState().setVar("tmpl-1", "BRAND_NAME", "Acme");
     useVarMemoryStore.getState().clearTemplate("tmpl-1");

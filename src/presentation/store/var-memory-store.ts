@@ -14,7 +14,7 @@ export const useVarMemoryStore = create<VarMemoryState>()(
     (set) => ({
       varMemory: {},
       setVar: (templateId, varName, value) => {
-        if (!value) return;
+        if (!value.trim()) return;
         set((state) => ({
           varMemory: {
             ...state.varMemory,
