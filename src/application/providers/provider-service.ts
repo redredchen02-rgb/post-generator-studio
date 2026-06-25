@@ -5,21 +5,17 @@ import {
   type ProviderModel,
   type ProviderProfile,
 } from "@/domain/schemas";
-import { AppErrorException } from "@/domain/schemas";
 import { getStorage } from "@/infrastructure/storage/sqlite-storage";
 import { deleteSecret, readSecret, saveSecret } from "@/infrastructure/security/secrets";
 import { getProviderAdapter } from "@/infrastructure/providers/registry";
+import { getOrThrow } from "@/application/crud-helpers";
 
 export async function listProviderProfiles(): Promise<ProviderProfile[]> {
   return getStorage().providerProfiles.list();
 }
 
 export async function getProviderProfile(id: string): Promise<ProviderProfile> {
-  const profile = await getStorage().providerProfiles.get(id);
-  if (!profile) {
-    throw new AppErrorException({ code: "NOT_FOUND", message: "供应商配置不存在" });
-  }
-  return profile;
+  return getOrThrow(getStorage().providerProfiles, id, "供应商配置不存在");
 }
 
 export async function createProviderProfile(input: unknown): Promise<ProviderProfile> {

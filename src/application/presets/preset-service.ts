@@ -4,19 +4,15 @@ import {
   generationPresetUpdateSchema,
   type GenerationPreset,
 } from "@/domain/schemas";
-import { AppErrorException } from "@/domain/schemas";
 import { getStorage } from "@/infrastructure/storage/sqlite-storage";
+import { getOrThrow } from "@/application/crud-helpers";
 
 export async function listGenerationPresets(): Promise<GenerationPreset[]> {
   return getStorage().generationPresets.list();
 }
 
 export async function getGenerationPreset(id: string): Promise<GenerationPreset> {
-  const preset = await getStorage().generationPresets.get(id);
-  if (!preset) {
-    throw new AppErrorException({ code: "NOT_FOUND", message: "生成预设不存在" });
-  }
-  return preset;
+  return getOrThrow(getStorage().generationPresets, id, "生成预设不存在");
 }
 
 export async function createGenerationPreset(input: unknown): Promise<GenerationPreset> {

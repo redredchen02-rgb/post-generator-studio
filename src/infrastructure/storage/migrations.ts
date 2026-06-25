@@ -97,6 +97,9 @@ export async function runMigrations(): Promise<void> {
   try {
     database.pragma("journal_mode = WAL");
     database.exec(INITIAL_SQL);
+    // Add indexes for query performance
+    database.exec("CREATE INDEX IF NOT EXISTS generations_status_idx ON generations(status)");
+    database.exec("CREATE INDEX IF NOT EXISTS generations_created_at_idx ON generations(created_at)");
   } finally {
     database.close();
   }
