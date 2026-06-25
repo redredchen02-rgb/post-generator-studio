@@ -58,7 +58,7 @@ export class OpenAICompatibleAdapter extends BaseAdapter {
     options?: GenerationOptions,
   ): Promise<RequestBuildResult> {
     return {
-      url: `${this.baseUrl(config)}/v1/chat/completions`,
+      url: this.apiUrl(config, "chat/completions"),
       init: {
         method: "POST",
         headers: this.headers(options?.apiKey),
@@ -99,7 +99,7 @@ export class OpenAICompatibleAdapter extends BaseAdapter {
     if (this.supportsApiKey && !options?.apiKey) {
       return [];
     }
-    const response = await fetch(`${this.baseUrl(config)}/v1/models`, {
+    const response = await fetch(this.apiUrl(config, "models"), {
       signal: options?.abortSignal,
       headers: this.headers(options?.apiKey),
     });
@@ -112,6 +112,14 @@ export class OpenAICompatibleAdapter extends BaseAdapter {
 
   private baseUrl(config: ProviderProfile): string {
     return (config.baseUrl || this.defaultBaseUrl).replace(/\/$/, "");
+  }
+
+  // Build an OpenAI-compatible endpoint, tolerating base URLs that already
+  // include the `/v1` API segment (the common convention, e.g. `.../api/v1`).
+  // Avoids producing a doubled `/v1/v1/...` path against such relays.
+  private apiUrl(config: ProviderProfile, path: string): string {
+    const base = this.baseUrl(config);
+    return base.endsWith("/v1") ? `${base}/${path}` : `${base}/v1/${path}`;
   }
 
   private headers(apiKey?: string): Record<string, string> {

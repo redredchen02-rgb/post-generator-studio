@@ -22,7 +22,9 @@ const PROVIDER_DEFAULTS: Record<ProviderKind, { baseUrl?: string; model: string;
   gemini: { model: "gemini-2.0-flash", requiresApiKey: true },
   ollama: { baseUrl: "http://localhost:11434", model: "llama3.2", requiresApiKey: false },
   openrouter: { baseUrl: "https://openrouter.ai/api/v1", model: "openrouter/auto", requiresApiKey: true },
-  "openai-compatible": { baseUrl: "http://localhost:8000", model: "", requiresApiKey: false },
+  // Hosted OpenAI-compatible relays (proxies/gateways) usually require a key; the
+  // field stays optional via the schema so local no-auth relays can leave it blank.
+  "openai-compatible": { baseUrl: "http://localhost:8000", model: "", requiresApiKey: true },
 };
 
 const CREATE_DEFAULTS: ProviderForm = {
