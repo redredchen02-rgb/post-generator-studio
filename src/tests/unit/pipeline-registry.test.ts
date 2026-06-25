@@ -44,6 +44,7 @@ function makeContext(overrides?: Partial<PipelineContext>): PipelineContext {
       systemPrompt: "你是{{LOCALE}}编辑。",
       userPromptTemplate: "标题：{{TITLE}}",
       supportedVariables: ["TITLE", "LOCALE"],
+      customVariableDefaults: {},
       outputFormat: "markdown",
       version: 1,
       isDefault: false,
