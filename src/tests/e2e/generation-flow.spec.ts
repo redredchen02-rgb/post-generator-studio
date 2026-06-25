@@ -53,6 +53,10 @@ test("user generates, copies, exports, and views history", async ({ page, contex
   await page.route("**/api/bootstrap", async (route) => {
     await route.fulfill({ json: bootstrap });
   });
+  // handleGenerate runs a provider pre-flight check before streaming.
+  await page.route("**/api/provider-profiles/*/test", async (route) => {
+    await route.fulfill({ json: { ok: true, message: "OK" } });
+  });
   await page.route("**/api/generations**", async (route) => {
     if (route.request().method() === "POST") {
       await route.fulfill({
@@ -71,23 +75,26 @@ test("user generates, copies, exports, and views history", async ({ page, contex
       });
       return;
     }
-    await route.fulfill({
-      json: [
-        {
-          id: "generation_fixture",
-          title: "台湾男子连续30天挑战AI创业",
-          eventSummary: "- 连续30天开发AI产品",
-          providerProfileSnapshot: {},
-          promptTemplateSnapshot: {},
-          generationPresetSnapshot: {},
-          renderedSystemPrompt: "",
-          renderedUserPrompt: "",
-          outputContent: "# 台湾男子连续30天挑战AI创业\n\n这是一篇实时生成的文章。",
-          status: "completed",
-          createdAt: "2026-06-24T00:00:00.000Z",
-        },
-      ],
-    });
+    // GET /api/generations -> PaginatedGenerations, honouring the `search` param
+    // so the history search box can be exercised end to end.
+    const url = new URL(route.request().url());
+    const search = url.searchParams.get("search") ?? "";
+    const record = {
+      id: "generation_fixture",
+      title: "台湾男子连续30天挑战AI创业",
+      eventSummary: "- 连续30天开发AI产品",
+      providerProfileSnapshot: {},
+      promptTemplateSnapshot: {},
+      generationPresetSnapshot: {},
+      renderedSystemPrompt: "",
+      renderedUserPrompt: "",
+      outputContent: "# 台湾男子连续30天挑战AI创业\n\n这是一篇实时生成的文章。",
+      status: "completed",
+      createdAt: "2026-06-24T00:00:00.000Z",
+    };
+    const matches = !search || record.title.includes(search);
+    const items = matches ? [record] : [];
+    await route.fulfill({ json: { items, total: items.length } });
   });
   await page.route("**/api/generations/generation_fixture/export?format=md", async (route) => {
     await route.fulfill({ body: "# 台湾男子连续30天挑战AI创业\n\n这是一篇实时生成的文章。" });
@@ -108,4 +115,16 @@ test("user generates, copies, exports, and views history", async ({ page, contex
   await page.getByRole("link", { name: /History/ }).click();
   await expect(page.getByRole("button", { name: /台湾男子连续30天挑战AI创业/ })).toBeVisible();
   await expect(page.getByText("这是一篇实时生成的文章。")).toBeVisible();
+
+  // Search wiring: a matching query keeps the record, a non-matching one clears it
+  // (and the stale selection must not linger in the detail pane).
+  await page.getByPlaceholder("搜索标题...").fill("不存在的标题xyz");
+  await expect(page.getByRole("button", { name: /台湾男子连续30天挑战AI创业/ })).toHaveCount(0);
+  await page.getByPlaceholder("搜索标题...").fill("台湾");
+  await expect(page.getByRole("button", { name: /台湾男子连续30天挑战AI创业/ })).toBeVisible();
 });
+
+// NOTE: mid-stream cancel is verified at the unit level
+// (src/tests/unit/use-generation-stream.test.ts) and integration level
+// (src/tests/integration/generation-cancel.test.ts). A mocked SSE route cannot
+// reliably hold the stream open long enough to drive the Cancel button in E2E.
