@@ -27,10 +27,12 @@ import {
   type BootstrapData,
 } from "@/presentation/lib/api";
 import { useUiStore } from "@/presentation/store/ui-store";
+import { useVarMemoryStore } from "@/presentation/store/var-memory-store";
 import { stripMarkdown } from "@/lib/utils";
 import { extractTemplateVariables } from "@/application/prompt/renderer";
 import { useGenerationStream } from "./use-generation-stream";
 import { useKeyboard } from "@/presentation/lib/use-keyboard";
+import { useSearchParams } from "next/navigation";
 
 const STANDARD_VARS = new Set(["TITLE", "EVENT_SUMMARY", "DATE", "TIME", "LOCALE"]);
 
@@ -47,9 +49,10 @@ function getCustomVars(template: { systemPrompt: string; userPromptTemplate: str
 }
 
 export function GeneratorWorkspace(): React.ReactElement {
+  const searchParams = useSearchParams();
   const [bootstrap, setBootstrap] = React.useState<BootstrapData | null>(null);
-  const [title, setTitle] = React.useState(sampleTitle);
-  const [eventSummary, setEventSummary] = React.useState(sampleSummary);
+  const [title, setTitle] = React.useState(searchParams.get("title") || sampleTitle);
+  const [eventSummary, setEventSummary] = React.useState(searchParams.get("summary") || sampleSummary);
   const [presetId, setPresetId] = React.useState("");
   const [providerProfileId, setProviderProfileId] = React.useState("");
   const [customVarValues, setCustomVarValues] = React.useState<Record<string, string>>({});
@@ -104,10 +107,13 @@ export function GeneratorWorkspace(): React.ReactElement {
       .catch(() => null);
   }, [effectiveProviderId]);
 
-  // Reset custom var values when template changes
+  // Pre-fill custom var values per template: user memory → template defaults → empty
   React.useEffect(() => {
-    setCustomVarValues({});
-  }, [templateId]);
+    if (!templateId) { setCustomVarValues({}); return; }
+    const memory = useVarMemoryStore.getState().varMemory[templateId] ?? {};
+    const defaults = selectedTemplate?.customVariableDefaults ?? {};
+    setCustomVarValues({ ...defaults, ...memory });
+  }, [templateId, selectedTemplate?.customVariableDefaults]);
 
   // Live prompt preview (debounced)
   React.useEffect(() => {
@@ -121,7 +127,20 @@ export function GeneratorWorkspace(): React.ReactElement {
   }, [title, eventSummary, templateId, customVarValues]);
 
   async function handleGenerate(regenerate = false): Promise<void> {
-    await generate({ title, eventSummary, presetId, providerProfileId, regenerate, customVariables: customVarValues });
+    await generate({
+      title,
+      eventSummary,
+      presetId,
+      providerProfileId,
+      regenerate,
+      customVariables: customVarValues,
+      onSuccess: (vars) => {
+        if (!templateId) return;
+        for (const [k, v] of Object.entries(vars)) {
+          useVarMemoryStore.getState().setVar(templateId, k, v);
+        }
+      },
+    });
   }
 
   async function saveToHistory(): Promise<void> {
@@ -149,7 +168,9 @@ export function GeneratorWorkspace(): React.ReactElement {
     const blob = new Blob([body], { type: format === "md" ? "text/markdown" : "text/plain" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    link.download = `${title || "generation"}.${format}`;
+    const now = new Date();
+    const ts = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}_${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}`;
+    link.download = `${title || "generation"}_${ts}.${format}`;
     link.click();
     URL.revokeObjectURL(link.href);
     setStatus(`Exported .${format}`);
@@ -318,7 +339,22 @@ export function GeneratorWorkspace(): React.ReactElement {
           </div>
         </div>
         <div className="rounded-md bg-secondary p-3 text-sm text-secondary-foreground">
-          {metadata.outputTokens ? `${metadata.outputTokens} output tokens` : "Token usage appears when providers report it."}
+          {metadata.inputTokens !== undefined && metadata.outputTokens !== undefined ? (
+            <>
+              <div>Input: {metadata.inputTokens.toLocaleString()} tok</div>
+              <div>Output: {metadata.outputTokens.toLocaleString()} tok</div>
+              <div className="border-t pt-1 mt-1 font-medium">
+                {(metadata.inputTokens + metadata.outputTokens).toLocaleString()} total
+              </div>
+              <div className="text-xs text-muted-foreground mt-1">
+                ~${((metadata.inputTokens * 3 + metadata.outputTokens * 15) / 1_000_000).toFixed(4)}
+              </div>
+            </>
+          ) : metadata.outputTokens ? (
+            `${metadata.outputTokens} output tokens`
+          ) : (
+            "Token usage appears when providers report it."
+          )}
         </div>
         <div className="border-t pt-3">
           <button

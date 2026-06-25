@@ -40,6 +40,7 @@ export function useGenerationStream() {
       providerProfileId?: string;
       regenerate?: boolean;
       customVariables?: Record<string, string>;
+      onSuccess?: (vars: Record<string, string>) => void;
     }) => {
       const { title, eventSummary, presetId, providerProfileId, regenerate, customVariables } = params;
       if (!presetId) {
@@ -101,6 +102,9 @@ export function useGenerationStream() {
               content: payload.content,
               status: payload.generation.status === "completed" ? "Completed" : payload.generation.status,
             }));
+            if (payload.generation.status === "completed") {
+              params.onSuccess?.(params.customVariables ?? {});
+            }
           }
         }
       } catch (streamError) {

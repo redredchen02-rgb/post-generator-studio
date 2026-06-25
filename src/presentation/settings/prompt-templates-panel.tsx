@@ -3,7 +3,7 @@
 import * as React from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Copy, Pencil, Plus, Save, Trash2 } from "lucide-react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import type { PromptTemplate } from "@/domain/schemas";
 import { promptTemplateCreateSchema } from "@/domain/schemas";
 import type { z } from "zod";
@@ -12,8 +12,12 @@ import { Field } from "@/presentation/components/ui/field";
 import { Input } from "@/presentation/components/ui/input";
 import { NativeSelect } from "@/presentation/components/ui/native-select";
 import { Textarea } from "@/presentation/components/ui/textarea";
+import { extractTemplateVariables } from "@/application/prompt/renderer";
 import { fetchJson } from "@/presentation/lib/api";
+import { useVarMemoryStore } from "@/presentation/store/var-memory-store";
 import { Header } from "./settings-workspace";
+
+const STANDARD_VARS = new Set(["TITLE", "EVENT_SUMMARY", "DATE", "TIME", "LOCALE"]);
 
 type TemplateForm = z.infer<typeof promptTemplateCreateSchema>;
 
@@ -23,6 +27,7 @@ const CREATE_DEFAULTS: TemplateForm = {
   systemPrompt: "你是一名资深内容编辑。",
   userPromptTemplate: "标题：{{TITLE}}\n\n事件：{{EVENT_SUMMARY}}\n\n日期：{{DATE}}",
   supportedVariables: ["TITLE", "EVENT_SUMMARY", "DATE", "TIME", "LOCALE"],
+  customVariableDefaults: {},
   outputFormat: "markdown",
   isDefault: false,
 };
@@ -42,16 +47,37 @@ export function PromptTemplatesPanel({
     defaultValues: CREATE_DEFAULTS,
   });
   const [preview, setPreview] = React.useState<{ systemPrompt: string; userPrompt: string } | null>(null);
+  const [detectedVars, setDetectedVars] = React.useState<string[]>([]);
+  const watchedDefaults = useWatch({ control: form.control, name: "customVariableDefaults" });
+  const watchedSystemPrompt = useWatch({ control: form.control, name: "systemPrompt" });
+  const watchedUserPromptTemplate = useWatch({ control: form.control, name: "userPromptTemplate" });
+
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      const all = [
+        ...extractTemplateVariables(watchedSystemPrompt ?? ""),
+        ...extractTemplateVariables(watchedUserPromptTemplate ?? ""),
+      ];
+      setDetectedVars([...new Set(all)].filter((v) => !STANDARD_VARS.has(v)));
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [watchedSystemPrompt, watchedUserPromptTemplate]);
 
   function loadForEdit(template: PromptTemplate): void {
     setEditingId(template.id);
     setPreview(null);
+    const all = [
+      ...extractTemplateVariables(template.systemPrompt),
+      ...extractTemplateVariables(template.userPromptTemplate),
+    ];
+    setDetectedVars([...new Set(all)].filter((v) => !STANDARD_VARS.has(v)));
     form.reset({
       name: template.name,
       description: template.description ?? "",
       systemPrompt: template.systemPrompt,
       userPromptTemplate: template.userPromptTemplate,
       supportedVariables: template.supportedVariables,
+      customVariableDefaults: template.customVariableDefaults,
       outputFormat: template.outputFormat,
       isDefault: template.isDefault,
     });
@@ -60,22 +86,30 @@ export function PromptTemplatesPanel({
   function cancelEdit(): void {
     setEditingId(null);
     setPreview(null);
+    setDetectedVars([]);
     form.reset(CREATE_DEFAULTS);
   }
 
   async function submit(values: TemplateForm): Promise<void> {
+    const syncedValues: TemplateForm = {
+      ...values,
+      supportedVariables: [...new Set([...values.supportedVariables, ...detectedVars])],
+      customVariableDefaults: Object.fromEntries(
+        Object.entries(values.customVariableDefaults).filter(([k]) => detectedVars.includes(k)),
+      ),
+    };
     try {
       if (editingId) {
         await fetchJson<PromptTemplate>(`/api/prompt-templates/${editingId}`, {
           method: "PATCH",
-          body: JSON.stringify(values),
+          body: JSON.stringify(syncedValues),
         });
         notify("Prompt template updated");
         cancelEdit();
       } else {
         await fetchJson<PromptTemplate>("/api/prompt-templates", {
           method: "POST",
-          body: JSON.stringify(values),
+          body: JSON.stringify(syncedValues),
         });
         notify("Prompt template saved");
       }
@@ -88,6 +122,7 @@ export function PromptTemplatesPanel({
   async function remove(id: string): Promise<void> {
     try {
       await fetch(`/api/prompt-templates/${id}`, { method: "DELETE" });
+      useVarMemoryStore.getState().clearTemplate(id);
       if (editingId === id) cancelEdit();
       await refresh();
       notify("Prompt template deleted");
@@ -146,6 +181,25 @@ export function PromptTemplatesPanel({
         <Field label="User Prompt Template">
           <Textarea className="min-h-52 font-mono" {...form.register("userPromptTemplate")} />
         </Field>
+        {detectedVars.length > 0 && (
+          <div className="grid gap-2 rounded-lg border p-3">
+            <span className="text-sm font-medium">Custom Variable Defaults</span>
+            {detectedVars.map((varName) => (
+              <Field key={varName} label={varName}>
+                <Input
+                  value={watchedDefaults?.[varName] ?? ""}
+                  onChange={(e) =>
+                    form.setValue("customVariableDefaults", {
+                      ...(watchedDefaults ?? {}),
+                      [varName]: e.target.value,
+                    })
+                  }
+                  placeholder={`Default value for {{${varName}}}`}
+                />
+              </Field>
+            ))}
+          </div>
+        )}
         <div className="flex flex-wrap gap-2">
           <Button type="submit">
             <Save className="h-4 w-4" />
