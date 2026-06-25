@@ -8,10 +8,8 @@ describe("useApi ignore-stale guard", () => {
     // Two deferred fetches: the FIRST started resolves LAST. The hook must keep
     // the result of the most recently started call, not the slow earlier one.
     const deferreds: Array<(value: string) => void> = [];
-    let call = 0;
     const fetcher = () =>
       new Promise<string>((resolve) => {
-        call += 1;
         deferreds.push(resolve);
       });
 
@@ -23,7 +21,6 @@ describe("useApi ignore-stale guard", () => {
     // identity (mirrors search/offset changing).
     const fetcher2 = () =>
       new Promise<string>((resolve) => {
-        call += 1;
         deferreds.push(resolve);
       });
     rerender({ f: fetcher2 });

@@ -5,7 +5,6 @@ import ReactMarkdown from "react-markdown";
 import { Clipboard, Download, FileText, RotateCcw, Save } from "lucide-react";
 import { Button } from "@/presentation/components/ui/button";
 import { Textarea } from "@/presentation/components/ui/textarea";
-import { stripMarkdown } from "@/lib/utils";
 import type { Generation } from "@/domain/schemas";
 
 type OutputPanelProps = {

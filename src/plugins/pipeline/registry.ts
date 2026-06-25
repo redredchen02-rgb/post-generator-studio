@@ -1,4 +1,3 @@
-import { PIPELINE_STEPS } from "@/domain/pipeline-steps";
 import type { PipelineStep } from "@/domain/ports/pipeline";
 import { cleanGeneratedContent, formatOutput } from "@/application/content/cleaner";
 import { renderTemplate } from "@/application/prompt/renderer";
