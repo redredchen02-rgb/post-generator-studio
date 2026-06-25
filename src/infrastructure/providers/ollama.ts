@@ -1,13 +1,12 @@
-import type { GenerationOptions, LLMProviderAdapter } from "@/domain/ports/provider";
+import type { GenerationOptions } from "@/domain/ports/provider";
 import type {
   GenerationEvent,
   NormalizedGenerationRequest,
   ProviderCapabilities,
   ProviderModel,
   ProviderProfile,
-  ProviderValidationResult,
 } from "@/domain/schemas";
-import { parseJsonLines, providerFailure, responseError } from "@/infrastructure/providers/streaming";
+import { BaseAdapter, type RequestBuildResult, type ChunkParseResult } from "@/infrastructure/providers/base-adapter";
 
 type OllamaChunk = {
   message?: { content?: string };
@@ -21,71 +20,67 @@ type OllamaTags = {
   models?: Array<{ name: string; model?: string }>;
 };
 
-export class OllamaAdapter implements LLMProviderAdapter {
+export class OllamaAdapter extends BaseAdapter {
   readonly id = "ollama";
+  protected supportsApiKey = false;
 
   capabilities(): ProviderCapabilities {
     return {
-      supportsStreaming: true,
+      ...super.capabilities(),
       supportsModelList: true,
-      requiresApiKey: false,
-      supportsSystemPrompt: true,
     };
   }
 
-  async validateConfig(config: ProviderProfile): Promise<ProviderValidationResult> {
+  async validateConfig(config: ProviderProfile, _options?: GenerationOptions): Promise<{ ok: boolean; error?: { code: string; message: string } }> {
     if (!config.baseUrl) {
       return { ok: false, error: { code: "BASE_URL_MISSING", message: "Ollama Base URL 未配置" } };
     }
     return { ok: true };
   }
 
-  async *generate(
+  protected async buildRequest(
     request: NormalizedGenerationRequest,
     config: ProviderProfile,
-    options?: GenerationOptions,
-  ): AsyncIterable<GenerationEvent> {
+    _options?: GenerationOptions,
+  ): Promise<RequestBuildResult> {
     const baseUrl = (config.baseUrl || "http://localhost:11434").replace(/\/$/, "");
-    const response = await fetch(`${baseUrl}/api/chat`, {
-      method: "POST",
-      signal: options?.abortSignal,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: request.model,
-        messages: [
-          { role: "system", content: request.systemPrompt },
-          { role: "user", content: request.userPrompt },
-        ],
-        stream: true,
-        options: {
-          temperature: request.temperature,
-          num_predict: request.maxTokens,
-        },
-      }),
-    });
+    return {
+      url: `${baseUrl}/api/chat`,
+      init: {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: request.model,
+          messages: [
+            { role: "system", content: request.systemPrompt },
+            { role: "user", content: request.userPrompt },
+          ],
+          stream: true,
+          options: {
+            temperature: request.temperature,
+            num_predict: request.maxTokens,
+          },
+        }),
+      },
+    };
+  }
 
-    if (!response.ok) {
-      yield responseError(await providerFailure(response), true);
-      return;
+  protected parseChunk(raw: unknown, _request: NormalizedGenerationRequest): ChunkParseResult {
+    const chunk = raw as OllamaChunk;
+    const events: GenerationEvent[] = [];
+    if (chunk.message?.content) {
+      events.push({ type: "token", value: chunk.message.content });
     }
-
-    for await (const value of parseJsonLines(response)) {
-      const chunk = value as OllamaChunk;
-      if (chunk.message?.content) {
-        yield { type: "token", value: chunk.message.content };
-      }
-      if (chunk.done) {
-        yield {
-          type: "metadata",
-          model: chunk.model,
-          inputTokens: chunk.prompt_eval_count,
-          outputTokens: chunk.eval_count,
-        };
-        yield { type: "complete" };
-        return;
-      }
+    if (chunk.done) {
+      events.push({
+        type: "metadata",
+        model: chunk.model,
+        inputTokens: chunk.prompt_eval_count,
+        outputTokens: chunk.eval_count,
+      });
+      return { events, done: true };
     }
-    yield { type: "complete" };
+    return { events };
   }
 
   async listModels(config: ProviderProfile, options?: GenerationOptions): Promise<ProviderModel[]> {
@@ -98,4 +93,3 @@ export class OllamaAdapter implements LLMProviderAdapter {
     return (parsed.models || []).map((model) => ({ id: model.model || model.name, name: model.name }));
   }
 }
-

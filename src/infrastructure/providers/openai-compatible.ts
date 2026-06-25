@@ -1,13 +1,12 @@
-import type { LLMProviderAdapter, GenerationOptions } from "@/domain/ports/provider";
+import type { GenerationOptions } from "@/domain/ports/provider";
 import type {
   GenerationEvent,
   NormalizedGenerationRequest,
   ProviderCapabilities,
   ProviderModel,
   ProviderProfile,
-  ProviderValidationResult,
 } from "@/domain/schemas";
-import { parseServerSentEvents, providerFailure, responseError } from "@/infrastructure/providers/streaming";
+import { BaseAdapter, type RequestBuildResult, type ChunkParseResult } from "@/infrastructure/providers/base-adapter";
 
 type ChatCompletionChunk = {
   choices?: Array<{
@@ -33,95 +32,71 @@ export type OpenAICompatibleAdapterOptions = {
   extraHeaders?: Record<string, string>;
 };
 
-export class OpenAICompatibleAdapter implements LLMProviderAdapter {
+export class OpenAICompatibleAdapter extends BaseAdapter {
   readonly id: string;
   private readonly defaultBaseUrl: string;
-  private readonly requiresApiKey: boolean;
   private readonly extraHeaders: Record<string, string>;
 
   constructor(options: OpenAICompatibleAdapterOptions) {
+    super();
     this.id = options.id;
     this.defaultBaseUrl = options.defaultBaseUrl;
-    this.requiresApiKey = options.requiresApiKey;
+    this.supportsApiKey = options.requiresApiKey;
     this.extraHeaders = options.extraHeaders || {};
   }
 
   capabilities(): ProviderCapabilities {
     return {
-      supportsStreaming: true,
+      ...super.capabilities(),
       supportsModelList: true,
-      requiresApiKey: this.requiresApiKey,
-      supportsSystemPrompt: true,
     };
   }
 
-  async validateConfig(config: ProviderProfile, options?: GenerationOptions): Promise<ProviderValidationResult> {
-    if (this.requiresApiKey && !options?.apiKey) {
-      return { ok: false, error: { code: "API_KEY_MISSING", message: "API Key 未配置" } };
-    }
-    if (!config.model) {
-      return { ok: false, error: { code: "MODEL_MISSING", message: "模型未配置" } };
-    }
-    return { ok: true };
-  }
-
-  async *generate(
+  protected async buildRequest(
     request: NormalizedGenerationRequest,
     config: ProviderProfile,
     options?: GenerationOptions,
-  ): AsyncIterable<GenerationEvent> {
-    const validation = await this.validateConfig(config, options);
-    if (!validation.ok) {
-      yield { type: "error", message: validation.error?.message || "Provider 配置无效" };
-      return;
-    }
+  ): Promise<RequestBuildResult> {
+    return {
+      url: `${this.baseUrl(config)}/v1/chat/completions`,
+      init: {
+        method: "POST",
+        headers: this.headers(options?.apiKey),
+        body: JSON.stringify({
+          model: request.model,
+          messages: [
+            { role: "system", content: request.systemPrompt },
+            { role: "user", content: request.userPrompt },
+          ],
+          temperature: request.temperature,
+          max_tokens: request.maxTokens,
+          stream: request.stream,
+          stream_options: { include_usage: true },
+        }),
+      },
+    };
+  }
 
-    const response = await fetch(`${this.baseUrl(config)}/v1/chat/completions`, {
-      method: "POST",
-      signal: options?.abortSignal,
-      headers: this.headers(options?.apiKey),
-      body: JSON.stringify({
-        model: request.model,
-        messages: [
-          { role: "system", content: request.systemPrompt },
-          { role: "user", content: request.userPrompt },
-        ],
-        temperature: request.temperature,
-        max_tokens: request.maxTokens,
-        stream: request.stream,
-        stream_options: { include_usage: true },
-      }),
-    });
-
-    if (!response.ok) {
-      yield responseError(await providerFailure(response), response.status >= 500 || response.status === 429);
-      return;
+  protected parseChunk(raw: unknown, _request: NormalizedGenerationRequest): ChunkParseResult {
+    const parsed = raw as ChatCompletionChunk;
+    const events: GenerationEvent[] = [];
+    const token = parsed.choices?.[0]?.delta?.content;
+    if (token) {
+      events.push({ type: "token", value: token });
     }
-
-    for await (const data of parseServerSentEvents(response)) {
-      if (data === "[DONE]") {
-        yield { type: "complete" };
-        return;
-      }
-      const parsed = JSON.parse(data) as ChatCompletionChunk;
-      const token = parsed.choices?.[0]?.delta?.content;
-      if (token) {
-        yield { type: "token", value: token };
-      }
-      if (parsed.model || parsed.usage) {
-        yield {
-          type: "metadata",
-          model: parsed.model,
-          inputTokens: parsed.usage?.prompt_tokens,
-          outputTokens: parsed.usage?.completion_tokens,
-        };
-      }
+    if (parsed.model || parsed.usage) {
+      events.push({
+        type: "metadata",
+        model: parsed.model,
+        inputTokens: parsed.usage?.prompt_tokens,
+        outputTokens: parsed.usage?.completion_tokens,
+      });
     }
-    yield { type: "complete" };
+    return { events };
   }
 
   async listModels(config: ProviderProfile, options?: GenerationOptions): Promise<ProviderModel[]> {
-    if (this.requiresApiKey && !options?.apiKey) {
+    if (this.supportsApiKey && !options?.apiKey) {
       return [];
     }
     const response = await fetch(`${this.baseUrl(config)}/v1/models`, {
@@ -147,4 +122,3 @@ export class OpenAICompatibleAdapter implements LLMProviderAdapter {
     };
   }
 }
-
