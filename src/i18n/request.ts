@@ -13,8 +13,15 @@ export default getRequestConfig(async () => {
   const raw = cookieStore.get("NEXT_LOCALE")?.value;
   const locale: Locale = isValidLocale(raw) ? raw : "en";
 
+  let messages: Record<string, unknown>;
+  try {
+    messages = (await import(`../../messages/${locale}.json`)).default as Record<string, unknown>;
+  } catch {
+    messages = {};
+  }
+
   return {
     locale,
-    messages: (await import(`../../messages/${locale}.json`)).default as Record<string, unknown>,
+    messages,
   };
 });

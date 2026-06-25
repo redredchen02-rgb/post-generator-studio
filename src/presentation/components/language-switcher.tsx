@@ -17,15 +17,26 @@ export function LanguageSwitcher(): React.ReactElement {
   const { locale, setLocale } = useUiStore();
   const router = useRouter();
   const [mounted, setMounted] = React.useState(false);
+  const [isRefreshing, setIsRefreshing] = React.useState(false);
 
   React.useEffect(() => {
     setMounted(true);
-  }, []);
+    // Sync Zustand locale from cookie in case localStorage was cleared independently
+    const match = document.cookie.match(/(?:^|;\s*)NEXT_LOCALE=([^;]+)/);
+    const cookieLocale = match?.[1] as Locale | undefined;
+    if (cookieLocale) {
+      setLocale(cookieLocale);
+    }
+  }, [setLocale]);
 
   function switchLocale(next: Locale): void {
+    if (isRefreshing) return;
+    setIsRefreshing(true);
     document.cookie = `${LOCALE_COOKIE}=${next}; path=/; max-age=${LOCALE_COOKIE_MAX_AGE}; SameSite=Lax`;
     setLocale(next);
     router.refresh();
+    // Reset guard after 1s — sufficient for RSC refresh to settle
+    setTimeout(() => setIsRefreshing(false), 1000);
   }
 
   if (!mounted) {
@@ -45,6 +56,7 @@ export function LanguageSwitcher(): React.ReactElement {
         onClick={() => switchLocale("en")}
         className={locale === "en" ? activeClass : inactiveClass}
         aria-label="Switch to English"
+        disabled={isRefreshing}
       >
         EN
       </button>
@@ -53,7 +65,8 @@ export function LanguageSwitcher(): React.ReactElement {
         type="button"
         onClick={() => switchLocale("zh-CN")}
         className={locale === "zh-CN" ? activeClass : inactiveClass}
-        aria-label="切换为中文"
+        aria-label="切換為中文"
+        disabled={isRefreshing}
       >
         中文
       </button>
