@@ -1,0 +1,10 @@
+import { z } from "zod";
+import { outputFormatSchema } from "./enums.js";
+export const promptTemplateSchema = z.object({ id: z.string(), name: z.string().min(1), description: z.string().optional(), systemPrompt: z.string().min(1), userPromptTemplate: z.string().min(1), supportedVariables: z.array(z.string()), customVariableDefaults: z.record(z.string()).default({}), outputFormat: outputFormatSchema, version: z.number().int().min(1), isDefault: z.boolean(), createdAt: z.string(), updatedAt: z.string() });
+export type PromptTemplate = z.infer<typeof promptTemplateSchema>;
+export const promptTemplateCreateSchema = z.object({ name: z.string().min(1), description: z.string().optional(), systemPrompt: z.string().min(1), userPromptTemplate: z.string().min(1), supportedVariables: z.array(z.string()).default(["TITLE", "EVENT_SUMMARY", "DATE", "TIME", "LOCALE"]), customVariableDefaults: z.record(z.string()).optional().default({}), outputFormat: outputFormatSchema.default("markdown"), isDefault: z.boolean().default(false) });
+export type PromptTemplateCreate = z.infer<typeof promptTemplateCreateSchema>;
+export const promptTemplateUpdateSchema = promptTemplateCreateSchema.partial().extend({ duplicateFromId: z.string().optional() });
+export type PromptTemplateUpdate = z.infer<typeof promptTemplateUpdateSchema>;
+export const promptPreviewRequestSchema = z.object({ templateId: z.string().optional(), systemPrompt: z.string().optional(), userPromptTemplate: z.string().optional(), title: z.string().default("test"), eventSummary: z.string().default("test"), locale: z.string().default("zh-CN"), customVariables: z.record(z.string()).optional() });
+export type PromptPreviewRequest = z.infer<typeof promptPreviewRequestSchema>;
