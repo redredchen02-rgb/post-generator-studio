@@ -3,7 +3,7 @@
 import * as React from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { FlaskConical, Pencil, Plus, Save, Trash2 } from "lucide-react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import type { ProviderKind, ProviderProfile } from "@/domain/schemas";
 import { providerKindSchema, providerProfileCreateSchema } from "@/domain/schemas";
 import type { z } from "zod";
@@ -15,6 +15,15 @@ import { fetchJson } from "@/presentation/lib/api";
 import { Header } from "./settings-workspace";
 
 type ProviderForm = z.infer<typeof providerProfileCreateSchema>;
+
+const PROVIDER_DEFAULTS: Record<ProviderKind, { baseUrl?: string; model: string; requiresApiKey: boolean }> = {
+  openai: { baseUrl: "https://api.openai.com", model: "gpt-4o-mini", requiresApiKey: true },
+  anthropic: { model: "claude-sonnet-4-6", requiresApiKey: true },
+  gemini: { model: "gemini-2.0-flash", requiresApiKey: true },
+  ollama: { baseUrl: "http://localhost:11434", model: "llama3.2", requiresApiKey: false },
+  openrouter: { baseUrl: "https://openrouter.ai/api/v1", model: "openrouter/auto", requiresApiKey: true },
+  "openai-compatible": { baseUrl: "http://localhost:8000", model: "", requiresApiKey: false },
+};
 
 const CREATE_DEFAULTS: ProviderForm = {
   name: "OpenAI Compatible",
@@ -41,6 +50,18 @@ export function ProviderProfilesPanel({
     resolver: zodResolver(providerProfileCreateSchema),
     defaultValues: CREATE_DEFAULTS,
   });
+
+  const watchedKind = useWatch({ control: form.control, name: "providerKind" });
+  const requiresApiKey = PROVIDER_DEFAULTS[watchedKind]?.requiresApiKey ?? true;
+
+  React.useEffect(() => {
+    if (editingId !== null) return;
+    const d = PROVIDER_DEFAULTS[watchedKind];
+    if (!d) return;
+    form.setValue("baseUrl", d.baseUrl ?? "");
+    form.setValue("model", d.model);
+    if (!d.requiresApiKey) form.setValue("apiKey", "");
+  }, [watchedKind, editingId, form]);
 
   function loadForEdit(profile: ProviderProfile): void {
     setEditingId(profile.id);
@@ -142,13 +163,15 @@ export function ProviderProfilesPanel({
           <Field label="Model">
             <Input {...form.register("model")} />
           </Field>
-          <Field label={editingId ? "API Key (leave blank to keep existing)" : "API Key"}>
-            <Input
-              type="password"
-              placeholder={editingId ? "[saved — type to replace]" : ""}
-              {...form.register("apiKey")}
-            />
-          </Field>
+          {requiresApiKey ? (
+            <Field label={editingId ? "API Key (leave blank to keep existing)" : "API Key"}>
+              <Input
+                type="password"
+                placeholder={editingId ? "[saved — type to replace]" : ""}
+                {...form.register("apiKey")}
+              />
+            </Field>
+          ) : null}
           <Field label="Temperature">
             <Input type="number" step="0.1" {...form.register("defaultTemperature", { valueAsNumber: true })} />
           </Field>
