@@ -27,6 +27,7 @@ import {
   type BootstrapData,
 } from "@/presentation/lib/api";
 import { useUiStore } from "@/presentation/store/ui-store";
+import { useProviderStore } from "@/presentation/store/provider-store";
 import { useVarMemoryStore } from "@/presentation/store/var-memory-store";
 import { stripMarkdown } from "@/lib/utils";
 import { extractTemplateVariables } from "@/application/prompt/renderer";
@@ -54,7 +55,8 @@ export function GeneratorWorkspace(): React.ReactElement {
   const [title, setTitle] = React.useState(searchParams.get("title") || sampleTitle);
   const [eventSummary, setEventSummary] = React.useState(searchParams.get("summary") || sampleSummary);
   const [presetId, setPresetId] = React.useState("");
-  const [providerProfileId, setProviderProfileId] = React.useState("");
+  const { selectedProfileId, setSelectedProfile } = useProviderStore();
+  const bootstrapRef = React.useRef<BootstrapData | null>(null);
   const [customVarValues, setCustomVarValues] = React.useState<Record<string, string>>({});
   const [providerError, setProviderError] = React.useState<string | null>(null);
   const [promptPreview, setPromptPreview] = React.useState<{ systemPrompt: string; userPrompt: string } | null>(null);
@@ -81,29 +83,60 @@ export function GeneratorWorkspace(): React.ReactElement {
     loadBootstrap()
       .then((data) => {
         setBootstrap(data);
-        const defaultPreset = data.generationPresets.find((preset) => preset.isDefault) || data.generationPresets[0];
+        bootstrapRef.current = data;
+        const defaultPreset = data.generationPresets.find((p) => p.isDefault) || data.generationPresets[0];
         if (defaultPreset) {
           setPresetId(defaultPreset.id);
-          setProviderProfileId(defaultPreset.providerProfileId);
+          const storedId = useProviderStore.getState().selectedProfileId;
+          const enabledProfiles = data.providerProfiles.filter((p) => p.enabled);
+          if (!storedId || !enabledProfiles.some((p) => p.id === storedId)) {
+            setSelectedProfile(defaultPreset.providerProfileId);
+          }
         }
       })
       .catch((loadError: unknown) => {
         setStatus(loadError instanceof Error ? loadError.message : "Failed to load app data");
       });
-  }, [setStatus]);
+  }, [setStatus, setSelectedProfile]);
+
+  React.useEffect(() => {
+    function handleVisibilityChange() {
+      if (document.visibilityState !== "visible") return;
+      loadBootstrap()
+        .then((data) => {
+          setBootstrap(data);
+          bootstrapRef.current = data;
+          const storedId = useProviderStore.getState().selectedProfileId;
+          const enabledProfiles = data.providerProfiles.filter((p) => p.enabled);
+          if (storedId && !enabledProfiles.some((p) => p.id === storedId)) {
+            const defaultPreset = data.generationPresets.find((p) => p.isDefault) || data.generationPresets[0];
+            if (defaultPreset) setSelectedProfile(defaultPreset.providerProfileId);
+          }
+        })
+        .catch(() => null);
+    }
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const selectedPreset = bootstrap?.generationPresets.find((preset) => preset.id === presetId);
   const selectedProvider = bootstrap?.providerProfiles.find(
-    (provider) => provider.id === (providerProfileId || selectedPreset?.providerProfileId),
+    (provider) => provider.id === (selectedProfileId ?? selectedPreset?.providerProfileId),
   );
   const selectedTemplate = bootstrap?.promptTemplates.find((template) => template.id === selectedPreset?.promptTemplateId);
   const templateId = selectedPreset?.promptTemplateId;
   const customVars = getCustomVars(selectedTemplate);
 
   // Provider pre-flight check
-  const effectiveProviderId = providerProfileId || selectedPreset?.providerProfileId;
+  const effectiveProviderId = selectedProfileId ?? selectedPreset?.providerProfileId;
   React.useEffect(() => {
     if (!effectiveProviderId) return;
+    const profiles = bootstrapRef.current?.providerProfiles;
+    if (profiles && !profiles.some((p) => p.id === effectiveProviderId)) {
+      setProviderError("Profile not found — please refresh");
+      return;
+    }
     setProviderError(null);
     testProviderProfile(effectiveProviderId)
       .then((result) => {
@@ -136,7 +169,7 @@ export function GeneratorWorkspace(): React.ReactElement {
       title,
       eventSummary,
       presetId,
-      providerProfileId,
+      providerProfileId: selectedProfileId ?? "",
       regenerate,
       customVariables: customVarValues,
       onSuccess: (vars) => {
@@ -208,10 +241,10 @@ export function GeneratorWorkspace(): React.ReactElement {
           </NativeSelect>
         </Field>
         <Field label="Provider Override">
-          <NativeSelect value={providerProfileId} onChange={(event) => setProviderProfileId(event.target.value)}>
-            {bootstrap?.providerProfiles.map((provider) => (
+          <NativeSelect value={selectedProfileId ?? ""} onChange={(event) => setSelectedProfile(event.target.value)}>
+            {bootstrap?.providerProfiles.filter((p) => p.enabled).map((provider) => (
               <option key={provider.id} value={provider.id}>
-                {provider.name} {provider.enabled ? "" : "(disabled)"}
+                {provider.name}
               </option>
             ))}
           </NativeSelect>
