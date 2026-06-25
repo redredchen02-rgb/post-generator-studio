@@ -12,8 +12,6 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "src"),
-      "@postgen/application": path.resolve(__dirname, "packages/application/dist/index.js"),
-      "@postgen/domain": path.resolve(__dirname, "packages/domain/dist/index.js"),
     },
   },
 });
