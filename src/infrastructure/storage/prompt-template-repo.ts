@@ -2,7 +2,7 @@ import { desc, eq } from "drizzle-orm";
 import { createId, nowIso, parseJson } from "@/lib/utils";
 import { promptTemplateSchema, type PromptTemplate, type PromptTemplateCreate, type PromptTemplateUpdate } from "@/domain/schemas";
 import type { PromptTemplateRepository } from "@/domain/ports/storage";
-import { AppErrorException } from "@/domain/schemas";
+import { notFound } from "@/infrastructure/storage/repo-utils";
 import { getDb } from "@/infrastructure/storage/db";
 import { promptTemplates, promptTemplateVersions } from "@/infrastructure/storage/schema";
 
@@ -23,10 +23,6 @@ function templateFromRow(row: TemplateRow): PromptTemplate {
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   });
-}
-
-function notFound(entity: string): never {
-  throw new AppErrorException({ code: "NOT_FOUND", message: `${entity} not found` });
 }
 
 export class SqlitePromptTemplateRepository implements PromptTemplateRepository {
