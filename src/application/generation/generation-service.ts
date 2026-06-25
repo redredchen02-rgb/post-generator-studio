@@ -1,3 +1,4 @@
+import { PIPELINE_STEPS } from "@/domain/pipeline-steps";
 import { createId, nowIso } from "@/lib/utils";
 import type { Generation, GenerationEvent, NormalizedGenerationRequest } from "@/domain/schemas";
 import { AppErrorException, generationRequestSchema } from "@/domain/schemas";
@@ -107,10 +108,10 @@ async function prepareGeneration(
     abortSignal: controller.signal,
   };
   const enabledSteps = new Set(preset.enabledPipelineSteps);
-  const contextPayload = enabledSteps.has("build-context")
+  const contextPayload = enabledSteps.has(PIPELINE_STEPS.BUILD_CONTEXT)
     ? await buildContextStep.execute(context, request)
     : { request, variables: {} };
-  const rendered = enabledSteps.has("render-prompt")
+  const rendered = enabledSteps.has(PIPELINE_STEPS.RENDER_PROMPT)
     ? await renderPromptStep.execute(context, contextPayload)
     : {
         request: contextPayload.request,
@@ -224,12 +225,12 @@ async function* streamToProvider(
         return;
       } else {
         let formatted = accumulated;
-        if (enabledSteps.has("clean-content")) {
+        if (enabledSteps.has(PIPELINE_STEPS.CLEAN_CONTENT)) {
           const cleaned = await cleanContentStep.execute(context, { content: accumulated, title: validated.request.title });
-          formatted = enabledSteps.has("format-output")
+          formatted = enabledSteps.has(PIPELINE_STEPS.FORMAT_OUTPUT)
             ? await formatOutputStep.execute(context, cleaned)
             : cleaned;
-        } else if (enabledSteps.has("format-output")) {
+        } else if (enabledSteps.has(PIPELINE_STEPS.FORMAT_OUTPUT)) {
           formatted = await formatOutputStep.execute(context, accumulated);
         }
         const completed = await getStorage().generations.update(generation.id, {
