@@ -36,7 +36,12 @@
     "exportMdBtn": ".md",
     "exportTxtBtn": ".txt",
     "saveBtn": "保存",
-    "regenerateBtn": "重新生成"
+    "regenerateBtn": "重新生成",
+    "metricsWords": "{count} 词",
+    "metricsCjk": "{count} 字",
+    "metricsReadMin": "{count} 分钟阅读",
+    "metricsAri": "ARI {grade}",
+    "metricsAriTitle": "自动可读性指数（仅英文）"
   },
   "Config": {
     "title": "当前配置",

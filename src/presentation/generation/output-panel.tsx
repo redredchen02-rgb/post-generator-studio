@@ -6,6 +6,7 @@ import { Clipboard, Download, FileText, RotateCcw, Save } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/presentation/components/ui/button";
 import { Textarea } from "@/presentation/components/ui/textarea";
+import { computeTextMetrics } from "@/lib/text-metrics";
 import type { Generation } from "@/domain/schemas";
 
 type OutputPanelProps = {
@@ -29,6 +30,7 @@ type OutputPanelProps = {
 
 export function OutputPanel(props: OutputPanelProps): React.ReactElement {
   const t = useTranslations("Output");
+  const metrics = React.useMemo(() => computeTextMetrics(props.content), [props.content]);
 
   return (
     <section className="app-surface grid min-h-[calc(100vh-6.5rem)] grid-rows-[auto_auto_minmax(0,1fr)_auto] gap-3 rounded-lg p-4 slide-up" style={{ animationDelay: "0.1s" }}>
@@ -65,17 +67,27 @@ export function OutputPanel(props: OutputPanelProps): React.ReactElement {
         )}
       </div>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <span>{t("fontLabel")}</span>
-          <input
-            aria-label="Editor font size"
-            type="range"
-            min="13"
-            max="20"
-            value={props.editorFontSize}
-            onChange={(e) => props.onFontSizeChange(Number(e.target.value))}
-          />
-          <span>{props.editorFontSize}px</span>
+        <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+          <div className="flex items-center gap-2">
+            <span>{t("fontLabel")}</span>
+            <input
+              aria-label="Editor font size"
+              type="range"
+              min="13"
+              max="20"
+              value={props.editorFontSize}
+              onChange={(e) => props.onFontSizeChange(Number(e.target.value))}
+            />
+            <span>{props.editorFontSize}px</span>
+          </div>
+          <div className="flex items-center gap-2" aria-label="Document metrics">
+            <span>{t("metricsWords", { count: metrics.words })}</span>
+            {metrics.cjkChars > 0 ? <span>· {t("metricsCjk", { count: metrics.cjkChars })}</span> : null}
+            <span>· {t("metricsReadMin", { count: metrics.readingMinutes })}</span>
+            {metrics.readabilityGrade !== null ? (
+              <span title={t("metricsAriTitle")}>· {t("metricsAri", { grade: metrics.readabilityGrade })}</span>
+            ) : null}
+          </div>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" size="sm" disabled={!props.content} onClick={props.onCopyMarkdown}>
