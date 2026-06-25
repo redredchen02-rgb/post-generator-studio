@@ -19,3 +19,11 @@ export function getStorage(): StoragePort {
   storage ??= createSqliteStorage();
   return storage;
 }
+
+export function setStorage(port: StoragePort): void {
+  storage = port;
+}
+
+export function resetStorage(): void {
+  storage = null;
+}

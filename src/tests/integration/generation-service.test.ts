@@ -1,7 +1,8 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { createGenerationPreset } from "@/application/presets/preset-service";
 import { createProviderProfile } from "@/application/providers/provider-service";
 import { streamGeneration } from "@/application/generation/generation-service";
+import { mockFetchSSE, mockFetchError } from "../fixtures";
 
 describe("generation use case", () => {
   it("streams fixture provider output and persists the completed generation", async () => {
@@ -20,23 +21,15 @@ describe("generation use case", () => {
       promptTemplateId: "template_news_writing",
       locale: "zh-CN",
       outputFormat: "markdown",
-      enabledPipelineSteps: ["build-context", "render-prompt", "generate-content", "clean-content", "format-output", "persist-generation"],
+      enabledPipelineSteps: ["build-context", "render-prompt", "clean-content", "format-output"],
       isDefault: false,
     });
 
-    const fetchMock = vi.spyOn(global, "fetch").mockResolvedValue(
-      new Response(
-        [
-          'data: {"model":"fixture-model","choices":[{"delta":{"content":"# 测试标题\\n\\n"}}]}',
-          "",
-          'data: {"choices":[{"delta":{"content":"正文内容。"}}],"usage":{"prompt_tokens":10,"completion_tokens":20}}',
-          "",
-          "data: [DONE]",
-          "",
-        ].join("\n"),
-        { status: 200, headers: { "Content-Type": "text/event-stream" } },
-      ),
-    );
+    const fetchMock = mockFetchSSE([
+      'data: {"model":"fixture-model","choices":[{"delta":{"content":"# 测试标题\\n\\n"}}]}',
+      'data: {"choices":[{"delta":{"content":"正文内容。"}}],"usage":{"prompt_tokens":10,"completion_tokens":20}}',
+      "data: [DONE]",
+    ]);
 
     const events = [];
     for await (const event of streamGeneration({
@@ -75,13 +68,11 @@ describe("generation use case", () => {
       promptTemplateId: "template_news_writing",
       locale: "zh-CN",
       outputFormat: "markdown",
-      enabledPipelineSteps: ["build-context", "render-prompt", "generate-content", "clean-content", "format-output", "persist-generation"],
+      enabledPipelineSteps: ["build-context", "render-prompt", "clean-content", "format-output"],
       isDefault: false,
     });
 
-    const fetchMock = vi.spyOn(global, "fetch").mockResolvedValue(
-      new Response(JSON.stringify({ error: { message: "model missing" } }), { status: 404 }),
-    );
+    const fetchMock = mockFetchError(404, "model missing");
     const events = [];
     for await (const event of streamGeneration({
       title: "失败",
@@ -102,4 +93,3 @@ describe("generation use case", () => {
     }
   });
 });
-
