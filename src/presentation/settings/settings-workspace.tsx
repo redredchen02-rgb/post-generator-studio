@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { Copy, Database, KeyRound, Layers } from "lucide-react";
-import { loadBootstrap, type BootstrapData } from "@/presentation/lib/api";
+import { loadBootstrap } from "@/presentation/lib/api";
 import { useApi } from "@/presentation/lib/use-api";
 import { ProviderProfilesPanel } from "./provider-profiles-panel";
 import { PromptTemplatesPanel } from "./prompt-templates-panel";
