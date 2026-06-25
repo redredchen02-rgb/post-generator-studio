@@ -30,6 +30,7 @@ import { useUiStore } from "@/presentation/store/ui-store";
 import { stripMarkdown } from "@/lib/utils";
 import { extractTemplateVariables } from "@/application/prompt/renderer";
 import { useGenerationStream } from "./use-generation-stream";
+import { useKeyboard } from "@/presentation/lib/use-keyboard";
 
 const STANDARD_VARS = new Set(["TITLE", "EVENT_SUMMARY", "DATE", "TIME", "LOCALE"]);
 
@@ -58,6 +59,15 @@ export function GeneratorWorkspace(): React.ReactElement {
   const { rawMode, setRawMode, editorFontSize, setEditorFontSize } = useUiStore();
   const { content, status, error, activeGeneration, metadata, isGenerating, generate, cancel, setContent, setStatus } =
     useGenerationStream();
+
+  const bindings = React.useMemo(
+    () => [
+      { key: "Enter", ctrl: true, handler: () => { if (!isGenerating) void handleGenerate(false); } },
+      { key: "Escape", handler: () => { if (isGenerating) void cancel(); } },
+    ],
+    [isGenerating],
+  );
+  useKeyboard(bindings);
 
   React.useEffect(() => {
     loadBootstrap()
@@ -147,7 +157,7 @@ export function GeneratorWorkspace(): React.ReactElement {
 
   return (
     <main className="mx-auto grid max-w-[1680px] gap-4 px-4 py-4 lg:grid-cols-[320px_minmax(0,1fr)_320px]">
-      <section className="app-surface grid h-fit gap-4 rounded-lg p-4">
+      <section className="app-surface grid h-fit gap-4 rounded-lg p-4 slide-up">
         <div>
           <h1 className="text-lg font-semibold">Generate</h1>
           <p className="text-sm text-muted-foreground">输入主题，选择 Preset，然后开始流式生成。</p>
@@ -211,7 +221,7 @@ export function GeneratorWorkspace(): React.ReactElement {
         </div>
       </section>
 
-      <section className="app-surface grid min-h-[calc(100vh-6.5rem)] grid-rows-[auto_auto_minmax(0,1fr)_auto] gap-3 rounded-lg p-4">
+      <section className="app-surface grid min-h-[calc(100vh-6.5rem)] grid-rows-[auto_auto_minmax(0,1fr)_auto] gap-3 rounded-lg p-4 slide-up" style={{ animationDelay: "0.1s" }}>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <h2 className="text-lg font-semibold">Output</h2>
@@ -286,7 +296,7 @@ export function GeneratorWorkspace(): React.ReactElement {
         </div>
       </section>
 
-      <aside className="app-surface grid h-fit gap-4 rounded-lg p-4">
+      <aside className="app-surface grid h-fit gap-4 rounded-lg p-4 slide-up" style={{ animationDelay: "0.2s" }}>
         <div>
           <h2 className="text-lg font-semibold">Current Config</h2>
           <p className="text-sm text-muted-foreground">常用配置可在这里快速确认。</p>
