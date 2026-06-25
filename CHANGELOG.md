@@ -1,5 +1,39 @@
 # Changelog
 
+## 0.0.2 — 2026-06-25
+
+### Added
+- **Language switching (EN / 简体中文)**: UI now fully supports English and Simplified
+  Chinese. A language switcher in the header writes a `NEXT_LOCALE` cookie and
+  refreshes server components; all 11 presentation components use `next-intl`
+  translation keys with 162-key parity across both message files.
+- **Dark mode flash prevention**: an inline script in `<head>` reads localStorage
+  before first paint and applies `.dark` on the root element, eliminating the
+  white flash on hard reload when dark mode is active.
+
+### Fixed
+- **OpenAI-compatible providers**: the API key field now appears in the provider
+  form (was hidden), and `/v1` is no longer doubled when a base URL already ends
+  with `/v1` (e.g. `https://host/v1/chat/completions` instead of `/v1/v1/`).
+- **Locale switcher UX**: rapid double-click is guarded by an `isRefreshing` flag;
+  buttons are disabled during the RSC refresh window. Skeleton renders both labels
+  as neutral (no premature active highlight before hydration).
+
+### Changed
+- `NextIntlClientProvider` wraps the app body; `<html lang>` is now dynamic
+  (`lang="en"` or `lang="zh-CN"` based on active locale).
+- Zustand `ui-store` extended with `locale` field; cookie-to-store sync on mount
+  recovers from localStorage-cleared divergence.
+- Three sequential `await` calls in `RootLayout` parallelized via `Promise.all`
+  (reduces server component TTFB).
+- Language switcher buttons carry `aria-current` for the active locale;
+  pre-mount skeleton marked `aria-busy` for screen readers.
+
+### Tests
+- Added `i18n-request.test.ts` (12 cases), `ui-store.test.ts` (4 cases),
+  `language-switcher.test.tsx` (6 cases), and extended
+  `openai-compatible-adapter.test.ts` (9 cases). Total: 172 tests across 32 files.
+
 ## 0.0.1 — First preliminary release
 
 First baseline that is considered usable. This release consolidates the codebase

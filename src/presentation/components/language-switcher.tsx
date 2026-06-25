@@ -22,9 +22,9 @@ export function LanguageSwitcher(): React.ReactElement {
   React.useEffect(() => {
     setMounted(true);
     // Sync Zustand locale from cookie in case localStorage was cleared independently
-    const match = document.cookie.match(/(?:^|;\s*)NEXT_LOCALE=([^;]+)/);
-    const cookieLocale = match?.[1] as Locale | undefined;
-    if (cookieLocale) {
+    const match = document.cookie.match(new RegExp(`(?:^|;\\s*)${LOCALE_COOKIE}=([^;]+)`));
+    const cookieLocale = match?.[1];
+    if (cookieLocale === "en" || cookieLocale === "zh-CN") {
       setLocale(cookieLocale);
     }
   }, [setLocale]);
@@ -32,7 +32,8 @@ export function LanguageSwitcher(): React.ReactElement {
   function switchLocale(next: Locale): void {
     if (isRefreshing) return;
     setIsRefreshing(true);
-    document.cookie = `${LOCALE_COOKIE}=${next}; path=/; max-age=${LOCALE_COOKIE_MAX_AGE}; SameSite=Lax`;
+    const secure = location.protocol === "https:" ? "; Secure" : "";
+    document.cookie = `${LOCALE_COOKIE}=${next}; path=/; max-age=${LOCALE_COOKIE_MAX_AGE}; SameSite=Lax${secure}`;
     setLocale(next);
     router.refresh();
     // Reset guard after 1s — sufficient for RSC refresh to settle
@@ -41,7 +42,7 @@ export function LanguageSwitcher(): React.ReactElement {
 
   if (!mounted) {
     return (
-      <div className="inline-flex h-9 items-center gap-1 rounded-md px-2 text-sm">
+      <div className="inline-flex h-9 items-center gap-1 rounded-md px-2 text-sm" aria-busy="true">
         <span className={inactiveClass}>EN</span>
         <span className="text-muted-foreground">/</span>
         <span className={inactiveClass}>中文</span>
@@ -56,6 +57,7 @@ export function LanguageSwitcher(): React.ReactElement {
         onClick={() => switchLocale("en")}
         className={locale === "en" ? activeClass : inactiveClass}
         aria-label="Switch to English"
+        aria-current={locale === "en" ? "true" : undefined}
         disabled={isRefreshing}
       >
         EN
@@ -66,6 +68,7 @@ export function LanguageSwitcher(): React.ReactElement {
         onClick={() => switchLocale("zh-CN")}
         className={locale === "zh-CN" ? activeClass : inactiveClass}
         aria-label="切換為中文"
+        aria-current={locale === "zh-CN" ? "true" : undefined}
         disabled={isRefreshing}
       >
         中文

@@ -14,8 +14,7 @@ export const metadata: Metadata = {
 };
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>): Promise<React.ReactElement> {
-  const locale = await getLocale();
-  const messages = await getMessages();
+  const [locale, messages] = await Promise.all([getLocale(), getMessages()]);
   const t = await getTranslations({ locale, namespace: "Navigation" });
 
   return (

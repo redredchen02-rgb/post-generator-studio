@@ -103,6 +103,29 @@ describe("OpenAICompatibleAdapter.listModels URL building", () => {
   });
 });
 
+describe("OpenAICompatibleAdapter.listModels non-200 response", () => {
+  it("returns [] when the endpoint responds with a non-200 status", async () => {
+    const originalFetch = global.fetch;
+    global.fetch = (async () =>
+      new Response("Internal Server Error", { status: 500 })) as typeof fetch;
+    try {
+      const models = await makeAdapter().listModels(makeProfile("https://relay.example.com"));
+      expect(models).toEqual([]);
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
+});
+
+describe("OpenAICompatibleAdapter URL building — non-terminal /v1", () => {
+  it("appends /v1 when base URL has /v1 as a non-terminal segment", async () => {
+    const url = await captureRequestUrl("https://example.com/v1/proxy");
+    // /v1/proxy does not end with /v1 so another /v1 is appended
+    expect(url).toBe("https://example.com/v1/proxy/v1/chat/completions");
+    expect(url).not.toContain("/v1/v1/chat");
+  });
+});
+
 describe("OpenAICompatibleAdapter.listModels early return", () => {
   it("returns [] without fetching when requiresApiKey=true and no key provided", async () => {
     const adapter = new OpenAICompatibleAdapter({
