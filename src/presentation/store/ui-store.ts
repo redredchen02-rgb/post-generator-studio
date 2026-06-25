@@ -3,7 +3,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-type Locale = "en" | "zh-CN";
+export type Locale = "en" | "zh-CN";
 
 type UiState = {
   rawMode: boolean;

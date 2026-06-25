@@ -49,6 +49,7 @@
     "outputFormatLabel": "输出格式",
     "pipelineStepsLabel": "Pipeline 步骤",
     "tokenUsageEmpty": "Provider 上报后将显示 Token 用量。",
+    "outputTokensOnly": "{count} 输出 token",
     "inputTokensLabel": "输入",
     "outputTokensLabel": "输出",
     "totalLabel": "合计",

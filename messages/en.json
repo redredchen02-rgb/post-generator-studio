@@ -49,6 +49,7 @@
     "outputFormatLabel": "Output Format",
     "pipelineStepsLabel": "Pipeline Steps",
     "tokenUsageEmpty": "Token usage appears when providers report it.",
+    "outputTokensOnly": "{count} output tokens",
     "inputTokensLabel": "Input",
     "outputTokensLabel": "Output",
     "totalLabel": "total",

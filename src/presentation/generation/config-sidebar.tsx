@@ -62,7 +62,7 @@ export function ConfigSidebar(props: ConfigSidebarProps): React.ReactElement {
             </div>
           </>
         ) : props.metadata.outputTokens ? (
-          `${props.metadata.outputTokens} output tokens`
+          t("outputTokensOnly", { count: props.metadata.outputTokens })
         ) : (
           t("tokenUsageEmpty")
         )}

@@ -71,3 +71,78 @@ describe("OpenAICompatibleAdapter URL building", () => {
     expect(url).toBe("https://la-sealion.inaiai.com/v1/chat/completions");
   });
 });
+
+describe("OpenAICompatibleAdapter.listModels URL building", () => {
+  async function captureListModelsUrl(baseUrl?: string): Promise<string> {
+    let captured = "";
+    const originalFetch = global.fetch;
+    global.fetch = (async (url: string) => {
+      captured = String(url);
+      return new Response(JSON.stringify({ data: [] }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }) as typeof fetch;
+    try {
+      await makeAdapter().listModels(makeProfile(baseUrl));
+    } finally {
+      global.fetch = originalFetch;
+    }
+    return captured;
+  }
+
+  it("hits /v1/models when base URL has no /v1 segment", async () => {
+    const url = await captureListModelsUrl("https://relay.example.com");
+    expect(url).toBe("https://relay.example.com/v1/models");
+  });
+
+  it("does not double /v1 for listModels when base URL already ends in /v1", async () => {
+    const url = await captureListModelsUrl("https://la-sealion.inaiai.com/v1");
+    expect(url).toBe("https://la-sealion.inaiai.com/v1/models");
+    expect(url).not.toContain("/v1/v1/");
+  });
+});
+
+describe("OpenAICompatibleAdapter.listModels early return", () => {
+  it("returns [] without fetching when requiresApiKey=true and no key provided", async () => {
+    const adapter = new OpenAICompatibleAdapter({
+      id: "needs-key",
+      defaultBaseUrl: "http://localhost:8000",
+      requiresApiKey: true,
+    });
+    let fetchCalled = false;
+    const originalFetch = global.fetch;
+    global.fetch = (async () => {
+      fetchCalled = true;
+      return new Response("{}", { status: 200 });
+    }) as typeof fetch;
+    try {
+      const models = await adapter.listModels(makeProfile());
+      expect(models).toEqual([]);
+      expect(fetchCalled).toBe(false);
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
+
+  it("fetches when requiresApiKey=true and an API key is provided", async () => {
+    const adapter = new OpenAICompatibleAdapter({
+      id: "needs-key",
+      defaultBaseUrl: "http://localhost:8000",
+      requiresApiKey: true,
+    });
+    const originalFetch = global.fetch;
+    global.fetch = (async () =>
+      new Response(JSON.stringify({ data: [{ id: "m1" }] }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      })) as typeof fetch;
+    try {
+      const models = await adapter.listModels(makeProfile(), { apiKey: "sk-test" });
+      expect(models).toHaveLength(1);
+      expect(models[0].id).toBe("m1");
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
+});

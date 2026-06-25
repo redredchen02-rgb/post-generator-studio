@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 const SUPPORTED_LOCALES = ["en", "zh-CN"] as const;
 type Locale = (typeof SUPPORTED_LOCALES)[number];
 
-function isValidLocale(value: string | undefined): value is Locale {
+export function isValidLocale(value: string | undefined): value is Locale {
   return SUPPORTED_LOCALES.includes(value as Locale);
 }
 
