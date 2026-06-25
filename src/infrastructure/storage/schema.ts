@@ -22,6 +22,7 @@ export const promptTemplates = sqliteTable("prompt_templates", {
   systemPrompt: text("system_prompt").notNull(),
   userPromptTemplate: text("user_prompt_template").notNull(),
   supportedVariables: text("supported_variables").notNull(),
+  customVariableDefaults: text("custom_variable_defaults").notNull().default("{}"),
   outputFormat: text("output_format").notNull(),
   version: integer("version").notNull(),
   isDefault: integer("is_default", { mode: "boolean" }).notNull(),

@@ -63,10 +63,15 @@ export function GeneratorWorkspace(): React.ReactElement {
   const { content, status, error, activeGeneration, metadata, isGenerating, generate, cancel, setContent, setStatus } =
     useGenerationStream();
 
+  const handleGenerateRef = React.useRef(handleGenerate);
+  handleGenerateRef.current = handleGenerate;
+  const cancelRef = React.useRef(cancel);
+  cancelRef.current = cancel;
+
   const bindings = React.useMemo(
     () => [
-      { key: "Enter", ctrl: true, handler: () => { if (!isGenerating) void handleGenerate(false); } },
-      { key: "Escape", handler: () => { if (isGenerating) void cancel(); } },
+      { key: "Enter", ctrl: true, handler: () => { if (!isGenerating) void handleGenerateRef.current(false); } },
+      { key: "Escape", handler: () => { if (isGenerating) void cancelRef.current(); } },
     ],
     [isGenerating],
   );

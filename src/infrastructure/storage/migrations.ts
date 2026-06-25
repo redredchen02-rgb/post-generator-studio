@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS prompt_templates (
   system_prompt TEXT NOT NULL,
   user_prompt_template TEXT NOT NULL,
   supported_variables TEXT NOT NULL,
+  custom_variable_defaults TEXT NOT NULL DEFAULT '{}',
   output_format TEXT NOT NULL,
   version INTEGER NOT NULL,
   is_default INTEGER NOT NULL,
@@ -100,6 +101,11 @@ export async function runMigrations(): Promise<void> {
     // Add indexes for query performance
     database.exec("CREATE INDEX IF NOT EXISTS generations_status_idx ON generations(status)");
     database.exec("CREATE INDEX IF NOT EXISTS generations_created_at_idx ON generations(created_at)");
+    // Migration: add custom_variable_defaults column if missing
+    const columns = database.prepare("PRAGMA table_info(prompt_templates)").all() as Array<{ name: string }>;
+    if (!columns.some((c) => c.name === "custom_variable_defaults")) {
+      database.exec("ALTER TABLE prompt_templates ADD COLUMN custom_variable_defaults TEXT NOT NULL DEFAULT '{}'");
+    }
   } finally {
     database.close();
   }

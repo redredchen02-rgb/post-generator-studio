@@ -8,6 +8,7 @@ export const promptTemplateSchema = z.object({
   systemPrompt: z.string().min(1),
   userPromptTemplate: z.string().min(1),
   supportedVariables: z.array(z.string()),
+  customVariableDefaults: z.record(z.string()).default({}),
   outputFormat: outputFormatSchema,
   version: z.number().int().min(1),
   isDefault: z.boolean(),
@@ -22,6 +23,7 @@ export const promptTemplateCreateSchema = z.object({
   systemPrompt: z.string().min(1),
   userPromptTemplate: z.string().min(1),
   supportedVariables: z.array(z.string()).default(["TITLE", "EVENT_SUMMARY", "DATE", "TIME", "LOCALE"]),
+  customVariableDefaults: z.record(z.string()).optional().default({}),
   outputFormat: outputFormatSchema.default("markdown"),
   isDefault: z.boolean().default(false),
 });
