@@ -27,6 +27,10 @@ React 组件不直接调用 LLM 或 SQLite。API routes 验证输入、调用 ap
 
 ## 分层详解
 
+### i18n (`messages/` + `src/i18n/`)
+
+`messages/en.json` 和 `messages/zh-CN.json` 提供 162-key 对等翻译文件。`src/i18n/request.ts` 实现 `next-intl` 请求配置（从 cookie 中解析 locale，默认 `en`）。
+
 ### Domain 层 (`src/domain/`)
 
 纯类型和业务规则，零外部依赖。
@@ -38,10 +42,11 @@ schemas/
   provider.ts       ProviderProfile, capabilities, validation
   template.ts       PromptTemplate, preview request
   generation.ts     Generation, Preset, Request, Event
+  completion.ts     CompletionRequest, CompletionResult schemas
   index.ts          统一 re-export
 ports/
   storage.ts        Repository 接口（ProviderProfile, Template, Preset, Generation）
-  provider.ts       LLMProviderAdapter 接口
+  provider.ts       LLMProviderAdapter 接口（含可选 complete() 方法）
   pipeline.ts       PipelineStep 接口 + PipelineContext
   logger.ts         Logger 接口
 ```
@@ -57,7 +62,7 @@ ports/
 | `prompts/` | 提示词模板 CRUD + 预览 |
 | `providers/` | Provider Profile CRUD + 测试连接 |
 | `export/` | Markdown/TXT 导出 |
-| `content/` | 内容清洗（去 AI 自我指涉）+ 格式化 |
+| `content/` | 内容清洗（去 AI 自我指涉）+ 格式化 + 非流式补全（`completion-service.ts`） |
 | `prompt/` | 模板渲染 + 变量解析 |
 
 ### Infrastructure 层 (`src/infrastructure/`)
@@ -95,6 +100,8 @@ logging/
 React UI，通过 API 客户端与后端交互。
 
 ```
+components/
+  language-switcher.tsx   语言切换按钮（EN / 简体中文），带防抖 + aria-current
 components/ui/          Button, Input, Textarea, NativeSelect
 generation/
   generator-workspace.tsx    生成主界面
@@ -111,7 +118,7 @@ lib/
   api.ts              API 客户端（fetchJson, loadBootstrap）
   use-api.ts          通用数据获取 hook
 store/
-  ui-store.ts         Zustand UI 状态（编辑器模式、字号）
+  ui-store.ts         Zustand UI 状态（编辑器模式、字号、locale）
 ```
 
 ### Pipeline (`src/plugins/pipeline/`)
@@ -167,7 +174,7 @@ tests/
   e2e/                  Playwright 端到端
 ```
 
-共 99 个测试，覆盖所有 Application + Infrastructure 层。
+共 172 个测试，覆盖所有 Application + Infrastructure 层。
 
 ## 扩展点
 
