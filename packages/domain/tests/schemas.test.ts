@@ -7,6 +7,7 @@ import {
   promptPreviewRequestSchema,
   promptTemplateCreateSchema,
   providerProfileCreateSchema,
+  providerProfileUpdateSchema,
 } from "@postgen/domain";
 
 describe("domain schemas", () => {
@@ -71,6 +72,17 @@ describe("domain schemas", () => {
       customVariables: { FOO: "bar" },
     });
     expect(result.customVariables).toEqual({ FOO: "bar" });
+  });
+
+  it("providerProfileUpdateSchema clearApiKey (R22)", () => {
+    const clear = providerProfileUpdateSchema.parse({ clearApiKey: true });
+    expect(clear.clearApiKey).toBe(true);
+
+    const noOp = providerProfileUpdateSchema.parse({ clearApiKey: false });
+    expect(noOp.clearApiKey).toBe(false);
+
+    const omitted = providerProfileUpdateSchema.parse({ name: "test" });
+    expect(omitted.clearApiKey).toBeUndefined();
   });
 
   it("validates prompt templates and generation events", () => {
