@@ -70,11 +70,11 @@ describe("preset-service", () => {
     });
 
     await deleteGenerationPreset(created.id);
-    await expect(getGenerationPreset(created.id)).rejects.toThrow("not found");
+    await expect(getGenerationPreset(created.id)).rejects.toThrow("生成预设不存在");
   });
 
   it("throws NOT_FOUND for non-existent preset", async () => {
-    await expect(getGenerationPreset("non-existent")).rejects.toThrow("not found");
+    await expect(getGenerationPreset("non-existent")).rejects.toThrow("生成预设不存在");
   });
 
   it("validates input schema", async () => {

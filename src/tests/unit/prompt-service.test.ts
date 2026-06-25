@@ -67,11 +67,11 @@ describe("prompt-service", () => {
     });
 
     await deletePromptTemplate(created.id);
-    await expect(getPromptTemplate(created.id)).rejects.toThrow("not found");
+    await expect(getPromptTemplate(created.id)).rejects.toThrow("提示词模板不存在");
   });
 
   it("throws NOT_FOUND for non-existent template", async () => {
-    await expect(getPromptTemplate("non-existent")).rejects.toThrow("not found");
+    await expect(getPromptTemplate("non-existent")).rejects.toThrow("提示词模板不存在");
   });
 
   it("rejects unsupported variables", async () => {

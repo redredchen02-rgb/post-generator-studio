@@ -83,10 +83,10 @@ describe("provider-service", () => {
     });
 
     await deleteProviderProfile(created.id);
-    await expect(getProviderProfile(created.id)).rejects.toThrow("not found");
+    await expect(getProviderProfile(created.id)).rejects.toThrow("供应商配置不存在");
   });
 
   it("throws NOT_FOUND for non-existent provider", async () => {
-    await expect(getProviderProfile("non-existent")).rejects.toThrow("not found");
+    await expect(getProviderProfile("non-existent")).rejects.toThrow("供应商配置不存在");
   });
 });

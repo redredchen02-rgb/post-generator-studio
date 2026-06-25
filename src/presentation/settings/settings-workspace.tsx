@@ -49,22 +49,24 @@ export function SettingsWorkspace(): React.ReactElement {
       </aside>
       <section className="app-surface min-h-[calc(100vh-6.5rem)] rounded-lg p-4">
         {message ? <div className="mb-4 rounded-md bg-secondary p-3 text-sm text-secondary-foreground">{message}</div> : null}
-        {tab === "providers" ? (
-          <ProviderProfilesPanel profiles={bootstrap?.providerProfiles || []} refresh={refresh} notify={notify} />
-        ) : null}
-        {tab === "templates" ? (
-          <PromptTemplatesPanel templates={bootstrap?.promptTemplates || []} refresh={refresh} notify={notify} />
-        ) : null}
-        {tab === "presets" ? (
-          <GenerationPresetsPanel
-            presets={bootstrap?.generationPresets || []}
-            providers={bootstrap?.providerProfiles || []}
-            templates={bootstrap?.promptTemplates || []}
-            refresh={refresh}
-            notify={notify}
-          />
-        ) : null}
-        {tab === "storage" ? <StoragePanel /> : null}
+        {!bootstrap ? (
+          <div className="flex h-full items-center justify-center text-sm text-muted-foreground">加载中...</div>
+        ) : (
+          <>
+            {tab === "providers" ? <ProviderProfilesPanel profiles={bootstrap.providerProfiles} refresh={refresh} notify={notify} /> : null}
+            {tab === "templates" ? <PromptTemplatesPanel templates={bootstrap.promptTemplates} refresh={refresh} notify={notify} /> : null}
+            {tab === "presets" ? (
+              <GenerationPresetsPanel
+                presets={bootstrap.generationPresets}
+                providers={bootstrap.providerProfiles}
+                templates={bootstrap.promptTemplates}
+                refresh={refresh}
+                notify={notify}
+              />
+            ) : null}
+            {tab === "storage" ? <StoragePanel /> : null}
+          </>
+        )}
       </section>
     </main>
   );

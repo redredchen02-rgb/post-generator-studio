@@ -17,7 +17,7 @@ export async function listProviderProfiles(): Promise<ProviderProfile[]> {
 export async function getProviderProfile(id: string): Promise<ProviderProfile> {
   const profile = await getStorage().providerProfiles.get(id);
   if (!profile) {
-    throw new AppErrorException({ code: "NOT_FOUND", message: "Provider profile not found" });
+    throw new AppErrorException({ code: "NOT_FOUND", message: "供应商配置不存在" });
   }
   return profile;
 }

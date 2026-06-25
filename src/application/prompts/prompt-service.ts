@@ -17,7 +17,7 @@ export async function listPromptTemplates(): Promise<PromptTemplate[]> {
 export async function getPromptTemplate(id: string): Promise<PromptTemplate> {
   const template = await getStorage().promptTemplates.get(id);
   if (!template) {
-    throw new AppErrorException({ code: "NOT_FOUND", message: "Prompt template not found" });
+    throw new AppErrorException({ code: "NOT_FOUND", message: "提示词模板不存在" });
   }
   return template;
 }

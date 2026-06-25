@@ -34,6 +34,6 @@ describe("export-service", () => {
   });
 
   it("throws for non-existent generation", async () => {
-    await expect(exportGeneration("non-existent", "md")).rejects.toThrow("not found");
+    await expect(exportGeneration("non-existent", "md")).rejects.toThrow("生成记录不存在");
   });
 });

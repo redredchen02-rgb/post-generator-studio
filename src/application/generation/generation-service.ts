@@ -27,7 +27,7 @@ export async function listGenerations(limit?: number): Promise<Generation[]> {
 export async function getGeneration(id: string): Promise<Generation> {
   const generation = await getStorage().generations.get(id);
   if (!generation) {
-    throw new AppErrorException({ code: "NOT_FOUND", message: "Generation not found" });
+    throw new AppErrorException({ code: "NOT_FOUND", message: "生成记录不存在" });
   }
   return generation;
 }

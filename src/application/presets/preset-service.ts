@@ -14,7 +14,7 @@ export async function listGenerationPresets(): Promise<GenerationPreset[]> {
 export async function getGenerationPreset(id: string): Promise<GenerationPreset> {
   const preset = await getStorage().generationPresets.get(id);
   if (!preset) {
-    throw new AppErrorException({ code: "NOT_FOUND", message: "Generation preset not found" });
+    throw new AppErrorException({ code: "NOT_FOUND", message: "生成预设不存在" });
   }
   return preset;
 }
