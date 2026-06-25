@@ -4,15 +4,42 @@
 
 ## 快速开始
 
+### 环境要求
+
+- Node.js >= 18
+- pnpm >= 9
+
+### 安装
+
 ```bash
+# 克隆仓库
+git clone https://github.com/redredchen02-rgb/post-generator-studio.git
+cd post-generator-studio
+
+# 安装依赖
 pnpm install
+
+# 配置环境变量（可选，使用默认值即可）
 cp .env.example .env.local
+
+# 初始化数据库
 pnpm db:migrate
+
+# 填充默认数据（Provider 模板、Prompt 模板、预设）
 pnpm db:seed
+
+# 启动开发服务器
 pnpm dev
 ```
 
 打开 http://localhost:3000。
+
+### 首次使用
+
+1. 进入 **Settings** 页面
+2. 配置一个 Provider Profile（Ollama 本地已预配置）
+3. 如果使用云端 Provider（OpenAI / Anthropic / Gemini），填入 API Key
+4. 回到 **Generate** 页面，输入标题和事件摘要，点击 Generate
 
 ## 功能
 
