@@ -1,10 +1,11 @@
-import type { GenerationOptions } from "@/domain/ports/provider";
-import type {
-  GenerationEvent,
-  NormalizedGenerationRequest,
-  ProviderCapabilities,
-  ProviderModel,
-  ProviderProfile,
+import type { CompletionResult, GenerationOptions } from "@/domain/ports/provider";
+import {
+  AppErrorException,
+  type GenerationEvent,
+  type NormalizedGenerationRequest,
+  type ProviderCapabilities,
+  type ProviderModel,
+  type ProviderProfile,
 } from "@/domain/schemas";
 import { BaseAdapter, type RequestBuildResult, type ChunkParseResult } from "@/infrastructure/providers/base-adapter";
 
@@ -28,6 +29,7 @@ export class OllamaAdapter extends BaseAdapter {
     return {
       ...super.capabilities(),
       supportsModelList: true,
+      supportsCompletion: true,
     };
   }
 
@@ -55,7 +57,7 @@ export class OllamaAdapter extends BaseAdapter {
             { role: "system", content: request.systemPrompt },
             { role: "user", content: request.userPrompt },
           ],
-          stream: true,
+          stream: request.stream,
           options: {
             temperature: request.temperature,
             num_predict: request.maxTokens,
@@ -81,6 +83,20 @@ export class OllamaAdapter extends BaseAdapter {
       return { events, done: true };
     }
     return { events };
+  }
+
+  protected parseCompletion(raw: unknown): CompletionResult {
+    const chunk = raw as OllamaChunk;
+    const content = chunk.message?.content;
+    if (typeof content !== "string") {
+      throw new AppErrorException({ code: "COMPLETION_FAILED", message: `${this.id} 返回了非预期的补全结构` });
+    }
+    return {
+      content,
+      model: chunk.model,
+      inputTokens: chunk.prompt_eval_count,
+      outputTokens: chunk.eval_count,
+    };
   }
 
   async listModels(config: ProviderProfile, options?: GenerationOptions): Promise<ProviderModel[]> {

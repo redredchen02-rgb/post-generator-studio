@@ -1,10 +1,11 @@
-import type { GenerationOptions } from "@/domain/ports/provider";
-import type {
-  GenerationEvent,
-  NormalizedGenerationRequest,
-  ProviderCapabilities,
-  ProviderModel,
-  ProviderProfile,
+import type { CompletionResult, GenerationOptions } from "@/domain/ports/provider";
+import {
+  AppErrorException,
+  type GenerationEvent,
+  type NormalizedGenerationRequest,
+  type ProviderCapabilities,
+  type ProviderModel,
+  type ProviderProfile,
 } from "@/domain/schemas";
 import { BaseAdapter, type RequestBuildResult, type ChunkParseResult } from "@/infrastructure/providers/base-adapter";
 
@@ -19,6 +20,12 @@ type ChatCompletionChunk = {
     completion_tokens?: number;
     total_tokens?: number;
   };
+};
+
+type ChatCompletionResponse = {
+  choices?: Array<{ message?: { content?: string } }>;
+  model?: string;
+  usage?: { prompt_tokens?: number; completion_tokens?: number };
 };
 
 type ModelsResponse = {
@@ -49,6 +56,7 @@ export class OpenAICompatibleAdapter extends BaseAdapter {
     return {
       ...super.capabilities(),
       supportsModelList: true,
+      supportsCompletion: true,
     };
   }
 
@@ -71,7 +79,9 @@ export class OpenAICompatibleAdapter extends BaseAdapter {
           temperature: request.temperature,
           max_tokens: request.maxTokens,
           stream: request.stream,
-          stream_options: { include_usage: true },
+          // stream_options is only valid on streaming requests; strict APIs
+          // reject it alongside stream:false.
+          ...(request.stream ? { stream_options: { include_usage: true } } : {}),
         }),
       },
     };
@@ -93,6 +103,20 @@ export class OpenAICompatibleAdapter extends BaseAdapter {
       });
     }
     return { events };
+  }
+
+  protected parseCompletion(raw: unknown): CompletionResult {
+    const parsed = raw as ChatCompletionResponse;
+    const content = parsed.choices?.[0]?.message?.content;
+    if (typeof content !== "string") {
+      throw new AppErrorException({ code: "COMPLETION_FAILED", message: `${this.id} 返回了非预期的补全结构` });
+    }
+    return {
+      content,
+      model: parsed.model,
+      inputTokens: parsed.usage?.prompt_tokens,
+      outputTokens: parsed.usage?.completion_tokens,
+    };
   }
 
   async listModels(config: ProviderProfile, options?: GenerationOptions): Promise<ProviderModel[]> {

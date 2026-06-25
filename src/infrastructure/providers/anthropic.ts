@@ -1,8 +1,10 @@
-import type { GenerationOptions } from "@/domain/ports/provider";
-import type {
-  GenerationEvent,
-  NormalizedGenerationRequest,
-  ProviderProfile,
+import type { CompletionResult, GenerationOptions } from "@/domain/ports/provider";
+import {
+  AppErrorException,
+  type GenerationEvent,
+  type NormalizedGenerationRequest,
+  type ProviderCapabilities,
+  type ProviderProfile,
 } from "@/domain/schemas";
 import { BaseAdapter, type RequestBuildResult, type ChunkParseResult } from "@/infrastructure/providers/base-adapter";
 
@@ -14,8 +16,22 @@ type AnthropicEvent = {
   error?: { message?: string };
 };
 
+type AnthropicMessage = {
+  content?: Array<{ type?: string; text?: string }>;
+  model?: string;
+  usage?: { input_tokens?: number; output_tokens?: number };
+  error?: { message?: string };
+};
+
 export class AnthropicAdapter extends BaseAdapter {
   readonly id = "anthropic";
+
+  capabilities(): ProviderCapabilities {
+    return {
+      ...super.capabilities(),
+      supportsCompletion: true,
+    };
+  }
 
   protected async buildRequest(
     request: NormalizedGenerationRequest,
@@ -38,7 +54,7 @@ export class AnthropicAdapter extends BaseAdapter {
           messages: [{ role: "user", content: request.userPrompt }],
           temperature: request.temperature,
           max_tokens: request.maxTokens,
-          stream: true,
+          stream: request.stream,
         }),
       },
     };
@@ -65,5 +81,25 @@ export class AnthropicAdapter extends BaseAdapter {
       return { events, done: true };
     }
     return { events };
+  }
+
+  protected parseCompletion(raw: unknown): CompletionResult {
+    const parsed = raw as AnthropicMessage;
+    if (parsed.error?.message) {
+      throw new AppErrorException({ code: "COMPLETION_FAILED", message: parsed.error.message });
+    }
+    if (!Array.isArray(parsed.content)) {
+      throw new AppErrorException({ code: "COMPLETION_FAILED", message: `${this.id} 返回了非预期的补全结构` });
+    }
+    const content = parsed.content
+      .filter((block) => block.type === "text")
+      .map((block) => block.text ?? "")
+      .join("");
+    return {
+      content,
+      model: parsed.model,
+      inputTokens: parsed.usage?.input_tokens,
+      outputTokens: parsed.usage?.output_tokens,
+    };
   }
 }
