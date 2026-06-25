@@ -39,6 +39,8 @@ export type GenerationRequest = z.infer<typeof generationRequestSchema>;
 
 export const generationListQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(30),
+  search: z.string().optional(),
+  offset: z.coerce.number().int().min(0).default(0),
 });
 
 export const normalizedGenerationRequestSchema = z.object({

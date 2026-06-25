@@ -28,8 +28,8 @@ function redactSnapshot(profile: Record<string, unknown>): Record<string, unknow
   return { ...rest, keyMasked: profile.keyMasked ? String(profile.keyMasked) : undefined };
 }
 
-export async function listGenerations(limit?: number): Promise<Generation[]> {
-  return getStorage().generations.list(limit);
+export async function listGenerations(opts?: { search?: string; offset?: number; limit?: number }): Promise<{ items: Generation[]; total: number }> {
+  return getStorage().generations.list(opts);
 }
 
 export async function getGeneration(id: string): Promise<Generation> {

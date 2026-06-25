@@ -15,7 +15,7 @@ export async function GET(request: Request): Promise<NextResponse> {
   try {
     const url = new URL(request.url);
     const parsed = generationListQuerySchema.parse(Object.fromEntries(url.searchParams.entries()));
-    return NextResponse.json(await listGenerations(parsed.limit));
+    return NextResponse.json(await listGenerations({ search: parsed.search, offset: parsed.offset, limit: parsed.limit }));
   } catch (error) {
     return errorResponse(error);
   }

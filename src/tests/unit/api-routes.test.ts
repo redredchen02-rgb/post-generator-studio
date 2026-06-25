@@ -89,26 +89,24 @@ describe("GET /api/generations", () => {
     vi.clearAllMocks();
   });
 
-  it("returns a list of generations", async () => {
-    const fakeGenerations = [
-      { id: "gen_1", title: "Test", status: "completed" },
-    ] as Generation[];
-    mockListGenerations.mockResolvedValue(fakeGenerations);
+  it("returns a paginated list of generations", async () => {
+    const fakeResult = { items: [{ id: "gen_1", title: "Test", status: "completed" }] as Generation[], total: 1 };
+    mockListGenerations.mockResolvedValue(fakeResult);
 
     const { GET } = await import("@/app/api/generations/route");
     const response = await GET(mockRequest({ method: "GET", url: "http://localhost/api/generations" }));
     const body = await response.json();
 
     expect(response.status).toBe(200);
-    expect(body).toEqual(fakeGenerations);
+    expect(body).toEqual(fakeResult);
     expect(mockListGenerations).toHaveBeenCalledOnce();
   });
 
-  it("respects limit query param", async () => {
-    mockListGenerations.mockResolvedValue([] as Generation[]);
+  it("respects limit, offset, and search query params", async () => {
+    mockListGenerations.mockResolvedValue({ items: [], total: 0 });
     const { GET } = await import("@/app/api/generations/route");
-    await GET(mockRequest({ method: "GET", url: "http://localhost/api/generations?limit=5" }));
-    expect(mockListGenerations).toHaveBeenCalledWith(5);
+    await GET(mockRequest({ method: "GET", url: "http://localhost/api/generations?limit=5&offset=10&search=hello" }));
+    expect(mockListGenerations).toHaveBeenCalledWith({ limit: 5, offset: 10, search: "hello" });
   });
 
   it("returns 400 for invalid query params", async () => {

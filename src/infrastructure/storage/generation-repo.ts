@@ -1,7 +1,7 @@
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, like, sql } from "drizzle-orm";
 import { nowIso, parseJson } from "@/lib/utils";
 import { generationSchema, type Generation } from "@/domain/schemas";
-import type { GenerationCreateInput, GenerationRepository, GenerationUpdateInput } from "@/domain/ports/storage";
+import type { GenerationCreateInput, GenerationListOpts, GenerationListResult, GenerationRepository, GenerationUpdateInput } from "@/domain/ports/storage";
 import { AppErrorException } from "@/domain/schemas";
 import { getDb } from "@/infrastructure/storage/db";
 import { generations } from "@/infrastructure/storage/schema";
@@ -38,10 +38,19 @@ function notFound(entity: string): never {
 }
 
 export class SqliteGenerationRepository implements GenerationRepository {
-  async list(limit = 30): Promise<Generation[]> {
+  async list(opts: GenerationListOpts = {}): Promise<GenerationListResult> {
+    const { search, offset = 0, limit = 30 } = opts;
     const db = await getDb();
-    const rows = await db.select().from(generations).orderBy(desc(generations.createdAt)).limit(limit);
-    return rows.map(generationFromRow);
+    const filter = search ? like(generations.title, `%${search}%`) : undefined;
+    const [rows, [{ total }]] = await Promise.all([
+      filter
+        ? db.select().from(generations).where(filter).orderBy(desc(generations.createdAt)).limit(limit).offset(offset)
+        : db.select().from(generations).orderBy(desc(generations.createdAt)).limit(limit).offset(offset),
+      filter
+        ? db.select({ total: sql<number>`count(*)` }).from(generations).where(filter)
+        : db.select({ total: sql<number>`count(*)` }).from(generations),
+    ]);
+    return { items: rows.map(generationFromRow), total: Number(total) };
   }
 
   async get(id: string): Promise<Generation | null> {

@@ -62,8 +62,11 @@ export interface GenerationPresetRepository {
   delete(id: string): Promise<void>;
 }
 
+export type GenerationListOpts = { search?: string; offset?: number; limit?: number };
+export type GenerationListResult = { items: Generation[]; total: number };
+
 export interface GenerationRepository {
-  list(limit?: number): Promise<Generation[]>;
+  list(opts?: GenerationListOpts): Promise<GenerationListResult>;
   get(id: string): Promise<Generation | null>;
   getByIdempotencyKey(key: string): Promise<Generation | null>;
   create(input: GenerationCreateInput): Promise<Generation>;
