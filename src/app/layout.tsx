@@ -3,6 +3,7 @@ import Link from "next/link";
 import { History, Settings, Sparkles } from "lucide-react";
 import "./globals.css";
 import { cn } from "@/lib/utils";
+import { ThemeToggle } from "@/presentation/components/theme-toggle";
 
 export const metadata: Metadata = {
   title: "Post Generator Studio",
@@ -26,6 +27,9 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
                 <NavLink href="/" label="Generate" icon={<Sparkles className="h-4 w-4" />} />
                 <NavLink href="/history" label="History" icon={<History className="h-4 w-4" />} />
                 <NavLink href="/settings" label="Settings" icon={<Settings className="h-4 w-4" />} />
+                <div className="ml-2">
+                  <ThemeToggle />
+                </div>
               </nav>
             </div>
           </header>
