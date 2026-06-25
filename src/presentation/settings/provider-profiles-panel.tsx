@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { FlaskConical, Pencil, Plus, Save, Trash2 } from "lucide-react";
+import { CheckCircle2, FlaskConical, Loader2, Pencil, Plus, Save, Trash2, XCircle } from "lucide-react";
 import { useForm, useWatch } from "react-hook-form";
 import type { ProviderKind, ProviderProfile } from "@/domain/schemas";
 import { providerKindSchema, providerProfileCreateSchema } from "@/domain/schemas";
@@ -11,7 +11,7 @@ import { Button } from "@/presentation/components/ui/button";
 import { Field } from "@/presentation/components/ui/field";
 import { Input } from "@/presentation/components/ui/input";
 import { NativeSelect } from "@/presentation/components/ui/native-select";
-import { fetchJson } from "@/presentation/lib/api";
+import { fetchJson, testProviderProfile } from "@/presentation/lib/api";
 import { Header } from "./settings-workspace";
 
 type ProviderForm = z.infer<typeof providerProfileCreateSchema>;
@@ -46,6 +46,8 @@ export function ProviderProfilesPanel({
   notify: (message: string) => void;
 }): React.ReactElement {
   const [editingId, setEditingId] = React.useState<string | null>(null);
+  const [testStatus, setTestStatus] = React.useState<Record<string, "idle" | "testing" | "ok" | "error">>({});
+  const [testMessage, setTestMessage] = React.useState<Record<string, string>>({});
   const form = useForm<ProviderForm>({
     resolver: zodResolver(providerProfileCreateSchema),
     defaultValues: CREATE_DEFAULTS,
@@ -65,6 +67,7 @@ export function ProviderProfilesPanel({
 
   function loadForEdit(profile: ProviderProfile): void {
     setEditingId(profile.id);
+    setTestStatus((prev) => ({ ...prev, [profile.id]: "idle" }));
     form.reset({
       name: profile.name,
       providerKind: profile.providerKind,
@@ -118,14 +121,22 @@ export function ProviderProfilesPanel({
     }
   }
 
-  async function test(id: string): Promise<void> {
+  async function handleTest(id: string): Promise<void> {
+    setTestStatus((prev) => ({ ...prev, [id]: "testing" }));
+    setTestMessage((prev) => ({ ...prev, [id]: "" }));
     try {
-      const result = await fetchJson<{ ok: boolean; message: string }>(`/api/provider-profiles/${id}/test`, {
-        method: "POST",
-      });
-      notify(result.message);
+      const result = await testProviderProfile(id);
+      if (result.ok) {
+        const msg = result.models?.length ? `Connected · ${result.models.length} models` : result.message;
+        setTestStatus((prev) => ({ ...prev, [id]: "ok" }));
+        setTestMessage((prev) => ({ ...prev, [id]: msg }));
+      } else {
+        setTestStatus((prev) => ({ ...prev, [id]: "error" }));
+        setTestMessage((prev) => ({ ...prev, [id]: result.message }));
+      }
     } catch (err) {
-      notify(err instanceof Error ? err.message : "Test failed");
+      setTestStatus((prev) => ({ ...prev, [id]: "error" }));
+      setTestMessage((prev) => ({ ...prev, [id]: err instanceof Error ? err.message : "Test failed" }));
     }
   }
 
@@ -202,14 +213,32 @@ export function ProviderProfilesPanel({
                 {profile.providerKind} · {profile.model} · {profile.enabled ? "enabled" : "disabled"} ·{" "}
                 {profile.keyMasked || "no key"}
               </p>
+              {testMessage[profile.id] ? (
+                <p className={`mt-1 text-xs ${testStatus[profile.id] === "ok" ? "text-green-600 dark:text-green-400" : "text-destructive"}`}>
+                  {testMessage[profile.id]}
+                </p>
+              ) : null}
             </div>
             <div className="flex flex-wrap gap-2">
               <Button variant="outline" size="sm" onClick={() => loadForEdit(profile)}>
                 <Pencil className="h-4 w-4" />
                 Edit
               </Button>
-              <Button variant="outline" size="sm" onClick={() => void test(profile.id)}>
-                <FlaskConical className="h-4 w-4" />
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={testStatus[profile.id] === "testing"}
+                onClick={() => void handleTest(profile.id)}
+              >
+                {testStatus[profile.id] === "testing" ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : testStatus[profile.id] === "ok" ? (
+                  <CheckCircle2 className="h-4 w-4 text-green-500" />
+                ) : testStatus[profile.id] === "error" ? (
+                  <XCircle className="h-4 w-4 text-red-500" />
+                ) : (
+                  <FlaskConical className="h-4 w-4" />
+                )}
                 Test
               </Button>
               <Button variant="destructive" size="sm" onClick={() => void remove(profile.id)}>

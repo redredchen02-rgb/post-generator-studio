@@ -13,6 +13,11 @@ export type BootstrapData = {
   pipelineSteps: Array<{ id: string; name: string }>;
 };
 
+export type PaginatedGenerations = {
+  items: Generation[];
+  total: number;
+};
+
 export class ApiClientError extends Error {
   readonly appError: AppError;
 
@@ -46,8 +51,12 @@ export async function loadBootstrap(): Promise<BootstrapData> {
   return fetchJson<BootstrapData>("/api/bootstrap");
 }
 
-export async function loadGenerations(): Promise<Generation[]> {
-  return fetchJson<Generation[]>("/api/generations?limit=50");
+export async function loadGenerations(search?: string, offset?: number, limit?: number): Promise<PaginatedGenerations> {
+  const params = new URLSearchParams();
+  if (search) params.set("search", search);
+  if (offset !== undefined) params.set("offset", String(offset));
+  if (limit !== undefined) params.set("limit", String(limit));
+  return fetchJson<PaginatedGenerations>(`/api/generations?${params.toString()}`);
 }
 
 export async function saveGenerationContent(id: string, outputContent: string): Promise<Generation> {
@@ -69,7 +78,9 @@ export async function fetchPromptPreview(params: {
   });
 }
 
-export async function testProviderProfile(id: string): Promise<{ ok: boolean; message: string }> {
+export async function testProviderProfile(
+  id: string,
+): Promise<{ ok: boolean; message: string; models?: { id: string; name?: string }[] }> {
   return fetchJson(`/api/provider-profiles/${id}/test`, { method: "POST" });
 }
 
