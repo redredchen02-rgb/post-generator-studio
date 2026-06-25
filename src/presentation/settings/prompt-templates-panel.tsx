@@ -1,0 +1,118 @@
+"use client";
+
+import * as React from "react";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Copy, Save } from "lucide-react";
+import { useForm } from "react-hook-form";
+import type { PromptTemplate } from "@/domain/schemas";
+import { promptTemplateCreateSchema } from "@/domain/schemas";
+import type { z } from "zod";
+import { Button } from "@/presentation/components/ui/button";
+import { Field } from "@/presentation/components/ui/field";
+import { Input } from "@/presentation/components/ui/input";
+import { NativeSelect } from "@/presentation/components/ui/native-select";
+import { Textarea } from "@/presentation/components/ui/textarea";
+import { fetchJson } from "@/presentation/lib/api";
+import { Header } from "./settings-workspace";
+
+type TemplateForm = z.infer<typeof promptTemplateCreateSchema>;
+
+export function PromptTemplatesPanel({
+  templates,
+  refresh,
+  notify,
+}: {
+  templates: PromptTemplate[];
+  refresh: () => Promise<void>;
+  notify: (message: string) => void;
+}): React.ReactElement {
+  const form = useForm<TemplateForm>({
+    resolver: zodResolver(promptTemplateCreateSchema),
+    defaultValues: {
+      name: "Custom Template",
+      description: "",
+      systemPrompt: "你是一名资深内容编辑。",
+      userPromptTemplate: "标题：{{TITLE}}\n\n事件：{{EVENT_SUMMARY}}\n\n日期：{{DATE}}",
+      supportedVariables: ["TITLE", "EVENT_SUMMARY", "DATE", "TIME", "LOCALE"],
+      outputFormat: "markdown",
+      isDefault: false,
+    },
+  });
+  const [preview, setPreview] = React.useState<{ systemPrompt: string; userPrompt: string } | null>(null);
+
+  async function submit(values: TemplateForm): Promise<void> {
+    await fetchJson<PromptTemplate>("/api/prompt-templates", {
+      method: "POST",
+      body: JSON.stringify(values),
+    });
+    await refresh();
+    notify("Prompt template saved");
+  }
+
+  async function previewRendered(): Promise<void> {
+    const values = form.getValues();
+    setPreview(
+      await fetchJson<{ systemPrompt: string; userPrompt: string }>("/api/prompt-templates/preview", {
+        method: "POST",
+        body: JSON.stringify(values),
+      }),
+    );
+  }
+
+  return (
+    <div className="grid gap-6">
+      <Header title="Prompt Templates" description="管理版本化模板和受控变量。" />
+      <form className="grid gap-3 rounded-lg border p-4" onSubmit={form.handleSubmit((values) => void submit(values))}>
+        <div className="grid gap-3 md:grid-cols-2">
+          <Field label="Name">
+            <Input {...form.register("name")} />
+          </Field>
+          <Field label="Output Format">
+            <NativeSelect {...form.register("outputFormat")}>
+              <option value="markdown">markdown</option>
+              <option value="plain_text">plain_text</option>
+              <option value="html">html</option>
+            </NativeSelect>
+          </Field>
+        </div>
+        <Field label="Description">
+          <Input {...form.register("description")} />
+        </Field>
+        <Field label="System Prompt">
+          <Textarea className="min-h-40" {...form.register("systemPrompt")} />
+        </Field>
+        <Field label="User Prompt Template">
+          <Textarea className="min-h-52 font-mono" {...form.register("userPromptTemplate")} />
+        </Field>
+        <div className="flex flex-wrap gap-2">
+          <Button type="submit">
+            <Save className="h-4 w-4" />
+            Save Template
+          </Button>
+          <Button type="button" variant="outline" onClick={() => void previewRendered()}>
+            <Copy className="h-4 w-4" />
+            Preview Rendered Prompt
+          </Button>
+        </div>
+      </form>
+      {preview ? (
+        <div className="grid gap-3 rounded-lg border p-4">
+          <h3 className="font-medium">Preview</h3>
+          <pre className="overflow-auto rounded bg-muted p-3 text-xs">{preview.systemPrompt}</pre>
+          <pre className="overflow-auto rounded bg-muted p-3 text-xs">{preview.userPrompt}</pre>
+        </div>
+      ) : null}
+      <div className="grid gap-2">
+        {templates.map((template) => (
+          <div key={template.id} className="rounded-lg border p-4">
+            <h3 className="font-medium">{template.name}</h3>
+            <p className="text-sm text-muted-foreground">
+              v{template.version} · {template.outputFormat} · {template.isDefault ? "default" : "custom"} ·{" "}
+              {template.supportedVariables.join(", ")}
+            </p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
