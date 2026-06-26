@@ -5,9 +5,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```bash
-pnpm start:clean    # Recommended: reclaim port 3000 (kill strays) → migrate → build → start ONE instance
-pnpm dev:clean      # Reclaim port 3000, then start dev server (HMR)
-pnpm dev            # Start dev server (does NOT reclaim the port — can stack duplicates if 3000 is busy)
+pnpm start:clean    # Full reset: reclaim port 3000 (kill strays) → migrate → build → start ONE instance
+pnpm dev            # Dev server (HMR). Reclaims port 3000 + self-heals native module first
+pnpm start          # Production server. Reclaims port 3000 + self-heals native module first (run after `pnpm build`)
+pnpm dev:clean      # Alias of `pnpm dev` (kept for muscle memory)
 pnpm build && pnpm start  # Production build — closest to real behavior for browser testing
 pnpm test           # Run all unit + integration tests (Vitest)
 pnpm test:watch     # Vitest watch mode

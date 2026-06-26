@@ -20,6 +20,7 @@
 
 import { createRequire } from "node:module";
 import { execFileSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 
 const PKG = "better-sqlite3";
 const SELF = process.argv[1];
@@ -39,6 +40,29 @@ if (process.argv.includes("--probe")) {
     process.exit(1);
   }
 }
+
+// Fail fast (with an actionable message) when launched under the wrong Node
+// major. pnpm already pins the Node via .npmrc `use-node-version`, so this only
+// fires when something bypasses pnpm — turning an opaque ABI crash + 500 into a
+// clear "switch your Node" message. The pinned version is read from .nvmrc so
+// there's a single source of truth.
+let pinned = "";
+try {
+  pinned = readFileSync(new URL("../.nvmrc", import.meta.url), "utf8").trim();
+} catch {
+  /* no .nvmrc — skip the version guard, keep the ABI self-heal below */
+}
+if (pinned) {
+  const pinnedMajor = pinned.split(".")[0];
+  const runningMajor = process.versions.node.split(".")[0];
+  if (runningMajor !== pinnedMajor) {
+    console.error(`  ✗ This project needs Node ${pinnedMajor}.x (pinned: ${pinned}), but you're on ${process.version}.`);
+    console.error(`    Launch via pnpm — it auto-uses the pinned Node: \`pnpm dev\` / \`pnpm start\`.`);
+    console.error(`    If you must bypass pnpm, switch Node first (e.g. \`nvm use\`, which reads .nvmrc).`);
+    process.exit(1);
+  }
+}
+console.log(`  ▶ Node ${process.version}`);
 
 // Probe in a fresh process using the SAME Node that's running this guard
 // (process.execPath), so the result reflects the Node the app will actually use.
