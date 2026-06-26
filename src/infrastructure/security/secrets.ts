@@ -3,6 +3,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
 import { getSecretsDir } from "@/infrastructure/config/paths";
+import { AppErrorException } from "@/domain/schemas";
 
 type SecretEnvelope = {
   version: 1;
@@ -98,7 +99,13 @@ export async function saveSecret(secret: string, existingRef?: string): Promise<
     encrypted: encrypted.toString("base64"), masked: maskSecret(secret),
     createdAt: new Date().toISOString(),
   };
-  await fs.writeFile(secretPath(ref), JSON.stringify(envelope, null, 2), { mode: 0o600 });
+  // Write to a temp file then rename: rename is atomic on the same filesystem, so a
+  // crash / power loss / ENOSPC mid-write can never truncate the only copy of an
+  // existing key (which would make every later readSecret throw).
+  const target = secretPath(ref);
+  const tmp = `${target}.tmp`;
+  await fs.writeFile(tmp, JSON.stringify(envelope, null, 2), { mode: 0o600 });
+  await fs.rename(tmp, target);
   return { ref, masked: envelope.masked };
 }
 
@@ -113,7 +120,14 @@ export async function readSecret(ref?: string): Promise<string | undefined> {
     if ((err as NodeJS.ErrnoException).code === "ENOENT") return undefined;
     throw err;
   }
-  const envelope = JSON.parse(raw) as SecretEnvelope;
+  let envelope: SecretEnvelope;
+  try {
+    envelope = JSON.parse(raw) as SecretEnvelope;
+  } catch {
+    // A corrupt/truncated envelope must surface as a clean, typed error rather
+    // than a raw SyntaxError that bubbles up as a 500.
+    throw new AppErrorException({ code: "SECRET_CORRUPT", message: "API 密钥文件已损坏，无法读取" });
+  }
   const decipher = crypto.createDecipheriv(envelope.algorithm, getEncryptionKey(), Buffer.from(envelope.iv, "base64"));
   decipher.setAuthTag(Buffer.from(envelope.authTag, "base64"));
   const decrypted = Buffer.concat([
