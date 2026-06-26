@@ -1,6 +1,7 @@
 import type {
   AppError,
   Generation,
+  GenerationDraft,
   GenerationPreset,
   PromptTemplate,
   ProviderProfile,
@@ -101,6 +102,38 @@ export type CompletionRequestInput = {
   providerProfileId?: string;
   signal?: AbortSignal;
 };
+
+/** Draft/version state for a generation (Unit 11). */
+export type DraftState = {
+  drafts: GenerationDraft[];
+  activeDraftId: string | null;
+  effectiveContent: string;
+};
+
+export async function loadDrafts(id: string): Promise<DraftState> {
+  return fetchJson<DraftState>(`/api/generations/${id}/drafts`);
+}
+
+export async function autosaveDraft(id: string, content: string): Promise<GenerationDraft> {
+  return fetchJson<GenerationDraft>(`/api/generations/${id}/drafts`, {
+    method: "POST",
+    body: JSON.stringify({ action: "autosave", content }),
+  });
+}
+
+export async function saveDraftVersion(id: string, label?: string): Promise<GenerationDraft> {
+  return fetchJson<GenerationDraft>(`/api/generations/${id}/drafts`, {
+    method: "POST",
+    body: JSON.stringify({ action: "saveVersion", label }),
+  });
+}
+
+export async function restoreDraftVersion(id: string, draftId: string): Promise<GenerationDraft> {
+  return fetchJson<GenerationDraft>(`/api/generations/${id}/drafts`, {
+    method: "POST",
+    body: JSON.stringify({ action: "restore", draftId }),
+  });
+}
 
 /** LLM-as-Judge quality scoring for a completed generation (Unit 9). */
 export async function scoreGeneration(

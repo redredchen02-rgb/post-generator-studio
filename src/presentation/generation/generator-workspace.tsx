@@ -19,6 +19,9 @@ import { OutputPanel } from "./output-panel";
 import { OutlinePanel } from "./outline-panel";
 import { VariantCompare } from "./variant-compare";
 import { useVariantGeneration } from "./use-variant-generation";
+import { DraftSwitcher } from "./draft-switcher";
+import { VersionCompare } from "./version-compare";
+import { useDraftVersions } from "./use-draft-versions";
 import { ConfigSidebar } from "./config-sidebar";
 import { requestCompletion } from "@/presentation/lib/api";
 import { buildOutlinePrompt, parseOutline, serializeOutline } from "./editor/rewrite-actions";
@@ -28,6 +31,7 @@ const sampleSummary = "- 连续30天开发AI产品\n- 使用 Claude Code 与 Ope
 
 export function GeneratorWorkspace(): React.ReactElement {
   const t = useTranslations("Generation");
+  const tVersions = useTranslations("Versions");
   const searchParams = useSearchParams();
   const bootstrap = useBootstrapStore((s) => s.data);
   const bootstrapLoading = useBootstrapStore((s) => s.loading);
@@ -59,6 +63,21 @@ export function GeneratorWorkspace(): React.ReactElement {
     setVariantContent,
     reset: resetVariants,
   } = useVariantGeneration();
+  const {
+    versions,
+    saving: draftSaving,
+    saved: draftSaved,
+    compareId,
+    compareVersion,
+    saveVersion,
+    restore: restoreVersion,
+    toggleCompare,
+  } = useDraftVersions({
+    generationId: activeGeneration?.id,
+    content,
+    isGenerating,
+    onRestoreContent: setContent,
+  });
 
   // Tracks the currently-active generation id so async handlers can detect a
   // generation switch that happened while their request was in flight.
@@ -361,8 +380,29 @@ export function GeneratorWorkspace(): React.ReactElement {
           onCancel={() => void cancelVariants()}
           onDiscard={resetVariants}
         />
+      ) : compareVersion ? (
+        <VersionCompare
+          left={compareVersion.content}
+          leftLabel={compareVersion.label || tVersions("versionN", { n: versions.indexOf(compareVersion) + 1 })}
+          right={content}
+          rightLabel={tVersions("current")}
+          onClose={() => toggleCompare(compareVersion.id)}
+        />
       ) : (
-        <OutputPanel
+        <div className="grid content-start gap-3">
+          {activeGeneration ? (
+            <DraftSwitcher
+              versions={versions}
+              saving={draftSaving}
+              saved={draftSaved}
+              busy={isGenerating}
+              compareId={compareId}
+              onSaveVersion={() => void saveVersion()}
+              onRestore={(draftId) => void restoreVersion(draftId)}
+              onToggleCompare={toggleCompare}
+            />
+          ) : null}
+          <OutputPanel
           content={content}
           status={status}
           error={error}
@@ -385,7 +425,8 @@ export function GeneratorWorkspace(): React.ReactElement {
           onSave={saveToHistory}
           onRegenerate={() => void handleGenerate(true)}
           onFontSizeChange={setEditorFontSize}
-        />
+          />
+        </div>
       )}
       <ConfigSidebar
         selectedProvider={selectedProvider}

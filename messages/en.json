@@ -264,6 +264,7 @@
     "cancelBtn": "Stop",
     "discardBtn": "Discard",
     "streamingPlaceholder": "Generating…",
+    "editPlaceholder": "Edit this draft…",
     "words": "{count} words",
     "countLabel": "Variants",
     "status": {
@@ -273,6 +274,20 @@
       "failed": "Failed",
       "cancelled": "Cancelled"
     }
+  },
+  "Versions": {
+    "title": "Versions",
+    "saving": "Saving…",
+    "saved": "Saved",
+    "saveVersion": "Save version",
+    "versionN": "Version {n}",
+    "noVersions": "No saved versions yet",
+    "restore": "Restore",
+    "compare": "Compare",
+    "compareTitle": "Compare versions",
+    "compareSides": "{left} vs {right}",
+    "closeCompare": "Close",
+    "current": "Current"
   },
   "Quality": {
     "scoreBtn": "Score quality",
