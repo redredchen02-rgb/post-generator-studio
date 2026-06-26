@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
+import type * as RestoreOps from "@/infrastructure/storage/restore-ops";
 
 const home = fs.mkdtempSync(path.join(os.tmpdir(), "restore-recovery-"));
 process.env.POST_GENERATOR_HOME = home;
@@ -14,7 +15,7 @@ process.env.POST_GENERATOR_DB_PATH = path.join(home, "post-generator.db");
 const failNext = vi.hoisted(() => ({ once: false }));
 
 vi.mock("@/infrastructure/storage/restore-ops", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/infrastructure/storage/restore-ops")>();
+  const actual = await importOriginal<typeof RestoreOps>();
   return {
     ...actual,
     applyBundleToLive: vi.fn((bundleDir: string) => {
@@ -29,7 +30,7 @@ vi.mock("@/infrastructure/storage/restore-ops", async (importOriginal) => {
 
 import { providerProfiles } from "@/infrastructure/storage/schema";
 import { getDb, closeDb } from "@/infrastructure/storage/db";
-import { getBackupsDir, getSecretsDir } from "@/infrastructure/config/paths";
+import { getBackupsDir } from "@/infrastructure/config/paths";
 import {
   recoverInterruptedRestore,
   writeRestoreMarker,

@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
 import Database from "better-sqlite3";
-import { getBackupsDir, getDatabasePath, getSecretsDir } from "@/infrastructure/config/paths";
+import { getBackupsDir, getSecretsDir } from "@/infrastructure/config/paths";
 import { getDb, closeDb, setRestoreInProgress } from "@/infrastructure/storage/db";
 import { CURRENT_SCHEMA_VERSION } from "@/infrastructure/storage/migrations";
 import {
