@@ -1,7 +1,7 @@
 ---
 title: "refactor: Enforce High Cohesion / Low Coupling Across All Layers"
 type: refactor
-status: active
+status: completed
 date: 2026-06-26
 deepened: 2026-06-26
 ---

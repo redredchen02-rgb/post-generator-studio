@@ -1,9 +1,14 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { errorResponse } from "@/application/errors";
-import { documentService } from "@/application/content/document-service";
-import { getStorage } from "@/infrastructure/storage/sqlite-storage";
-import { getOrThrow } from "@/application/crud-helpers";
+import {
+  listDrafts,
+  getActiveDraftId,
+  getEffectiveContent,
+  autosave,
+  saveVersion,
+  restoreVersion,
+} from "@/application/content/document-service";
 import type { RouteContext } from "@/app/api/types";
 
 export const runtime = "nodejs";
@@ -18,12 +23,12 @@ const bodySchema = z.discriminatedUnion("action", [
 export async function GET(_request: Request, context: RouteContext): Promise<NextResponse> {
   try {
     const { id } = await context.params;
-    const generation = await getOrThrow(getStorage().generations, id, "生成不存在");
-    const [drafts, effectiveContent] = await Promise.all([
-      documentService.listDrafts(id),
-      documentService.getEffectiveContent(id),
+    const [drafts, activeDraftId, effectiveContent] = await Promise.all([
+      listDrafts(id),
+      getActiveDraftId(id),
+      getEffectiveContent(id),
     ]);
-    return NextResponse.json({ drafts, activeDraftId: generation.activeDraftId ?? null, effectiveContent });
+    return NextResponse.json({ drafts, activeDraftId, effectiveContent });
   } catch (error) {
     return errorResponse(error);
   }
@@ -40,12 +45,12 @@ export async function POST(request: Request, context: RouteContext): Promise<Nex
     }
     const body = bodySchema.parse(raw);
     if (body.action === "autosave") {
-      return NextResponse.json(await documentService.autosave(id, body.content));
+      return NextResponse.json(await autosave(id, body.content));
     }
     if (body.action === "saveVersion") {
-      return NextResponse.json(await documentService.saveVersion(id, body.label));
+      return NextResponse.json(await saveVersion(id, body.label));
     }
-    return NextResponse.json(await documentService.restoreVersion(id, body.draftId));
+    return NextResponse.json(await restoreVersion(id, body.draftId));
   } catch (error) {
     return errorResponse(error);
   }

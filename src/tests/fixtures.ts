@@ -36,7 +36,7 @@ export function createTestPreset(overrides?: Partial<GenerationPreset>): Generat
     maxTokens: 3000,
     locale: "zh-CN",
     outputFormat: "markdown",
-    enabledPipelineSteps: ["build-context", "render-prompt", "clean-content", "format-output"],
+    enabledPipelineSteps: ["build-context", "render-prompt", "apply-controls", "clean-content", "format-output"],
     isDefault: false,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),

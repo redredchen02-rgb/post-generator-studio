@@ -25,7 +25,7 @@ import { useDraftVersions } from "./use-draft-versions";
 import { useRestoreFromHistory } from "./use-restore-from-history";
 import { ConfigSidebar } from "./config-sidebar";
 import { requestCompletion } from "@/presentation/lib/api";
-import { buildOutlinePrompt, parseOutline, serializeOutline } from "./editor/rewrite-actions";
+import { buildOutlinePrompt, parseOutline, serializeOutline } from "@/presentation/lib/prompt-builders";
 
 const sampleTitle = "台湾男子连续30天挑战AI创业";
 const sampleSummary = "- 连续30天开发AI产品\n- 使用 Claude Code 与 OpenAI Agent\n- 每天公开开发日志\n- 获得大量关注";
@@ -125,13 +125,13 @@ export function GeneratorWorkspace(): React.ReactElement {
     const defaultPreset = bootstrap.generationPresets.find((p) => p.isDefault) || bootstrap.generationPresets[0];
     if (defaultPreset) {
       setPresetId(defaultPreset.id);
-      const storedId = useProviderStore.getState().selectedProfileId;
+      const storedId = selectedProfileId;
       const enabledProfiles = bootstrap.providerProfiles.filter((p) => p.enabled);
       if (!storedId || !enabledProfiles.some((p) => p.id === storedId)) {
         setSelectedProfile(defaultPreset.providerProfileId);
       }
     }
-  }, [bootstrap, presetId, setSelectedProfile]);
+  }, [bootstrap, presetId, selectedProfileId, setSelectedProfile]);
 
   // SWR refresh on visibility change
   React.useEffect(() => {
@@ -154,6 +154,9 @@ export function GeneratorWorkspace(): React.ReactElement {
   // Pre-fill custom var values per template
   React.useEffect(() => {
     if (!templateId) { setCustomVarValues({}); return; }
+    // Intentional one-shot read: initialise custom vars once when the template
+    // changes. A reactive selector would re-run this effect after every
+    // generation (setVar at line ~202 writes varMemory), overwriting in-progress input.
     const memory = useVarMemoryStore.getState().varMemory[templateId] ?? {};
     const defaults = selectedTemplate?.customVariableDefaults ?? {};
     setCustomVarValues({ ...defaults, ...memory });

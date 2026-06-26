@@ -60,10 +60,11 @@ function makeContext(overrides?: Partial<PipelineContext>): PipelineContext {
 describe("pipeline registry", () => {
   it("lists all pipeline steps", () => {
     const steps = listPipelineSteps();
-    expect(steps).toHaveLength(4);
+    expect(steps).toHaveLength(5);
     expect(steps.map((s) => s.id)).toEqual([
       "build-context",
       "render-prompt",
+      "apply-controls",
       "clean-content",
       "format-output",
     ]);
@@ -72,6 +73,11 @@ describe("pipeline registry", () => {
   it("gets a step by id", () => {
     const step = getPipelineStep("build-context");
     expect(step?.name).toBe("Build Context");
+  });
+
+  it("exposes apply-controls as a real registry step (single source of truth)", () => {
+    const step = getPipelineStep("apply-controls");
+    expect(step?.name).toBe("Apply Controls");
   });
 
   it("returns undefined for unknown step", () => {
