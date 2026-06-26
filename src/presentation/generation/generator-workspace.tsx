@@ -25,7 +25,7 @@ import { useDraftVersions } from "./use-draft-versions";
 import { useRestoreFromHistory } from "./use-restore-from-history";
 import { ConfigSidebar } from "./config-sidebar";
 import { requestCompletion } from "@/presentation/lib/api";
-import { buildOutlinePrompt, parseOutline, serializeOutline } from "./editor/rewrite-actions";
+import { buildOutlinePrompt, parseOutline, serializeOutline } from "@/presentation/lib/prompt-builders";
 
 const sampleTitle = "台湾男子连续30天挑战AI创业";
 const sampleSummary = "- 连续30天开发AI产品\n- 使用 Claude Code 与 OpenAI Agent\n- 每天公开开发日志\n- 获得大量关注";

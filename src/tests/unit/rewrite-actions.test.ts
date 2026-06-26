@@ -2,12 +2,14 @@ import { describe, expect, it } from "vitest";
 import {
   REWRITE_ACTIONS,
   availableActions,
-  buildContinuePrompt,
-  buildParagraphPrompt,
-  buildRewritePrompt,
   replaceRange,
   sanitizeCompletion,
 } from "@/presentation/generation/editor/rewrite-actions";
+import {
+  buildContinuePrompt,
+  buildParagraphPrompt,
+  buildRewritePrompt,
+} from "@/application/content/prompt-builders";
 
 describe("sanitizeCompletion", () => {
   it("trims surrounding whitespace", () => {

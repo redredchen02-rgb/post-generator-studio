@@ -11,6 +11,8 @@ import {
   buildContinuePrompt,
   buildParagraphPrompt,
   buildRewritePrompt,
+} from "@/presentation/lib/prompt-builders";
+import {
   paragraphRangeAt,
   sanitizeCompletion,
   type RewriteActionId,

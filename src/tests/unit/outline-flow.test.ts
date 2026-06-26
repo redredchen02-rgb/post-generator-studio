@@ -3,7 +3,7 @@ import {
   buildOutlinePrompt,
   parseOutline,
   serializeOutline,
-} from "@/presentation/generation/editor/rewrite-actions";
+} from "@/application/content/prompt-builders";
 import { applyControlsToPrompts } from "@/application/prompt/controls";
 
 describe("parseOutline", () => {
