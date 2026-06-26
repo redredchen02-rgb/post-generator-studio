@@ -21,6 +21,7 @@
     "providerCheckFailed": "Provider 检查失败",
     "savedToHistory": "已保存到历史",
     "saveFailed": "保存失败",
+    "scoreFailed": "评分失败",
     "markdownCopied": "Markdown 已复制",
     "plainTextCopied": "纯文本已复制",
     "copyFailed": "复制失败",
@@ -234,5 +235,20 @@
     "moveDown": "下移",
     "remove": "删除",
     "modeLabel": "大纲优先"
+  },
+  "Quality": {
+    "scoreBtn": "质量评分",
+    "rescoreBtn": "重新评分",
+    "overall": "质量 {score}/5",
+    "overallTitle": "总体质量（五维平均）",
+    "suggestionHint": "一位试读者的建议——不会自动改写。",
+    "selfEvaluatedCaveat": "由撰写本文的同一模型评分，仅作粗略自评参考。",
+    "dim": {
+      "relevance": "相关性",
+      "coherence": "连贯性",
+      "factuality": "真实性",
+      "style": "文采",
+      "completeness": "完整度"
+    }
   }
 }

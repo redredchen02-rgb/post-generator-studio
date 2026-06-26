@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { outputFormatSchema, providerKindSchema, generationStatusSchema } from "./enums";
+import { qualityScoreSchema } from "./quality";
 import { DEFAULT_ENABLED_STEPS } from "@/domain/pipeline-steps";
 
 const snapshotSchema = z.record(z.unknown());
@@ -26,6 +27,7 @@ export const generationSchema = z.object({
   completedAt: z.string().optional(),
   createdAt: z.string(),
   activeDraftId: z.string().optional(),
+  qualityScore: qualityScoreSchema.optional(),
 });
 export type Generation = z.infer<typeof generationSchema>;
 

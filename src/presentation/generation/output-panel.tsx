@@ -6,8 +6,9 @@ import { Clipboard, Download, FileText, RotateCcw, Save } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/presentation/components/ui/button";
 import { CodeMirrorEditor } from "@/presentation/generation/editor/codemirror-editor";
+import { QualityBadge } from "@/presentation/generation/quality-badge";
 import { computeTextMetrics } from "@/lib/text-metrics";
-import type { Generation } from "@/domain/schemas";
+import type { Generation, QualityScore } from "@/domain/schemas";
 
 type OutputPanelProps = {
   content: string;
@@ -20,6 +21,9 @@ type OutputPanelProps = {
   title: string;
   presetId: string;
   providerProfileId?: string;
+  qualityScore: QualityScore | null;
+  scoring: boolean;
+  onScore: () => void;
   onRawModeChange: (v: boolean) => void;
   onContentChange: (v: string) => void;
   onCopyMarkdown: () => void;
@@ -51,6 +55,14 @@ export function OutputPanel(props: OutputPanelProps): React.ReactElement {
             <FileText className="h-4 w-4" />
             {t("previewBtn")}
           </Button>
+        </div>
+        <div className="w-full">
+          <QualityBadge
+            score={props.qualityScore}
+            scoring={props.scoring}
+            disabled={!props.activeGeneration || !props.content || props.isGenerating}
+            onScore={props.onScore}
+          />
         </div>
       </div>
       {props.error ? <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm">{props.error}</div> : null}

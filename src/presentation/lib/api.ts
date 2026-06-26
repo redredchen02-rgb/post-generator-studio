@@ -4,6 +4,7 @@ import type {
   GenerationPreset,
   PromptTemplate,
   ProviderProfile,
+  QualityScore,
 } from "@/domain/schemas";
 
 export type BootstrapData = {
@@ -100,6 +101,17 @@ export type CompletionRequestInput = {
   providerProfileId?: string;
   signal?: AbortSignal;
 };
+
+/** LLM-as-Judge quality scoring for a completed generation (Unit 9). */
+export async function scoreGeneration(
+  id: string,
+  opts?: { presetId?: string; providerProfileId?: string },
+): Promise<QualityScore> {
+  return fetchJson<QualityScore>(`/api/generations/${id}/score`, {
+    method: "POST",
+    body: JSON.stringify(opts ?? {}),
+  });
+}
 
 /** One-shot, non-streaming completion (selection rewrite, continue, etc.). */
 export async function requestCompletion(input: CompletionRequestInput): Promise<CompletionResponse> {

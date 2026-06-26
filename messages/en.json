@@ -21,6 +21,7 @@
     "providerCheckFailed": "Provider check failed",
     "savedToHistory": "Saved to history",
     "saveFailed": "Save failed",
+    "scoreFailed": "Scoring failed",
     "markdownCopied": "Markdown copied",
     "plainTextCopied": "Plain text copied",
     "copyFailed": "Copy failed",
@@ -234,5 +235,20 @@
     "moveDown": "Move down",
     "remove": "Remove",
     "modeLabel": "Outline first"
+  },
+  "Quality": {
+    "scoreBtn": "Score quality",
+    "rescoreBtn": "Re-score",
+    "overall": "Quality {score}/5",
+    "overallTitle": "Overall quality (average of five dimensions)",
+    "suggestionHint": "A test reader's suggestions — not an automatic rewrite.",
+    "selfEvaluatedCaveat": "Scored by the same model that wrote the text; treat as a rough self-estimate.",
+    "dim": {
+      "relevance": "Relevance",
+      "coherence": "Coherence",
+      "factuality": "Factuality",
+      "style": "Style",
+      "completeness": "Completeness"
+    }
   }
 }

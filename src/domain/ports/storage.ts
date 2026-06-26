@@ -3,6 +3,7 @@ import type {
   DraftSource,
   Generation,
   GenerationDraft,
+  QualityScore,
   GenerationPreset,
   GenerationPresetCreate,
   GenerationPresetUpdate,
@@ -39,6 +40,7 @@ export type GenerationUpdateInput = Partial<{
   totalTokens: number;
   startedAt: string;
   completedAt: string;
+  qualityScore: QualityScore;
 }>;
 
 export type GenerationDraftCreateInput = {

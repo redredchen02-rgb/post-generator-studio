@@ -10,10 +10,10 @@ import { useBootstrapStore } from "@/presentation/store/bootstrap-store";
 import { useGenerationStream } from "./use-generation-stream";
 import { useKeyboard } from "@/presentation/lib/use-keyboard";
 import { useSearchParams } from "next/navigation";
-import { testProviderProfile } from "@/presentation/lib/api";
+import { scoreGeneration, testProviderProfile } from "@/presentation/lib/api";
 import { computePromptPreview } from "@/presentation/lib/preview-prompt";
 import { stripMarkdown } from "@/lib/utils";
-import type { GenerationControls } from "@/domain/schemas";
+import type { GenerationControls, QualityScore } from "@/domain/schemas";
 import { InputPanel } from "./input-panel";
 import { OutputPanel } from "./output-panel";
 import { OutlinePanel } from "./outline-panel";
@@ -40,6 +40,8 @@ export function GeneratorWorkspace(): React.ReactElement {
   const [outlineMode, setOutlineMode] = React.useState(false);
   const [outline, setOutline] = React.useState<string[] | null>(null);
   const [outlineBusy, setOutlineBusy] = React.useState(false);
+  const [qualityScore, setQualityScore] = React.useState<QualityScore | null>(null);
+  const [scoring, setScoring] = React.useState(false);
   const [providerError, setProviderError] = React.useState<string | null>(null);
   const [promptPreview, setPromptPreview] = React.useState<{ systemPrompt: string; userPrompt: string } | null>(null);
   const [promptPreviewOpen, setPromptPreviewOpen] = React.useState(false);
@@ -191,6 +193,24 @@ export function GeneratorWorkspace(): React.ReactElement {
     } catch { setStatus(t("saveFailed")); }
   }
 
+  // Reset the badge when the active generation changes; reflect an already-scored one.
+  React.useEffect(() => {
+    setQualityScore(activeGeneration?.qualityScore ?? null);
+  }, [activeGeneration?.id, activeGeneration?.qualityScore]);
+
+  async function handleScore(): Promise<void> {
+    if (!activeGeneration || !content.trim() || scoring) return;
+    setScoring(true);
+    try {
+      const score = await scoreGeneration(activeGeneration.id, { presetId, providerProfileId: effectiveProviderId });
+      setQualityScore(score);
+    } catch {
+      setStatus(t("scoreFailed"));
+    } finally {
+      setScoring(false);
+    }
+  }
+
   async function copyMarkdown(): Promise<void> {
     try {
       await navigator.clipboard.writeText(content);
@@ -298,6 +318,9 @@ export function GeneratorWorkspace(): React.ReactElement {
           title={title}
           presetId={presetId}
           providerProfileId={effectiveProviderId}
+          qualityScore={qualityScore}
+          scoring={scoring}
+          onScore={() => void handleScore()}
           onRawModeChange={setRawMode}
           onContentChange={setContent}
           onCopyMarkdown={copyMarkdown}
