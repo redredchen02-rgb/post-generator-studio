@@ -69,6 +69,8 @@ export const InputPanel = React.memo(function InputPanel(props: InputPanelProps)
   const tOutline = useTranslations("Outline");
   const tVariant = useTranslations("Variant");
   const customVars = getCustomVars(props.selectedTemplate);
+  const enabledProviders = props.bootstrap.providerProfiles.filter((p) => p.enabled);
+  const hasUsableProvider = enabledProviders.length > 0;
 
   return (
     <section className="app-surface grid h-fit gap-4 rounded-lg p-4 slide-up">
@@ -100,12 +102,15 @@ export const InputPanel = React.memo(function InputPanel(props: InputPanelProps)
           value={props.selectedProfileId ?? ""}
           onChange={(e) => props.onProfileIdChange(e.target.value)}
         >
-          {props.bootstrap.providerProfiles.filter((p) => p.enabled).map((provider) => (
+          {enabledProviders.map((provider) => (
             <option key={provider.id} value={provider.id}>
               {provider.name}
             </option>
           ))}
         </NativeSelect>
+        {!hasUsableProvider && (
+          <p className="mt-1 text-xs text-destructive">{t("noProviderHint")}</p>
+        )}
         {props.providerError && (
           <p className="mt-1 text-xs text-destructive">{props.providerError}</p>
         )}
@@ -186,7 +191,7 @@ export const InputPanel = React.memo(function InputPanel(props: InputPanelProps)
         </NativeSelect>
       </Field>
       <div className="grid grid-cols-2 gap-2">
-        <Button disabled={props.isGenerating} onClick={props.onGenerate}>
+        <Button disabled={props.isGenerating || !hasUsableProvider} onClick={props.onGenerate}>
           {props.isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
           {t("generateBtn")}
         </Button>

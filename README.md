@@ -28,11 +28,19 @@ pnpm db:migrate
 # 填充默认数据（Provider 模板、Prompt 模板、预设）
 pnpm db:seed
 
-# 启动开发服务器
-pnpm dev
+# 启动应用（推荐：一键干净启动）
+pnpm start:clean
 ```
 
 打开 http://localhost:3000。
+
+> **推荐用 `pnpm start:clean`。** 它会先回收 3000 端口（清掉任何残留的旧实例，
+> 避免多个 server 互相冲突导致「画面卡住、功能全部点不动」），再执行
+> 迁移 → 正式构建 → 启动**单一**实例。正式构建的 CSP 最严格、行为最接近真实，
+> 比 `pnpm dev` 更稳定。
+>
+> 开发时若需要热重载，用 `pnpm dev:clean`（同样会先回收端口，再启动 dev server）。
+> 直接 `pnpm dev` 在端口被占用时**不会**自动清理，容易堆叠出多个实例。
 
 ### 首次使用
 
@@ -133,7 +141,9 @@ src/
 ## 开发命令
 
 ```bash
-pnpm dev              # 开发服务器
+pnpm start:clean      # 推荐：回收端口 → 迁移 → 构建 → 启动单一正式实例
+pnpm dev:clean        # 回收端口后启动开发服务器（热重载）
+pnpm dev              # 开发服务器（不回收端口）
 pnpm build            # 生产构建
 pnpm start            # 生产服务器
 pnpm lint             # ESLint 检查
