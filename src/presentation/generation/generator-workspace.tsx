@@ -54,7 +54,7 @@ export function GeneratorWorkspace(): React.ReactElement {
   const [promptPreview, setPromptPreview] = React.useState<{ systemPrompt: string; userPrompt: string } | null>(null);
   const [promptPreviewOpen, setPromptPreviewOpen] = React.useState(false);
   const { rawMode, setRawMode, editorFontSize, setEditorFontSize } = useUiStore();
-  const { content, status, error, activeGeneration, metadata, isGenerating, generate, cancel, setContent, setStatus, setActiveGeneration } =
+  const { content, status, error, errorDetail, activeGeneration, metadata, isGenerating, generate, cancel, setContent, setStatus, setActiveGeneration } =
     useGenerationStream();
   const {
     variants,
@@ -424,6 +424,7 @@ export function GeneratorWorkspace(): React.ReactElement {
           content={content}
           status={status}
           error={error}
+          errorDetail={errorDetail}
           rawMode={rawMode}
           editorFontSize={editorFontSize}
           isGenerating={isGenerating}

@@ -17,6 +17,9 @@ type GenerationStreamState = {
   content: string;
   status: string;
   error: string | null;
+  // Raw upstream (provider/network) error text, kept out of the localized main
+  // message and surfaced only in an expandable "details" area for debugging.
+  errorDetail: string | null;
   activeGeneration: Generation | null;
   metadata: { model?: string; inputTokens?: number; outputTokens?: number };
   isGenerating: boolean;
@@ -28,6 +31,7 @@ export function useGenerationStream() {
     content: "",
     status: t("statusReady"),
     error: null,
+    errorDetail: null,
     activeGeneration: null,
     metadata: {},
     isGenerating: false,
@@ -58,6 +62,7 @@ export function useGenerationStream() {
         ...s,
         isGenerating: true,
         error: null,
+        errorDetail: null,
         content: "",
         metadata: {},
         status: regenerate ? t("statusRegenerating") : t("statusGenerating"),
@@ -117,19 +122,30 @@ export function useGenerationStream() {
             setState((s) => ({ ...s, metadata: { ...s.metadata, ...payload } }));
           }
           if (payload.type === "error") {
+            // Localize the main message; keep the raw provider/server text in
+            // errorDetail so zh-CN never shows untranslated upstream English.
+            const detail = payload.message || payload.error?.message || null;
             setState((s) => ({
               ...s,
-              error: payload.message || payload.error?.message || t("statusFailed"),
+              error: t("errorProvider"),
+              errorDetail: detail,
               status: t("statusFailed"),
             }));
           }
           if (payload.type === "final") {
             bufferRef.current = "";
+            const finalStatus =
+              payload.generation.status === "completed" ? t("statusCompleted")
+              : payload.generation.status === "failed" ? t("statusFailed")
+              : payload.generation.status === "cancelled" ? t("statusCancelled")
+              : payload.generation.status === "streaming" ? t("statusStreaming")
+              : payload.generation.status === "queued" ? t("statusQueued")
+              : t("statusReady");
             setState((s) => ({
               ...s,
               activeGeneration: payload.generation,
               content: payload.content,
-              status: payload.generation.status === "completed" ? t("statusCompleted") : payload.generation.status,
+              status: finalStatus,
             }));
             if (payload.generation.status === "completed") {
               params.onSuccess?.(params.customVariables ?? {});
@@ -138,9 +154,12 @@ export function useGenerationStream() {
         }
       } catch (streamError) {
         if (!controller.signal.aborted) {
+          // Main message stays localized; the raw Error text goes to errorDetail.
+          const detail = streamError instanceof Error ? streamError.message : null;
           setState((s) => ({
             ...s,
-            error: streamError instanceof Error ? streamError.message : t("statusStreamFailed"),
+            error: t("statusStreamFailed"),
+            errorDetail: detail,
           }));
         }
       } finally {

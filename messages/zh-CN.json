@@ -50,15 +50,18 @@
     "statusCompleted": "已完成",
     "statusFailed": "失败",
     "statusCancelled": "已取消",
+    "statusQueued": "排队中",
     "statusStreamFailed": "流式传输失败",
     "errorNoPreset": "请选择 Generation Preset",
-    "errorNoStream": "无法获取流式响应"
+    "errorNoStream": "无法获取流式响应",
+    "errorProvider": "生成服务返回了错误"
   },
   "Output": {
     "title": "输出",
     "rawBtn": "原文",
     "previewBtn": "预览",
     "streamingPlaceholder": "流式内容将在这里出现...",
+    "errorDetails": "详细信息",
     "fontLabel": "字体",
     "copyMarkdownBtn": "复制 Markdown",
     "copyPlainTextBtn": "复制纯文本",

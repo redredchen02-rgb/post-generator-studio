@@ -76,7 +76,9 @@ describe("useGenerationStream", () => {
       await result.current.generate(baseParams);
     });
 
-    expect(result.current.error).toBe("boom");
+    // Main error is localized; raw upstream text goes to errorDetail
+    expect(result.current.error).toBe("The generation service returned an error.");
+    expect(result.current.errorDetail).toBe("boom");
     expect(result.current.status).toBe("Failed");
     expect(result.current.isGenerating).toBe(false);
   });

@@ -50,15 +50,18 @@
     "statusCompleted": "Completed",
     "statusFailed": "Failed",
     "statusCancelled": "Cancelled",
+    "statusQueued": "Queued",
     "statusStreamFailed": "Streaming failed",
     "errorNoPreset": "Please select a Generation Preset",
-    "errorNoStream": "Streaming response unavailable"
+    "errorNoStream": "Streaming response unavailable",
+    "errorProvider": "The generation service returned an error."
   },
   "Output": {
     "title": "Output",
     "rawBtn": "Raw",
     "previewBtn": "Preview",
     "streamingPlaceholder": "Streaming content will appear here...",
+    "errorDetails": "Details",
     "fontLabel": "Font",
     "copyMarkdownBtn": "Copy Markdown",
     "copyPlainTextBtn": "Copy Plain Text",

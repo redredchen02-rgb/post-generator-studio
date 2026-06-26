@@ -31,6 +31,7 @@ type OutputPanelProps = {
   content: string;
   status: string;
   error: string | null;
+  errorDetail?: string | null;
   rawMode: boolean;
   editorFontSize: number;
   isGenerating: boolean;
@@ -82,7 +83,17 @@ export const OutputPanel = React.memo(function OutputPanel(props: OutputPanelPro
           />
         </div>
       </div>
-      {props.error ? <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm">{props.error}</div> : null}
+      {props.error ? (
+        <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm">
+          {props.error}
+          {props.errorDetail ? (
+            <details className="mt-2 text-xs text-muted-foreground">
+              <summary className="cursor-pointer select-none">{t("errorDetails")}</summary>
+              <p className="mt-1 whitespace-pre-wrap break-words font-mono">{props.errorDetail}</p>
+            </details>
+          ) : null}
+        </div>
+      ) : null}
       <div className="min-h-0 overflow-hidden rounded-md border bg-background">
         {props.rawMode ? (
           <CodeMirrorEditor
