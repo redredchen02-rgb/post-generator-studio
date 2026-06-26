@@ -18,7 +18,7 @@ type QualityBadgeProps = {
  * the five per-dimension justifications. Deliberately advisory — it never offers
  * an auto-improve action (that would invite verbosity bias).
  */
-export function QualityBadge(props: QualityBadgeProps): React.ReactElement {
+export const QualityBadge = React.memo(function QualityBadge(props: QualityBadgeProps): React.ReactElement {
   const t = useTranslations("Quality");
   const [open, setOpen] = React.useState(false);
   const { score } = props;
@@ -68,4 +68,4 @@ export function QualityBadge(props: QualityBadgeProps): React.ReactElement {
       ) : null}
     </div>
   );
-}
+});

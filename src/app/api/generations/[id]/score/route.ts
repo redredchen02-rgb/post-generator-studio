@@ -14,7 +14,12 @@ const bodySchema = z.object({
 export async function POST(request: Request, context: RouteContext): Promise<NextResponse> {
   try {
     const { id } = await context.params;
-    const raw = await request.json().catch(() => ({}));
+    let raw: unknown;
+    try {
+      raw = await request.json();
+    } catch {
+      return NextResponse.json({ error: { code: "INVALID_BODY", message: "Request body must be valid JSON" } }, { status: 400 });
+    }
     const opts = bodySchema.parse(raw ?? {});
     return NextResponse.json(await scoreGeneration(id, opts));
   } catch (error) {

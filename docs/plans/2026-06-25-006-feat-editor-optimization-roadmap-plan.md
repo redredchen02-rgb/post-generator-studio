@@ -472,7 +472,7 @@ flowchart TB
 
 ---
 
-- [ ] **Unit 9: LLM-as-Judge 质量评分（含偏见缓解）**
+- [x] **Unit 9: LLM-as-Judge 质量评分（含偏见缓解）**
 
 **Goal:** 实现既定五维 rubric 评分（1-5/维 + 理由 + 总分），含偏见缓解，以“试读者”口吻呈现。
 

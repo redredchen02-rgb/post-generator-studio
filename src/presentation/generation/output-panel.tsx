@@ -2,6 +2,8 @@
 
 import * as React from "react";
 import ReactMarkdown from "react-markdown";
+
+const MemoizedReactMarkdown = React.memo(ReactMarkdown);
 import { Clipboard, Download, FileText, RotateCcw, Save } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/presentation/components/ui/button";
@@ -81,7 +83,7 @@ export function OutputPanel(props: OutputPanelProps): React.ReactElement {
           />
         ) : (
           <article className="prose prose-neutral max-w-none overflow-auto p-4 dark:prose-invert">
-            <ReactMarkdown>{props.content || t("streamingPlaceholder")}</ReactMarkdown>
+            <MemoizedReactMarkdown>{props.content || t("streamingPlaceholder")}</MemoizedReactMarkdown>
           </article>
         )}
       </div>
