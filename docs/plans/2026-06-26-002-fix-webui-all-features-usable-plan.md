@@ -1,7 +1,7 @@
 ---
 title: "fix: Make every WebUI feature actually usable (root-cause the blank/dead UI)"
 type: fix
-status: active
+status: completed
 date: 2026-06-26
 ---
 
