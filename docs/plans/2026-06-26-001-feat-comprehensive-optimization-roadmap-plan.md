@@ -168,7 +168,7 @@ flowchart TB
 
 ### Phase 1 — 穩定收尾 + 高危體驗（P1）
 
-- [ ] **Unit 1: 穩定複核 + flaky 根因判定（S4 + S1）**
+- [x] **Unit 1: 穩定複核 + flaky 根因判定（S4 + S1）** — ✅ HEAD 07dbdb92：S1 已解(延遲非race)、R1/R7/R8/R9/R10 已修、R3 殘留(e2e 未接 CI)、R11/R14-17 N-A；S5 硬閘解除。findings: docs/solutions/stability/2026-06-26-s4-stability-reverify-findings.md
 
 **Goal:** 確認穩定線是否真能「收尾」：驗證 S1 flaky 是否仍復現（其首選解 `{ timeout: 10_000 }` **已在 `api-routes.test.ts:61/78` 落地**），逐條複核舊回歸在現 `src/` 樹的現況（**先剔除已隨 monorepo→單樹消亡的 R 項**），產出有明確判定的 findings。
 
