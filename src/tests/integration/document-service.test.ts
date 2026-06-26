@@ -53,6 +53,48 @@ describe("document service (real connection)", () => {
     expect(second.id).toBe(first.id);
   });
 
+  it("saves versions in time order without disturbing the working draft", async () => {
+    const genId = await seedCompletedGeneration("base");
+    await service.autosave(genId, "edited content");
+    const v1 = await service.saveVersion(genId, "v1");
+    await service.autosave(genId, "edited more");
+    const v2 = await service.saveVersion(genId, "v2");
+
+    expect(v1.kind).toBe("snapshot");
+    expect(v1.content).toBe("edited content");
+    expect(v2.content).toBe("edited more");
+    // Snapshots never become active — the working draft stays live.
+    const gen = await storage.generations.get(genId);
+    const working = (await service.listDrafts(genId)).find((d) => d.kind === "working");
+    expect(gen?.activeDraftId).toBe(working?.id);
+    // working + 2 snapshots, oldest first.
+    const labels = (await service.listDrafts(genId)).map((d) => d.label ?? null);
+    expect(labels).toEqual([null, "v1", "v2"]);
+  });
+
+  it("restores a version into the working draft (snapshot stays frozen)", async () => {
+    const genId = await seedCompletedGeneration("base");
+    await service.autosave(genId, "version one");
+    const v1 = await service.saveVersion(genId, "v1");
+    await service.autosave(genId, "version two");
+
+    await service.restoreVersion(genId, v1.id);
+    expect(await service.getEffectiveContent(genId)).toBe("version one");
+    // The snapshot row is unchanged.
+    const reloaded = await storage.generationDrafts.get(v1.id);
+    expect(reloaded?.content).toBe("version one");
+  });
+
+  it("refuses to restore a draft from another generation", async () => {
+    const a = await seedCompletedGeneration("a");
+    const b = await seedCompletedGeneration("b");
+    await service.autosave(b, "b content");
+    const bVersion = await service.saveVersion(b, "vb");
+    await expect(service.restoreVersion(a, bVersion.id)).rejects.toMatchObject({
+      appError: { code: "NOT_FOUND" },
+    });
+  });
+
   it("rejects draft writes while the generation is not terminal", async () => {
     const id = createId("generation");
     await storage.generations.create({

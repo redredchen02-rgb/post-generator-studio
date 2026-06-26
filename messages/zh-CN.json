@@ -264,6 +264,7 @@
     "cancelBtn": "停止",
     "discardBtn": "放弃",
     "streamingPlaceholder": "生成中…",
+    "editPlaceholder": "编辑此草稿…",
     "words": "{count} 词",
     "countLabel": "变体数",
     "status": {
@@ -273,6 +274,20 @@
       "failed": "失败",
       "cancelled": "已取消"
     }
+  },
+  "Versions": {
+    "title": "版本",
+    "saving": "保存中…",
+    "saved": "已保存",
+    "saveVersion": "存为版本",
+    "versionN": "版本 {n}",
+    "noVersions": "暂无已保存版本",
+    "restore": "恢复",
+    "compare": "对比",
+    "compareTitle": "版本对比",
+    "compareSides": "{left} vs {right}",
+    "closeCompare": "关闭",
+    "current": "当前"
   },
   "Quality": {
     "scoreBtn": "质量评分",

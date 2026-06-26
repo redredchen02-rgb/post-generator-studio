@@ -81,6 +81,40 @@ export class DocumentService {
     await getOrThrow(this.storage.generations, generationId, "生成不存在");
     return this.storage.generationDrafts.listByGeneration(generationId);
   }
+
+  /**
+   * Snapshot the current working content as a frozen version (kind:'snapshot').
+   * Snapshots never become active — the working draft stays the live buffer — so
+   * saving a version never disturbs ongoing editing.
+   */
+  async saveVersion(generationId: string, label?: string): Promise<GenerationDraft> {
+    const working = await this.ensureWorkingDraft(generationId);
+    return this.storage.generationDrafts.create(
+      {
+        id: createId("draft"),
+        generationId,
+        content: working.content,
+        kind: "snapshot",
+        source: "edited",
+        label,
+      },
+      false,
+    );
+  }
+
+  /**
+   * Restore a saved version back into the live working draft. The snapshot stays
+   * frozen; the editor (which always reads/writes the working draft) now shows it.
+   */
+  async restoreVersion(generationId: string, draftId: string): Promise<GenerationDraft> {
+    await getOrThrow(this.storage.generations, generationId, "生成不存在");
+    const snapshot = await getOrThrow(this.storage.generationDrafts, draftId, "草稿不存在");
+    if (snapshot.generationId !== generationId) {
+      throw new AppErrorException({ code: "NOT_FOUND", message: "草稿不属于该生成" });
+    }
+    const working = await this.ensureWorkingDraft(generationId);
+    return this.storage.generationDrafts.updateContent(working.id, snapshot.content);
+  }
 }
 
 export const documentService = new DocumentService();

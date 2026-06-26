@@ -24,7 +24,7 @@ function ConfigRow({ label, value }: { label: string; value: string }): React.Re
   );
 }
 
-export function ConfigSidebar(props: ConfigSidebarProps): React.ReactElement {
+export const ConfigSidebar = React.memo(function ConfigSidebar(props: ConfigSidebarProps): React.ReactElement {
   const t = useTranslations("Config");
 
   return (
@@ -97,4 +97,4 @@ export function ConfigSidebar(props: ConfigSidebarProps): React.ReactElement {
       </div>
     </aside>
   );
-}
+});
