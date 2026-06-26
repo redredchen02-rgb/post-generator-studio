@@ -10,6 +10,22 @@ import { NativeSelect } from "@/presentation/components/ui/native-select";
 import { Textarea } from "@/presentation/components/ui/textarea";
 import { extractTemplateVariables } from "@/presentation/lib/preview-prompt";
 import type { BootstrapData } from "@/presentation/lib/api";
+import type { GenerationControls, LengthTarget, ToneOption } from "@/domain/schemas";
+
+const TONE_OPTIONS: ToneOption[] = ["professional", "casual", "enthusiastic", "authoritative", "friendly"];
+const LENGTH_OPTIONS: LengthTarget[] = ["short", "medium", "long"];
+const TONE_KEY: Record<ToneOption, string> = {
+  professional: "toneProfessional",
+  casual: "toneCasual",
+  enthusiastic: "toneEnthusiastic",
+  authoritative: "toneAuthoritative",
+  friendly: "toneFriendly",
+};
+const LENGTH_KEY: Record<LengthTarget, string> = {
+  short: "lengthShort",
+  medium: "lengthMedium",
+  long: "lengthLong",
+};
 
 const STANDARD_VARS = new Set(["TITLE", "EVENT_SUMMARY", "DATE", "TIME", "LOCALE"]);
 
@@ -29,6 +45,7 @@ type InputPanelProps = {
   presetId: string;
   selectedProfileId: string | null;
   customVarValues: Record<string, string>;
+  controls: GenerationControls;
   providerError: string | null;
   isGenerating: boolean;
   selectedTemplate: BootstrapData["promptTemplates"][number] | undefined;
@@ -38,6 +55,7 @@ type InputPanelProps = {
   onPresetIdChange: (value: string) => void;
   onProfileIdChange: (id: string) => void;
   onCustomVarChange: (varName: string, value: string) => void;
+  onControlChange: (patch: Partial<GenerationControls>) => void;
   onGenerate: () => void;
   onCancel: () => void;
 };
@@ -100,6 +118,48 @@ export function InputPanel(props: InputPanelProps): React.ReactElement {
           ))}
         </div>
       )}
+      <div className="grid gap-3 rounded-lg border p-3">
+        <span className="text-sm font-medium">{t("controlsLabel")}</span>
+        <Field label={t("customInstructionLabel")}>
+          <Textarea
+            value={props.controls.customInstruction ?? ""}
+            onChange={(e) => props.onControlChange({ customInstruction: e.target.value })}
+            placeholder={t("customInstructionPlaceholder")}
+            className="min-h-16"
+          />
+        </Field>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label={t("toneLabel")}>
+            <NativeSelect
+              value={props.controls.tone ?? ""}
+              onChange={(e) => props.onControlChange({ tone: (e.target.value || undefined) as ToneOption | undefined })}
+            >
+              <option value="">{t("controlDefault")}</option>
+              {TONE_OPTIONS.map((tone) => (
+                <option key={tone} value={tone}>{t(TONE_KEY[tone])}</option>
+              ))}
+            </NativeSelect>
+          </Field>
+          <Field label={t("lengthLabel")}>
+            <NativeSelect
+              value={props.controls.lengthTarget ?? ""}
+              onChange={(e) => props.onControlChange({ lengthTarget: (e.target.value || undefined) as LengthTarget | undefined })}
+            >
+              <option value="">{t("controlDefault")}</option>
+              {LENGTH_OPTIONS.map((len) => (
+                <option key={len} value={len}>{t(LENGTH_KEY[len])}</option>
+              ))}
+            </NativeSelect>
+          </Field>
+        </div>
+        <Field label={t("audienceLabel")}>
+          <Input
+            value={props.controls.audience ?? ""}
+            onChange={(e) => props.onControlChange({ audience: e.target.value })}
+            placeholder={t("audiencePlaceholder")}
+          />
+        </Field>
+      </div>
       <div className="grid grid-cols-2 gap-2">
         <Button disabled={props.isGenerating} onClick={props.onGenerate}>
           {props.isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}

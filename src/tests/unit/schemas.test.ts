@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   generationEventSchema,
   generationPresetCreateSchema,
+  generationRequestSchema,
   promptTemplateCreateSchema,
   providerProfileCreateSchema,
 } from "@/domain/schemas";
@@ -46,6 +47,26 @@ describe("domain schemas", () => {
       type: "token",
       value: "hello",
     });
+  });
+
+  it("accepts request-level generation controls", () => {
+    const req = generationRequestSchema.parse({
+      title: "T",
+      eventSummary: "S",
+      presetId: "preset_1",
+      tone: "casual",
+      lengthTarget: "short",
+      audience: "学生",
+      customInstruction: "多用短句",
+    });
+    expect(req.tone).toBe("casual");
+    expect(req.lengthTarget).toBe("short");
+  });
+
+  it("rejects an unknown tone", () => {
+    expect(() =>
+      generationRequestSchema.parse({ title: "T", eventSummary: "S", presetId: "p", tone: "sarcastic" }),
+    ).toThrow();
   });
 });
 

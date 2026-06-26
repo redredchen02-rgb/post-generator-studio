@@ -45,6 +45,25 @@ export type GenerationDraft = z.infer<typeof generationDraftSchema>;
 export type DraftKind = z.infer<typeof draftKindSchema>;
 export type DraftSource = z.infer<typeof draftSourceSchema>;
 
+/** Request-level generation controls — not persisted into a preset. */
+export const toneOptionSchema = z.enum([
+  "professional",
+  "casual",
+  "enthusiastic",
+  "authoritative",
+  "friendly",
+]);
+export const lengthTargetSchema = z.enum(["short", "medium", "long"]);
+export const generationControlsSchema = z.object({
+  customInstruction: z.string().optional(),
+  tone: toneOptionSchema.optional(),
+  lengthTarget: lengthTargetSchema.optional(),
+  audience: z.string().optional(),
+});
+export type ToneOption = z.infer<typeof toneOptionSchema>;
+export type LengthTarget = z.infer<typeof lengthTargetSchema>;
+export type GenerationControls = z.infer<typeof generationControlsSchema>;
+
 export const generationRequestSchema = z.object({
   title: z.string().min(1, "Title is required"),
   eventSummary: z.string().min(1, "Event summary is required"),
@@ -52,6 +71,10 @@ export const generationRequestSchema = z.object({
   providerProfileId: z.string().optional(),
   idempotencyKey: z.string().min(1).optional(),
   customVariables: z.record(z.string()).optional(),
+  customInstruction: z.string().optional(),
+  tone: toneOptionSchema.optional(),
+  lengthTarget: lengthTargetSchema.optional(),
+  audience: z.string().optional(),
 });
 export type GenerationRequest = z.infer<typeof generationRequestSchema>;
 

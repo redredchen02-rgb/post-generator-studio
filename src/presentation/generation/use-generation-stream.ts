@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import type { AppError, Generation } from "@/domain/schemas";
+import type { AppError, Generation, GenerationControls } from "@/domain/schemas";
 import { parseSSEStream } from "@/lib/sse";
 
 type StreamPayload =
@@ -42,9 +42,10 @@ export function useGenerationStream() {
       providerProfileId?: string;
       regenerate?: boolean;
       customVariables?: Record<string, string>;
+      controls?: GenerationControls;
       onSuccess?: (vars: Record<string, string>) => void;
     }) => {
-      const { title, eventSummary, presetId, providerProfileId, regenerate, customVariables } = params;
+      const { title, eventSummary, presetId, providerProfileId, regenerate, customVariables, controls } = params;
       if (!presetId) {
         setState((s) => ({ ...s, error: "请选择 Generation Preset" }));
         return;
@@ -70,6 +71,7 @@ export function useGenerationStream() {
           providerProfileId: providerProfileId || undefined,
           idempotencyKey: regenerate ? undefined : crypto.randomUUID(),
           customVariables: customVariables && Object.keys(customVariables).length > 0 ? customVariables : undefined,
+          ...controls,
         }),
       });
 

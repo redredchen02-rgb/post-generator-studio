@@ -13,6 +13,7 @@ import { useSearchParams } from "next/navigation";
 import { testProviderProfile } from "@/presentation/lib/api";
 import { computePromptPreview } from "@/presentation/lib/preview-prompt";
 import { stripMarkdown } from "@/lib/utils";
+import type { GenerationControls } from "@/domain/schemas";
 import { InputPanel } from "./input-panel";
 import { OutputPanel } from "./output-panel";
 import { ConfigSidebar } from "./config-sidebar";
@@ -32,6 +33,7 @@ export function GeneratorWorkspace(): React.ReactElement {
   const [presetId, setPresetId] = React.useState("");
   const { selectedProfileId, setSelectedProfile } = useProviderStore();
   const [customVarValues, setCustomVarValues] = React.useState<Record<string, string>>({});
+  const [controls, setControls] = React.useState<GenerationControls>({});
   const [providerError, setProviderError] = React.useState<string | null>(null);
   const [promptPreview, setPromptPreview] = React.useState<{ systemPrompt: string; userPrompt: string } | null>(null);
   const [promptPreviewOpen, setPromptPreviewOpen] = React.useState(false);
@@ -103,12 +105,12 @@ export function GeneratorWorkspace(): React.ReactElement {
     const timer = setTimeout(() => {
       const result = computePromptPreview({
         template: selectedTemplate, title, eventSummary,
-        locale: selectedPreset?.locale, customVariables: customVarValues,
+        locale: selectedPreset?.locale, customVariables: customVarValues, controls,
       });
       setPromptPreview({ systemPrompt: result.systemPrompt, userPrompt: result.userPrompt });
     }, 400);
     return () => clearTimeout(timer);
-  }, [title, eventSummary, templateId, selectedTemplate, selectedPreset?.locale, customVarValues]);
+  }, [title, eventSummary, templateId, selectedTemplate, selectedPreset?.locale, customVarValues, controls]);
 
   async function handleGenerate(regenerate = false): Promise<void> {
     setProviderError(null);
@@ -128,6 +130,7 @@ export function GeneratorWorkspace(): React.ReactElement {
       title, eventSummary, presetId,
       providerProfileId: effectiveProviderId ?? "", regenerate,
       customVariables: customVarValues,
+      controls,
       onSuccess: (vars) => {
         if (!templateId) return;
         for (const [k, v] of Object.entries(vars)) {
@@ -194,6 +197,7 @@ export function GeneratorWorkspace(): React.ReactElement {
         presetId={presetId}
         selectedProfileId={selectedProfileId}
         customVarValues={customVarValues}
+        controls={controls}
         providerError={providerError}
         isGenerating={isGenerating}
         selectedTemplate={selectedTemplate}
@@ -205,6 +209,7 @@ export function GeneratorWorkspace(): React.ReactElement {
         onCustomVarChange={(varName, value) =>
           setCustomVarValues((prev) => ({ ...prev, [varName]: value }))
         }
+        onControlChange={(patch) => setControls((prev) => ({ ...prev, ...patch }))}
         onGenerate={() => void handleGenerate(false)}
         onCancel={() => void cancel()}
       />
