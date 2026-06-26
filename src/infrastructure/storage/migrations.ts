@@ -78,7 +78,8 @@ CREATE TABLE IF NOT EXISTS generations (
   started_at TEXT,
   completed_at TEXT,
   created_at TEXT NOT NULL,
-  active_draft_id TEXT
+  active_draft_id TEXT,
+  quality_score TEXT
 );
 
 CREATE TABLE IF NOT EXISTS generation_drafts (
@@ -123,6 +124,10 @@ export async function runMigrations(): Promise<void> {
     const genColumns = database.prepare("PRAGMA table_info(generations)").all() as Array<{ name: string }>;
     if (!genColumns.some((c) => c.name === "active_draft_id")) {
       database.exec("ALTER TABLE generations ADD COLUMN active_draft_id TEXT");
+    }
+    // Migration: add quality_score (LLM-as-Judge result, JSON) for existing installs.
+    if (!genColumns.some((c) => c.name === "quality_score")) {
+      database.exec("ALTER TABLE generations ADD COLUMN quality_score TEXT");
     }
   } finally {
     database.close();

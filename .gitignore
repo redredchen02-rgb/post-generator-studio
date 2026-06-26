@@ -16,3 +16,4 @@ data/
 *.log
 *.tsbuildinfo
 next-env.d.ts
+Start Dev.command

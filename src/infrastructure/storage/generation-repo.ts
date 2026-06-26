@@ -31,6 +31,7 @@ function generationFromRow(row: GenerationRow): Generation {
     completedAt: row.completedAt || undefined,
     createdAt: row.createdAt,
     activeDraftId: row.activeDraftId || undefined,
+    qualityScore: row.qualityScore ? parseJson(row.qualityScore, undefined) : undefined,
   });
 }
 
@@ -130,6 +131,12 @@ export class SqliteGenerationRepository implements GenerationRepository {
         totalTokens: input.totalTokens ?? existing.totalTokens ?? null,
         startedAt: input.startedAt ?? existing.startedAt ?? null,
         completedAt: input.completedAt ?? existing.completedAt ?? null,
+        qualityScore:
+          input.qualityScore !== undefined
+            ? JSON.stringify(input.qualityScore)
+            : existing.qualityScore
+              ? JSON.stringify(existing.qualityScore)
+              : null,
       })
       .where(eq(generations.id, id));
     const updated = await this.get(id);

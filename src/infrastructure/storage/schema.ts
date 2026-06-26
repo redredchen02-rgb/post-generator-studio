@@ -75,6 +75,7 @@ export const generations = sqliteTable("generations", {
   completedAt: text("completed_at"),
   createdAt: text("created_at").notNull(),
   activeDraftId: text("active_draft_id"),
+  qualityScore: text("quality_score"),
 });
 
 export const generationDrafts = sqliteTable("generation_drafts", {
