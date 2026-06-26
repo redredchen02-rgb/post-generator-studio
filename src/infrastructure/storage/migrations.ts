@@ -3,6 +3,16 @@ import path from "node:path";
 import Database from "better-sqlite3";
 import { getBackupsDir, getDataHome, getDatabasePath, getExportsDir, getLogsDir, getSecretsDir } from "@/infrastructure/config/paths";
 
+/**
+ * Monotonic schema version stamped into backup bundles (`meta.schemaVer`).
+ * Migrations are idempotent and forward-only, so restoring an equal-or-older
+ * bundle is always safe (reconnect re-runs `runMigrations`). Restore rejects a
+ * bundle whose `schemaVer` is *newer* than this — a backup from a future app
+ * version we cannot safely down-migrate. Bump this whenever `runMigrations`
+ * gains a new schema-changing step.
+ */
+export const CURRENT_SCHEMA_VERSION = 1;
+
 const INITIAL_SQL = `
 CREATE TABLE IF NOT EXISTS provider_profiles (
   id TEXT PRIMARY KEY,
