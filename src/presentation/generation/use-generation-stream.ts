@@ -89,42 +89,44 @@ export function useGenerationStream() {
         timeoutSignal.addEventListener("abort", onAbort, { once: true });
         combinedSignal = combined.signal;
       }
-      const response = await fetch("/api/generations", {
-        method: "POST",
-        signal: combinedSignal,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title,
-          eventSummary,
-          presetId,
-          providerProfileId: providerProfileId || undefined,
-          idempotencyKey: regenerate ? undefined : crypto.randomUUID(),
-          customVariables: customVariables && Object.keys(customVariables).length > 0 ? customVariables : undefined,
-          ...controls,
-        }),
-      });
-
-      if (!response.ok) {
-        // Server returned 4xx/5xx with a non-SSE body. Surface a clear error
-        // instead of feeding the error payload into the SSE parser (which would
-        // throw a JSON parse error and read as "stream broke").
-        const detail = await response.text().catch(() => null);
-        setState((s) => ({
-          ...s,
-          error: t("errorProvider"),
-          errorDetail: detail || null,
-          status: t("statusFailed"),
-          isGenerating: false,
-        }));
-        return;
-      }
-
-      if (!response.body) {
-        setState((s) => ({ ...s, error: t("errorNoStream"), isGenerating: false }));
-        return;
-      }
-
       try {
+        // The fetch itself must be inside the try: if it rejects (server down,
+        // offline, connection reset) the finally still clears the flush interval
+        // and resets isGenerating, instead of leaving the UI stuck "Generating…".
+        const response = await fetch("/api/generations", {
+          method: "POST",
+          signal: combinedSignal,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title,
+            eventSummary,
+            presetId,
+            providerProfileId: providerProfileId || undefined,
+            idempotencyKey: regenerate ? undefined : crypto.randomUUID(),
+            customVariables: customVariables && Object.keys(customVariables).length > 0 ? customVariables : undefined,
+            ...controls,
+          }),
+        });
+
+        if (!response.ok) {
+          // Server returned 4xx/5xx with a non-SSE body. Surface a clear error
+          // instead of feeding the error payload into the SSE parser (which would
+          // throw a JSON parse error and read as "stream broke").
+          const detail = await response.text().catch(() => null);
+          setState((s) => ({
+            ...s,
+            error: t("errorProvider"),
+            errorDetail: detail || null,
+            status: t("statusFailed"),
+          }));
+          return;
+        }
+
+        if (!response.body) {
+          setState((s) => ({ ...s, error: t("errorNoStream") }));
+          return;
+        }
+
         for await (const msg of parseSSEStream(response.body)) {
           const payload = JSON.parse(msg.data) as StreamPayload;
           if (payload.type === "generation") {
@@ -178,12 +180,14 @@ export function useGenerationStream() {
         }
       } catch (streamError) {
         if (!controller.signal.aborted) {
-          // Main message stays localized; the raw Error text goes to errorDetail.
+          // Covers both a mid-stream break and an initial fetch rejection (server
+          // down / offline). Main message stays localized; raw Error text → errorDetail.
           const detail = streamError instanceof Error ? streamError.message : null;
           setState((s) => ({
             ...s,
             error: t("statusStreamFailed"),
             errorDetail: detail,
+            status: t("statusFailed"),
           }));
         }
       } finally {

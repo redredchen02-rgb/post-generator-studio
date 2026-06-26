@@ -96,6 +96,24 @@ describe("useGenerationStream", () => {
     expect(result.current.error).toBe("Please select a Generation Preset");
   });
 
+  it("recovers from a fetch rejection (server down) instead of hanging on Generating…", async () => {
+    // Regression: the fetch used to run outside the try/finally, so a rejection
+    // left isGenerating=true forever (button locked) and leaked the flush interval.
+    global.fetch = (async () => {
+      throw new TypeError("Failed to fetch");
+    }) as typeof fetch;
+
+    const { result } = renderHook(() => useGenerationStream(), { wrapper });
+    await act(async () => {
+      await result.current.generate(baseParams);
+    });
+
+    expect(result.current.isGenerating).toBe(false);
+    expect(result.current.error).toBe("Streaming failed");
+    expect(result.current.status).toBe("Failed");
+    expect(result.current.errorDetail).toBe("Failed to fetch");
+  });
+
   it("cancel posts to the cancel endpoint and marks the state cancelled", async () => {
     const calls: string[] = [];
     global.fetch = (async (url: string) => {

@@ -289,7 +289,9 @@ export function GeneratorWorkspace(): React.ReactElement {
         if (activeGenIdRef.current === genId) setQualityScore(score);
         break;
       } catch (err) {
-        const isRetryable = err instanceof Error && (err.message.includes("429") || err.message.includes("5"));
+        // 5xx only: \b5\d\d\b matches 500–599 but not 405/415 or "5 chars"
+        // (includes("5") matched any message with the digit 5 — far too broad).
+        const isRetryable = err instanceof Error && (err.message.includes("429") || /\b5\d\d\b/.test(err.message));
         if (isRetryable && attempt < MAX_RETRIES) continue;
         if (activeGenIdRef.current === genId) setStatus(t("scoreFailed"));
       }
