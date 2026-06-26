@@ -82,6 +82,12 @@ export class DocumentService {
     return this.storage.generationDrafts.listByGeneration(generationId);
   }
 
+  /** The active working-draft pointer for a generation, or null. */
+  async getActiveDraftId(generationId: string): Promise<string | null> {
+    const generation = await getOrThrow(this.storage.generations, generationId, "生成不存在");
+    return generation.activeDraftId ?? null;
+  }
+
   /**
    * Snapshot the current working content as a frozen version (kind:'snapshot').
    * Snapshots never become active — the working draft stays the live buffer — so

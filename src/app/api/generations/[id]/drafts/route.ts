@@ -2,8 +2,6 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { errorResponse } from "@/application/errors";
 import { documentService } from "@/application/content/document-service";
-import { getStorage } from "@/infrastructure/storage/sqlite-storage";
-import { getOrThrow } from "@/application/crud-helpers";
 import type { RouteContext } from "@/app/api/types";
 
 export const runtime = "nodejs";
@@ -18,12 +16,12 @@ const bodySchema = z.discriminatedUnion("action", [
 export async function GET(_request: Request, context: RouteContext): Promise<NextResponse> {
   try {
     const { id } = await context.params;
-    const generation = await getOrThrow(getStorage().generations, id, "生成不存在");
-    const [drafts, effectiveContent] = await Promise.all([
+    const [drafts, activeDraftId, effectiveContent] = await Promise.all([
       documentService.listDrafts(id),
+      documentService.getActiveDraftId(id),
       documentService.getEffectiveContent(id),
     ]);
-    return NextResponse.json({ drafts, activeDraftId: generation.activeDraftId ?? null, effectiveContent });
+    return NextResponse.json({ drafts, activeDraftId, effectiveContent });
   } catch (error) {
     return errorResponse(error);
   }
