@@ -95,6 +95,7 @@ export const formatOutputStep: PipelineStep<string, string> = {
 const steps = [
   buildContextStep,
   renderPromptStep,
+  applyControlsStep,
   cleanContentStep,
   formatOutputStep,
 ];

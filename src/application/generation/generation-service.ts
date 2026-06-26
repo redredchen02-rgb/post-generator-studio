@@ -127,7 +127,10 @@ async function prepareGeneration(
         },
       };
   // Request-level controls (tone/length/audience/instruction); no-ops when unset.
-  const rendered = await applyControlsStep.execute(context, renderedBase);
+  // Preset-gated like every other step (registry is the single source of truth).
+  const rendered = enabledSteps.has(PIPELINE_STEPS.APPLY_CONTROLS)
+    ? await applyControlsStep.execute(context, renderedBase)
+    : renderedBase;
   const generation = await getStorage().generations.create({
     id: generationId,
     idempotencyKey: request.idempotencyKey,

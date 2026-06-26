@@ -55,6 +55,7 @@ const defaultUserPromptTemplate = `请根据以下信息生成完整文章。
 const pipelineSteps = JSON.stringify([
   "build-context",
   "render-prompt",
+  "apply-controls",
   "clean-content",
   "format-output",
 ]);

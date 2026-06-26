@@ -129,6 +129,7 @@ export async function runMigrations(): Promise<void> {
     if (!genColumns.some((c) => c.name === "quality_score")) {
       database.exec("ALTER TABLE generations ADD COLUMN quality_score TEXT");
     }
+    migratePresetPipelineSteps(database);
     // Migration: retrofit foreign-key constraints onto pre-FK installs.
     // SQLite cannot ALTER TABLE ADD CONSTRAINT, so this rebuilds the affected
     // tables. No-op on fresh installs (INITIAL_SQL already creates them with FKs).
@@ -139,6 +140,35 @@ export async function runMigrations(): Promise<void> {
 }
 
 type SqliteDb = InstanceType<typeof Database>;
+
+/**
+ * Opt existing presets into the `apply-controls` step. It used to run
+ * unconditionally (a hidden step); now it is registry-driven and preset-gated,
+ * so pre-existing presets must list it to preserve their current behavior.
+ * Idempotent: skips presets that already include it. Inserted right after
+ * `render-prompt` to keep execution order. Malformed JSON rows are left untouched.
+ */
+export function migratePresetPipelineSteps(database: SqliteDb): void {
+  const rows = database
+    .prepare("SELECT id, enabled_pipeline_steps FROM generation_presets")
+    .all() as Array<{ id: string; enabled_pipeline_steps: string }>;
+  const update = database.prepare(
+    "UPDATE generation_presets SET enabled_pipeline_steps = ? WHERE id = ?",
+  );
+  for (const row of rows) {
+    let steps: unknown;
+    try {
+      steps = JSON.parse(row.enabled_pipeline_steps);
+    } catch {
+      continue;
+    }
+    if (!Array.isArray(steps) || steps.includes("apply-controls")) continue;
+    const renderIdx = steps.indexOf("render-prompt");
+    if (renderIdx >= 0) steps.splice(renderIdx + 1, 0, "apply-controls");
+    else steps.push("apply-controls");
+    update.run(JSON.stringify(steps), row.id);
+  }
+}
 
 function tableHasFk(database: SqliteDb, table: string, fromColumn?: string): boolean {
   const fks = database.pragma(`foreign_key_list(${table})`) as Array<{ from: string }>;
