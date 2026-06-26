@@ -1,4 +1,4 @@
-import { desc, eq, like, sql } from "drizzle-orm";
+import { desc, eq, sql } from "drizzle-orm";
 import { nowIso, parseJson } from "@/lib/utils";
 import { generationSchema, type Generation, type QualityScore } from "@/domain/schemas";
 import type { GenerationCreateInput, GenerationListOpts, GenerationListResult, GenerationRepository, GenerationUpdateInput } from "@/domain/ports/storage";
@@ -46,8 +46,11 @@ export class SqliteGenerationRepository implements GenerationRepository {
   async list(opts: GenerationListOpts = {}): Promise<GenerationListResult> {
     const { search, offset = 0, limit = 30 } = opts;
     const db = await getDb();
-    const escaped = search ? search.replace(/%/g, "\\%").replace(/_/g, "\\_") : undefined;
-    const filter = escaped ? like(generations.title, `%${escaped}%`) : undefined;
+    // Escape LIKE wildcards (and the escape char itself) AND declare ESCAPE '\':
+    // drizzle's like() emits no ESCAPE clause, so without it SQLite treats the
+    // injected backslash as a literal, breaking any search for titles with _ or %.
+    const escaped = search ? search.replace(/[\\%_]/g, (c) => `\\${c}`) : undefined;
+    const filter = escaped ? sql`${generations.title} LIKE ${`%${escaped}%`} ESCAPE '\\'` : undefined;
     const [rows, [{ total }]] = await Promise.all([
       filter
         ? db.select().from(generations).where(filter).orderBy(desc(generations.createdAt)).limit(limit).offset(offset)
