@@ -277,15 +277,19 @@ export function GeneratorWorkspace(): React.ReactElement {
     if (!activeGeneration || !content.trim() || scoring) return;
     const genId = activeGeneration.id;
     setScoring(true);
-    try {
-      const score = await scoreGeneration(genId, { presetId, providerProfileId: effectiveProviderId });
-      // Ignore a result that landed after the user switched to another generation.
-      if (activeGenIdRef.current === genId) setQualityScore(score);
-    } catch {
-      if (activeGenIdRef.current === genId) setStatus(t("scoreFailed"));
-    } finally {
-      setScoring(false);
+    const MAX_RETRIES = 1;
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        const score = await scoreGeneration(genId, { presetId, providerProfileId: effectiveProviderId });
+        if (activeGenIdRef.current === genId) setQualityScore(score);
+        break;
+      } catch (err) {
+        const isRetryable = err instanceof Error && (err.message.includes("429") || err.message.includes("5"));
+        if (isRetryable && attempt < MAX_RETRIES) continue;
+        if (activeGenIdRef.current === genId) setStatus(t("scoreFailed"));
+      }
     }
+    setScoring(false);
   }, [activeGeneration, content, scoring, presetId, effectiveProviderId, t]);
 
   async function copyMarkdown(): Promise<void> {
