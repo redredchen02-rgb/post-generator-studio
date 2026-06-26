@@ -47,7 +47,7 @@ function cacheSet(ref: string, value: string): void {
   secretCache.set(ref, { value, expiresAt: Date.now() + CACHE_TTL_MS });
 }
 
-function cacheInvalidate(ref?: string): void {
+export function cacheInvalidate(ref?: string): void {
   if (ref) {
     secretCache.delete(ref);
   } else {

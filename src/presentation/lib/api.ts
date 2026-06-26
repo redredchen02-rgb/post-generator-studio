@@ -96,6 +96,39 @@ export async function deleteGenerationRecord(id: string): Promise<void> {
   }
 }
 
+// --- Storage: backup & restore ---
+// Mirrors the application BackupMeta shape; the presentation layer may not import
+// from application/infrastructure, so the type is declared here.
+export type BackupMeta = {
+  id: string;
+  createdAt: string;
+  schemaVer: number;
+  fileSizeBytes: number;
+  includesSecrets: boolean;
+};
+
+export async function listBackups(): Promise<BackupMeta[]> {
+  return fetchJson<BackupMeta[]>("/api/storage/backup");
+}
+
+export async function createBackup(): Promise<BackupMeta> {
+  return fetchJson<BackupMeta>("/api/storage/backup", { method: "POST" });
+}
+
+export async function deleteBackup(id: string): Promise<void> {
+  const response = await fetch(`/api/storage/backup/${encodeURIComponent(id)}`, { method: "DELETE" });
+  if (!response.ok) {
+    throw new ApiClientError({ code: "HTTP_ERROR", message: `HTTP ${response.status}` });
+  }
+}
+
+export async function restoreBackup(id: string): Promise<void> {
+  await fetchJson<{ ok: true }>("/api/storage/restore", {
+    method: "POST",
+    body: JSON.stringify({ id }),
+  });
+}
+
 export type CompletionResponse = {
   content: string;
   model?: string;
