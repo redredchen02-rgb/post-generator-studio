@@ -99,6 +99,29 @@ test("user generates, copies, exports, and views history", async ({ page, contex
   await page.route("**/api/generations/generation_fixture/export?format=md", async (route) => {
     await route.fulfill({ body: "# 台湾男子连续30天挑战AI创业\n\n这是一篇实时生成的文章。" });
   });
+  // Restore-from-History (Unit 12): single-generation GET + active draft. The
+  // draft body is deliberately distinct from outputContent so the assertion
+  // proves the editor loaded the working draft, not the frozen output.
+  await page.route("**/api/generations/generation_fixture/drafts", async (route) => {
+    await route.fulfill({ json: { drafts: [], activeDraftId: null, effectiveContent: "草稿续写内容" } });
+  });
+  await page.route("**/api/generations/generation_fixture", async (route) => {
+    await route.fulfill({
+      json: {
+        id: "generation_fixture",
+        title: "台湾男子连续30天挑战AI创业",
+        eventSummary: "- 连续30天开发AI产品",
+        providerProfileSnapshot: {},
+        promptTemplateSnapshot: {},
+        generationPresetSnapshot: { id: "preset_fixture" },
+        renderedSystemPrompt: "",
+        renderedUserPrompt: "",
+        outputContent: "# 台湾男子连续30天挑战AI创业\n\n这是一篇实时生成的文章。",
+        status: "completed",
+        createdAt: "2026-06-24T00:00:00.000Z",
+      },
+    });
+  });
 
   await page.goto("/");
   await page.getByLabel("Title").fill("台湾男子连续30天挑战AI创业");
@@ -122,6 +145,11 @@ test("user generates, copies, exports, and views history", async ({ page, contex
   await expect(page.getByRole("button", { name: /台湾男子连续30天挑战AI创业/ })).toHaveCount(0);
   await page.getByPlaceholder("搜索标题...").fill("台湾");
   await expect(page.getByRole("button", { name: /台湾男子连续30天挑战AI创业/ })).toBeVisible();
+
+  // Continue editing: restore the generation + active draft into the editor (Unit 12).
+  await page.getByRole("link", { name: /Continue editing|继续编辑/ }).click();
+  await expect(page).toHaveURL(/generationId=generation_fixture/);
+  await expect(page.getByText("草稿续写内容")).toBeVisible();
 });
 
 // NOTE: mid-stream cancel is verified at the unit level

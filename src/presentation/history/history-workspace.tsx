@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import ReactMarkdown from "react-markdown";
-import { ChevronDown, ChevronRight, Download, RefreshCw, Search, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronRight, Download, Pencil, RefreshCw, Search, Trash2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import type { Generation } from "@/domain/schemas";
 import { Button } from "@/presentation/components/ui/button";
@@ -154,6 +154,12 @@ export function HistoryWorkspace(): React.ReactElement {
                 </p>
               </div>
               <div className="flex gap-2">
+                <Button asChild size="sm">
+                  <a href={`/?generationId=${encodeURIComponent(selected.id)}`}>
+                    <Pencil className="h-4 w-4" />
+                    {t("restoreEditBtn")}
+                  </a>
+                </Button>
                 <Button asChild variant="outline" size="sm">
                   <a href={`/api/generations/${selected.id}/export?format=md`}>
                     <Download className="h-4 w-4" />

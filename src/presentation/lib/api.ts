@@ -68,6 +68,10 @@ export async function loadGenerations(search?: string, offset?: number, limit?: 
   return fetchJson<PaginatedGenerations>(`/api/generations?${params.toString()}`);
 }
 
+export async function getGeneration(id: string): Promise<Generation> {
+  return fetchJson<Generation>(`/api/generations/${id}`);
+}
+
 export async function saveGenerationContent(id: string, outputContent: string): Promise<Generation> {
   return fetchJson<Generation>(`/api/generations/${id}`, {
     method: "PATCH",
