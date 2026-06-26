@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { errorResponse } from "@/application/errors";
 import { exportGeneration } from "@/application/export/export-service";
+import { contentDisposition } from "@/lib/content-disposition";
 import type { RouteContext } from "@/app/api/types";
 
 export const runtime = "nodejs";
@@ -19,7 +20,7 @@ export async function GET(request: Request, context: RouteContext): Promise<Next
     return new NextResponse(exported.content, {
       headers: {
         "Content-Type": format === "md" ? "text/markdown; charset=utf-8" : "text/plain; charset=utf-8",
-        "Content-Disposition": `attachment; filename="${exported.filename}"`,
+        "Content-Disposition": contentDisposition(exported.filename),
       },
     });
   } catch (error) {
