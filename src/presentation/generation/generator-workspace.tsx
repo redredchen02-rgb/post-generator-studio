@@ -125,7 +125,7 @@ export function GeneratorWorkspace(): React.ReactElement {
     const defaultPreset = bootstrap.generationPresets.find((p) => p.isDefault) || bootstrap.generationPresets[0];
     if (defaultPreset) {
       setPresetId(defaultPreset.id);
-      const storedId = useProviderStore.getState().selectedProfileId;
+      const storedId = selectedProfileId;
       const enabledProfiles = bootstrap.providerProfiles.filter((p) => p.enabled);
       if (!storedId || !enabledProfiles.some((p) => p.id === storedId)) {
         setSelectedProfile(defaultPreset.providerProfileId);
@@ -154,6 +154,9 @@ export function GeneratorWorkspace(): React.ReactElement {
   // Pre-fill custom var values per template
   React.useEffect(() => {
     if (!templateId) { setCustomVarValues({}); return; }
+    // Intentional one-shot read: initialise custom vars once when the template
+    // changes. A reactive selector would re-run this effect after every
+    // generation (setVar at line ~202 writes varMemory), overwriting in-progress input.
     const memory = useVarMemoryStore.getState().varMemory[templateId] ?? {};
     const defaults = selectedTemplate?.customVariableDefaults ?? {};
     setCustomVarValues({ ...defaults, ...memory });
