@@ -87,3 +87,68 @@ export function replaceRange(doc: string, from: number, to: number, replacement:
   }
   return doc.slice(0, from) + replacement + doc.slice(to);
 }
+
+/**
+ * The paragraph (maximal run of non-blank lines) containing `pos`, or null when
+ * the cursor sits on a blank separator line or the document is empty. Used to
+ * regenerate just the paragraph under the cursor without touching its neighbours.
+ */
+export function paragraphRangeAt(doc: string, pos: number): { from: number; to: number } | null {
+  if (doc.length === 0) return null;
+  const lines: { start: number; end: number; blank: boolean }[] = [];
+  let start = 0;
+  for (const line of doc.split("\n")) {
+    const end = start + line.length;
+    lines.push({ start, end, blank: line.trim() === "" });
+    start = end + 1; // account for the "\n"
+  }
+  const clamped = Math.max(0, Math.min(pos, doc.length));
+  let idx = lines.findIndex((l) => clamped >= l.start && clamped <= l.end);
+  if (idx === -1) idx = lines.length - 1;
+  if (lines[idx].blank) return null;
+
+  let top = idx;
+  while (top > 0 && !lines[top - 1].blank) top--;
+  let bottom = idx;
+  while (bottom < lines.length - 1 && !lines[bottom + 1].blank) bottom++;
+  return { from: lines[top].start, to: lines[bottom].end };
+}
+
+const CONTINUE_SYSTEM_PROMPT =
+  "你是一位中文写作助手。只返回续写的后续内容，承接上文语气与主题，不要重复已有文字，不要解释。";
+
+export function buildContinuePrompt(ctx: { title: string; fullText: string }): {
+  systemPrompt: string;
+  prompt: string;
+} {
+  const prompt = [
+    `文章标题：${ctx.title}`,
+    "请在下面文章的末尾续写，自然承接，只返回新增的后续内容：",
+    "",
+    ctx.fullText,
+    "",
+    "续写内容：",
+  ].join("\n");
+  return { systemPrompt: CONTINUE_SYSTEM_PROMPT, prompt };
+}
+
+export function buildParagraphPrompt(ctx: {
+  title: string;
+  paragraph: string;
+  before: string;
+  after: string;
+}): { systemPrompt: string; prompt: string } {
+  const prompt = [
+    `文章标题：${ctx.title}`,
+    "重写下面这一段，保持与前后文连贯，只返回替换后的该段文本：",
+    "",
+    `前文（仅供参考，不要改写）：${ctx.before}`,
+    `后文（仅供参考，不要改写）：${ctx.after}`,
+    "",
+    "需要重写的段落：",
+    ctx.paragraph,
+    "",
+    "只返回替换后的段落：",
+  ].join("\n");
+  return { systemPrompt: SYSTEM_PROMPT, prompt };
+}

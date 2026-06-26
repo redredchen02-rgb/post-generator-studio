@@ -196,6 +196,10 @@
     "accept": "Accept",
     "reject": "Reject",
     "original": "Original",
-    "suggestion": "Suggestion"
+    "suggestion": "Suggestion",
+    "continue": "Continue",
+    "regenParagraph": "Regenerate paragraph",
+    "noParagraph": "Place the cursor inside a paragraph first",
+    "processing": "Working…"
   }
 }

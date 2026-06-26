@@ -196,6 +196,10 @@
     "accept": "接受",
     "reject": "拒绝",
     "original": "原文",
-    "suggestion": "建议"
+    "suggestion": "建议",
+    "continue": "续写",
+    "regenParagraph": "重生成本段",
+    "noParagraph": "请先把光标放到某一段落内",
+    "processing": "处理中…"
   }
 }

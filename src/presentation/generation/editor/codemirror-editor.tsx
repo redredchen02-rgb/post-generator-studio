@@ -7,7 +7,13 @@ import { useTranslations } from "next-intl";
 import { Button } from "@/presentation/components/ui/button";
 import { requestCompletion } from "@/presentation/lib/api";
 import { SelectionToolbar, type ToolbarPosition } from "./selection-toolbar";
-import { buildRewritePrompt, type RewriteActionId } from "./rewrite-actions";
+import {
+  buildContinuePrompt,
+  buildParagraphPrompt,
+  buildRewritePrompt,
+  paragraphRangeAt,
+  type RewriteActionId,
+} from "./rewrite-actions";
 
 type CodeMirrorEditorProps = {
   value: string;
@@ -44,6 +50,7 @@ export function CodeMirrorEditor({
   const t = useTranslations("Editor");
   const containerRef = React.useRef<HTMLDivElement>(null);
   const viewRef = React.useRef<EditorView | null>(null);
+  const cursorRef = React.useRef(0);
   const [selection, setSelection] = React.useState<Selection | null>(null);
   const [busy, setBusy] = React.useState(false);
   const [diff, setDiff] = React.useState<PendingDiff | null>(null);
@@ -80,6 +87,7 @@ export function CodeMirrorEditor({
   const handleUpdate = React.useCallback(
     (update: ViewUpdate) => {
       if (update.selectionSet || update.docChanged || update.focusChanged) {
+        cursorRef.current = update.state.selection.main.head;
         // A pending diff is anchored to a stale range; drop it if the user moves on.
         if (diff && update.docChanged) setDiff(null);
         refreshSelection(update.view);
@@ -117,6 +125,56 @@ export function CodeMirrorEditor({
     },
     [selection, presetId, providerProfileId, title, t],
   );
+
+  const runContinue = React.useCallback(async () => {
+    const view = viewRef.current;
+    if (!view || !presetId) return;
+    const fullText = view.state.doc.toString();
+    const { systemPrompt, prompt } = buildContinuePrompt({ title, fullText });
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await requestCompletion({ prompt, systemPrompt, presetId, providerProfileId });
+      const addition = result.content.trim();
+      if (!addition) return;
+      const end = view.state.doc.length;
+      const insert = (fullText.trim() ? "\n\n" : "") + addition;
+      view.dispatch({ changes: { from: end, to: end, insert } });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t("rewriteFailed"));
+    } finally {
+      setBusy(false);
+    }
+  }, [presetId, providerProfileId, title, t]);
+
+  const runParagraphRegen = React.useCallback(async () => {
+    const view = viewRef.current;
+    if (!view || !presetId) return;
+    const doc = view.state.doc.toString();
+    const range = paragraphRangeAt(doc, cursorRef.current);
+    if (!range) {
+      setError(t("noParagraph"));
+      return;
+    }
+    const original = doc.slice(range.from, range.to);
+    const { systemPrompt, prompt } = buildParagraphPrompt({
+      title,
+      paragraph: original,
+      before: doc.slice(Math.max(0, range.from - CONTEXT_CHARS), range.from),
+      after: doc.slice(range.to, range.to + CONTEXT_CHARS),
+    });
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await requestCompletion({ prompt, systemPrompt, presetId, providerProfileId });
+      const suggestion = result.content.trim();
+      if (suggestion) setDiff({ from: range.from, to: range.to, original, suggestion });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t("rewriteFailed"));
+    } finally {
+      setBusy(false);
+    }
+  }, [presetId, providerProfileId, title, t]);
 
   const acceptDiff = React.useCallback(() => {
     const view = viewRef.current;
@@ -159,6 +217,29 @@ export function CodeMirrorEditor({
           searchKeymap: false,
         }}
       />
+
+      {rewriteEnabled && !diff ? (
+        <div className="pointer-events-none absolute bottom-2 right-2 z-20 flex gap-1">
+          <Button
+            size="sm"
+            variant="secondary"
+            className="pointer-events-auto"
+            disabled={busy}
+            onClick={() => void runParagraphRegen()}
+          >
+            {t("regenParagraph")}
+          </Button>
+          <Button
+            size="sm"
+            variant="secondary"
+            className="pointer-events-auto"
+            disabled={busy}
+            onClick={() => void runContinue()}
+          >
+            {busy ? t("processing") : t("continue")}
+          </Button>
+        </div>
+      ) : null}
 
       {!diff ? (
         <SelectionToolbar

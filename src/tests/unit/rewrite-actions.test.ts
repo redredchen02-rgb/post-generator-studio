@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   REWRITE_ACTIONS,
   availableActions,
+  buildContinuePrompt,
+  buildParagraphPrompt,
   buildRewritePrompt,
   replaceRange,
 } from "@/presentation/generation/editor/rewrite-actions";
@@ -84,5 +86,29 @@ describe("buildRewritePrompt", () => {
     for (const action of REWRITE_ACTIONS) {
       expect(() => buildRewritePrompt(action.id, ctx)).not.toThrow();
     }
+  });
+});
+
+describe("buildContinuePrompt", () => {
+  it("uses the whole article as context and asks only for the continuation", () => {
+    const { prompt, systemPrompt } = buildContinuePrompt({ title: "T", fullText: "Existing body." });
+    expect(prompt).toContain("Existing body.");
+    expect(prompt).toContain("T");
+    expect(`${systemPrompt}\n${prompt}`).toMatch(/续写|continue|接着|后续/i);
+  });
+});
+
+describe("buildParagraphPrompt", () => {
+  it("targets the paragraph with surrounding context and returns only its replacement", () => {
+    const { prompt, systemPrompt } = buildParagraphPrompt({
+      title: "T",
+      paragraph: "the middle paragraph",
+      before: "intro.",
+      after: "conclusion.",
+    });
+    expect(prompt).toContain("the middle paragraph");
+    expect(prompt).toContain("intro.");
+    expect(prompt).toContain("conclusion.");
+    expect(`${systemPrompt}\n${prompt}`.toLowerCase()).toMatch(/only|仅|替换|replacement/);
   });
 });
