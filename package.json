@@ -3,21 +3,24 @@
   "version": "0.1.0",
   "private": true,
   "packageManager": "pnpm@10.33.0",
+  "engines": {
+    "node": ">=22 <23"
+  },
   "scripts": {
-    "dev": "next dev",
-    "dev:clean": "node scripts/free-port.mjs 3000 && next dev",
+    "dev": "node scripts/ensure-native.mjs && next dev",
+    "dev:clean": "node scripts/free-port.mjs 3000 && node scripts/ensure-native.mjs && next dev",
     "build": "next build",
     "analyze": "ANALYZE=true next build",
-    "start": "next start",
-    "start:clean": "node scripts/free-port.mjs 3000 && pnpm db:migrate && next build && next start",
+    "start": "node scripts/ensure-native.mjs && next start",
+    "start:clean": "node scripts/free-port.mjs 3000 && node scripts/ensure-native.mjs && pnpm db:migrate && next build && next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "test:e2e": "playwright test",
+    "test": "node scripts/ensure-native.mjs && vitest run",
+    "test:watch": "node scripts/ensure-native.mjs && vitest",
+    "test:e2e": "node scripts/ensure-native.mjs && playwright test",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "tsx scripts/migrate.ts",
-    "db:seed": "tsx scripts/seed.ts",
+    "db:migrate": "node scripts/ensure-native.mjs && tsx scripts/migrate.ts",
+    "db:seed": "node scripts/ensure-native.mjs && tsx scripts/seed.ts",
     "prepare": "husky"
   },
   "dependencies": {

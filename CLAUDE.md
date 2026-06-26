@@ -23,6 +23,19 @@ pnpm db:migrate     # Apply migrations
 pnpm db:seed        # Seed default Provider / Template / Preset data
 ```
 
+### Node version & the native SQLite module
+
+This project is pinned to **Node 22.22.3** (`.nvmrc`, `.node-version`, `package.json#engines`).
+`.npmrc` sets `use-node-version=22.22.3`, so every `pnpm` command uses that Node regardless
+of the shell PATH — important on machines with multiple Node installs.
+
+`better-sqlite3` ships a native addon compiled against a specific Node ABI
+(`NODE_MODULE_VERSION`). If it's loaded under a different Node major, it crashes with
+`compiled against a different Node.js version using NODE_MODULE_VERSION X`. To prevent this,
+every script runs `scripts/ensure-native.mjs` first — it loads the addon and, only on a real
+ABI mismatch, runs `pnpm rebuild better-sqlite3` automatically (no-op when already valid).
+If you ever hit the error manually, the fix is `pnpm rebuild better-sqlite3` under Node 22.
+
 ## Architecture
 
 This is a **local-first AI content generation app** built on Next.js 15 App Router. The architecture follows a strict layered dependency rule: `presentation → app (API routes) → application → domain ← infrastructure`.
