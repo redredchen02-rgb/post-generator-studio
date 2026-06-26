@@ -22,8 +22,15 @@ export async function GET(request: Request): Promise<NextResponse> {
 }
 
 export async function POST(request: Request): Promise<Response> {
-  const body = await parseBody(request);
-  if (body instanceof NextResponse) return body;
+  let body: unknown;
+  try {
+    body = await parseBody(request);
+  } catch (error) {
+    // parseBody throws AppErrorException on malformed JSON; without this catch the
+    // throw escapes before the SSE stream is created and Next.js returns a bare 500
+    // instead of the structured 400 INVALID_BODY that errorResponse produces.
+    return errorResponse(error);
+  }
   const encoder = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {

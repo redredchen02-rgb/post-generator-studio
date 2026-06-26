@@ -115,3 +115,26 @@ describe("GET /api/generations", () => {
     expect(response.status).toBe(400);
   });
 });
+
+describe("POST /api/generations", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("returns a structured 400 (not a bare 500) when the body is malformed JSON", async () => {
+    // Regression: parseBody threw outside any try/catch, so a malformed body
+    // escaped the handler as a 500 instead of the structured 400 INVALID_BODY.
+    const { AppErrorException } = await import("@/domain/schemas");
+    mockParseBody.mockRejectedValue(
+      new AppErrorException({ code: "INVALID_BODY", message: "请求体不是有效的 JSON" }),
+    );
+
+    const { POST } = await import("@/app/api/generations/route");
+    const response = await POST(mockRequest({ method: "POST", url: "http://localhost/api/generations", body: {} }));
+
+    expect(response.status).toBe(400);
+    const body = await response.json();
+    expect(body.error.code).toBe("INVALID_BODY");
+    expect(mockStreamGeneration).not.toHaveBeenCalled();
+  });
+});
