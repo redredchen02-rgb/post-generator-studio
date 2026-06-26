@@ -23,15 +23,18 @@ export function useRestoreFromHistory(opts: {
   onError: () => void;
 }): void {
   const { generationId } = opts;
-  const doneRef = React.useRef(false);
+  // Remember which generation we loaded so a new ?generationId= (e.g. switching
+  // History records in-page) restores it, while re-renders for the same id stay
+  // a no-op. A boolean would wedge after the first restore.
+  const loadedIdRef = React.useRef<string | null>(null);
   const onRestoreRef = React.useRef(opts.onRestore);
   onRestoreRef.current = opts.onRestore;
   const onErrorRef = React.useRef(opts.onError);
   onErrorRef.current = opts.onError;
 
   React.useEffect(() => {
-    if (!generationId || doneRef.current) return;
-    doneRef.current = true;
+    if (!generationId || loadedIdRef.current === generationId) return;
+    loadedIdRef.current = generationId;
     let cancelled = false;
     void (async () => {
       try {
@@ -40,7 +43,9 @@ export function useRestoreFromHistory(opts: {
           loadDrafts(generationId),
         ]);
         if (cancelled) return;
-        const presetId = (generation.generationPresetSnapshot as { id?: string })?.id;
+        // Snapshot is Record<string, unknown>; read id defensively.
+        const snapshotId = generation.generationPresetSnapshot.id;
+        const presetId = typeof snapshotId === "string" ? snapshotId : undefined;
         onRestoreRef.current({ generation, content: draftState.effectiveContent, presetId });
       } catch {
         if (!cancelled) onErrorRef.current();

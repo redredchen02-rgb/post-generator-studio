@@ -64,16 +64,39 @@ describe("useRestoreFromHistory", () => {
     expect(onError).not.toHaveBeenCalled();
   });
 
-  it("restores only once even across re-renders", async () => {
+  it("restores only once for the same id, but reloads when the id changes", async () => {
     const onRestore = vi.fn();
     const { rerender } = renderHook(
       ({ id }) => useRestoreFromHistory({ generationId: id, onRestore, onError: () => {} }),
       { initialProps: { id: "gen_1" } },
     );
     await waitFor(() => expect(onRestore).toHaveBeenCalledTimes(1));
+    // Re-render with the same id: no extra fetch.
     rerender({ id: "gen_1" });
     await new Promise((r) => setTimeout(r, 30));
     expect(getGeneration).toHaveBeenCalledTimes(1);
-    expect(onRestore).toHaveBeenCalledTimes(1);
+    // Switch to a different id: must load the new generation.
+    rerender({ id: "gen_2" });
+    await waitFor(() => expect(getGeneration).toHaveBeenCalledWith("gen_2"));
+    expect(onRestore).toHaveBeenCalledTimes(2);
+  });
+
+  it("calls onError when the active draft cannot be loaded", async () => {
+    loadDrafts.mockRejectedValue(new Error("network"));
+    const onRestore = vi.fn();
+    const onError = vi.fn();
+    renderHook(() => useRestoreFromHistory({ generationId: "gen_1", onRestore, onError }));
+
+    await waitFor(() => expect(onError).toHaveBeenCalled());
+    expect(onRestore).not.toHaveBeenCalled();
+  });
+
+  it("yields presetId undefined when the snapshot has no usable id", async () => {
+    getGeneration.mockResolvedValue({ ...generation, generationPresetSnapshot: {} });
+    const onRestore = vi.fn();
+    renderHook(() => useRestoreFromHistory({ generationId: "gen_1", onRestore, onError: () => {} }));
+
+    await waitFor(() => expect(onRestore).toHaveBeenCalled());
+    expect(onRestore.mock.calls[0][0].presetId).toBeUndefined();
   });
 });
