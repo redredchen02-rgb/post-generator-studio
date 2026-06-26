@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import type { AppError, Generation } from "@/domain/schemas";
+import type { AppError, Generation, GenerationControls } from "@/domain/schemas";
 import { parseSSEStream } from "@/lib/sse";
 
 type StreamPayload =
@@ -33,6 +33,8 @@ export function useGenerationStream() {
   const abortRef = React.useRef<AbortController | null>(null);
   const activeGenerationRef = React.useRef(state.activeGeneration);
   activeGenerationRef.current = state.activeGeneration;
+  const bufferRef = React.useRef("");
+  const flushTimerRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
 
   const generate = React.useCallback(
     async (params: {
@@ -42,9 +44,10 @@ export function useGenerationStream() {
       providerProfileId?: string;
       regenerate?: boolean;
       customVariables?: Record<string, string>;
+      controls?: GenerationControls;
       onSuccess?: (vars: Record<string, string>) => void;
     }) => {
-      const { title, eventSummary, presetId, providerProfileId, regenerate, customVariables } = params;
+      const { title, eventSummary, presetId, providerProfileId, regenerate, customVariables, controls } = params;
       if (!presetId) {
         setState((s) => ({ ...s, error: "请选择 Generation Preset" }));
         return;
@@ -59,9 +62,29 @@ export function useGenerationStream() {
       }));
       const controller = new AbortController();
       abortRef.current = controller;
+      bufferRef.current = "";
+      if (flushTimerRef.current) clearInterval(flushTimerRef.current);
+      flushTimerRef.current = setInterval(() => {
+        if (bufferRef.current) {
+          const chunk = bufferRef.current;
+          bufferRef.current = "";
+          setState((s) => ({ ...s, content: s.content + chunk }));
+        }
+      }, 100);
+      const timeoutSignal = AbortSignal.timeout(120_000);
+      let combinedSignal: AbortSignal;
+      if (typeof AbortSignal.any === "function") {
+        combinedSignal = AbortSignal.any([controller.signal, timeoutSignal]);
+      } else {
+        const combined = new AbortController();
+        const onAbort = () => combined.abort();
+        controller.signal.addEventListener("abort", onAbort, { once: true });
+        timeoutSignal.addEventListener("abort", onAbort, { once: true });
+        combinedSignal = combined.signal;
+      }
       const response = await fetch("/api/generations", {
         method: "POST",
-        signal: controller.signal,
+        signal: combinedSignal,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title,
@@ -70,6 +93,7 @@ export function useGenerationStream() {
           providerProfileId: providerProfileId || undefined,
           idempotencyKey: regenerate ? undefined : crypto.randomUUID(),
           customVariables: customVariables && Object.keys(customVariables).length > 0 ? customVariables : undefined,
+          ...controls,
         }),
       });
 
@@ -85,7 +109,7 @@ export function useGenerationStream() {
             setState((s) => ({ ...s, activeGeneration: payload.generation, status: "Streaming response..." }));
           }
           if (payload.type === "token") {
-            setState((s) => ({ ...s, content: s.content + payload.value, status: "Tokens received..." }));
+            bufferRef.current += payload.value;
           }
           if (payload.type === "metadata") {
             setState((s) => ({ ...s, metadata: { ...s.metadata, ...payload } }));
@@ -98,6 +122,7 @@ export function useGenerationStream() {
             }));
           }
           if (payload.type === "final") {
+            bufferRef.current = "";
             setState((s) => ({
               ...s,
               activeGeneration: payload.generation,
@@ -117,7 +142,13 @@ export function useGenerationStream() {
           }));
         }
       } finally {
-        setState((s) => ({ ...s, isGenerating: false }));
+        if (flushTimerRef.current) {
+          clearInterval(flushTimerRef.current);
+          flushTimerRef.current = null;
+        }
+        const remaining = bufferRef.current;
+        bufferRef.current = "";
+        setState((s) => ({ ...s, content: remaining ? s.content + remaining : s.content, isGenerating: false }));
         abortRef.current = null;
       }
     },

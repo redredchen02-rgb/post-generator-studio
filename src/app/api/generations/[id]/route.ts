@@ -21,6 +21,9 @@ export async function PATCH(request: Request, context: RouteContext): Promise<Ne
     if (typeof body.outputContent !== "string") {
       return NextResponse.json({ error: "outputContent is required" }, { status: 400 });
     }
+    if (body.outputContent.length > 500_000) {
+      return NextResponse.json({ error: "outputContent too large" }, { status: 413 });
+    }
     return NextResponse.json(await updateGenerationContent(id, body.outputContent));
   } catch (error) {
     return errorResponse(error);

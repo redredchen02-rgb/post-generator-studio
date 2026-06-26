@@ -111,6 +111,9 @@ export class OpenAICompatibleAdapter extends BaseAdapter {
     if (typeof content !== "string") {
       throw new AppErrorException({ code: "COMPLETION_FAILED", message: `${this.id} 返回了非预期的补全结构` });
     }
+    if (!content) {
+      throw new AppErrorException({ code: "COMPLETION_FAILED", message: `${this.id} 返回了空补全` });
+    }
     return {
       content,
       model: parsed.model,

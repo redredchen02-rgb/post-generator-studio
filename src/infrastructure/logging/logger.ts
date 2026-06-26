@@ -3,7 +3,7 @@ import type { Logger } from "@/domain/ports/logger";
 const SECRET_PATTERNS = [
   /sk-[A-Za-z0-9_-]{12,}/g,
   /Bearer\s+[A-Za-z0-9._-]+/gi,
-  /(authorization|cookie|api[_-]?key)["':=\s]+[^,\s}]+/gi,
+  /(authorization|cookie|api[_-]?key|x-api-key|x-goog-api-key)["':=\s]+[^,\s}]+/gi,
 ];
 
 function redact(value: unknown): unknown {
@@ -17,7 +17,7 @@ function redact(value: unknown): unknown {
     return Object.fromEntries(
       Object.entries(value).map(([key, item]) => [
         key,
-        /authorization|cookie|secret|apiKey|api_key|token/i.test(key) ? "[REDACTED]" : redact(item),
+        /authorization|cookie|secret|apiKey|api_key|token|x-api-key|x-goog-api-key/i.test(key) ? "[REDACTED]" : redact(item),
       ]),
     );
   }

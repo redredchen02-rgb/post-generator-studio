@@ -95,6 +95,9 @@ export class AnthropicAdapter extends BaseAdapter {
       .filter((block) => block.type === "text")
       .map((block) => block.text ?? "")
       .join("");
+    if (!content) {
+      throw new AppErrorException({ code: "COMPLETION_FAILED", message: `${this.id} 返回了空补全` });
+    }
     return {
       content,
       model: parsed.model,

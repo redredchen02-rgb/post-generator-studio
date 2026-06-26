@@ -25,11 +25,19 @@ export function SettingsWorkspace(): React.ReactElement {
   const t = useTranslations("Settings");
   const [tab, setTab] = React.useState<SettingsTab>("providers");
   const [message, setMessage] = React.useState<string | null>(null);
+  const messageTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const { data: bootstrap, loading, isRefetching, error, refetch } = useApi(loadBootstrap);
 
+  React.useEffect(() => {
+    return () => {
+      if (messageTimerRef.current) clearTimeout(messageTimerRef.current);
+    };
+  }, []);
+
   function notify(value: string): void {
+    if (messageTimerRef.current) clearTimeout(messageTimerRef.current);
     setMessage(value);
-    window.setTimeout(() => setMessage(null), 3000);
+    messageTimerRef.current = setTimeout(() => setMessage(null), 3000);
   }
 
   return (

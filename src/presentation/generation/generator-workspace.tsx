@@ -13,9 +13,13 @@ import { useSearchParams } from "next/navigation";
 import { testProviderProfile } from "@/presentation/lib/api";
 import { computePromptPreview } from "@/presentation/lib/preview-prompt";
 import { stripMarkdown } from "@/lib/utils";
+import type { GenerationControls } from "@/domain/schemas";
 import { InputPanel } from "./input-panel";
 import { OutputPanel } from "./output-panel";
+import { OutlinePanel } from "./outline-panel";
 import { ConfigSidebar } from "./config-sidebar";
+import { requestCompletion } from "@/presentation/lib/api";
+import { buildOutlinePrompt, parseOutline, serializeOutline } from "./editor/rewrite-actions";
 
 const sampleTitle = "台湾男子连续30天挑战AI创业";
 const sampleSummary = "- 连续30天开发AI产品\n- 使用 Claude Code 与 OpenAI Agent\n- 每天公开开发日志\n- 获得大量关注";
@@ -32,6 +36,10 @@ export function GeneratorWorkspace(): React.ReactElement {
   const [presetId, setPresetId] = React.useState("");
   const { selectedProfileId, setSelectedProfile } = useProviderStore();
   const [customVarValues, setCustomVarValues] = React.useState<Record<string, string>>({});
+  const [controls, setControls] = React.useState<GenerationControls>({});
+  const [outlineMode, setOutlineMode] = React.useState(false);
+  const [outline, setOutline] = React.useState<string[] | null>(null);
+  const [outlineBusy, setOutlineBusy] = React.useState(false);
   const [providerError, setProviderError] = React.useState<string | null>(null);
   const [promptPreview, setPromptPreview] = React.useState<{ systemPrompt: string; userPrompt: string } | null>(null);
   const [promptPreviewOpen, setPromptPreviewOpen] = React.useState(false);
@@ -39,17 +47,17 @@ export function GeneratorWorkspace(): React.ReactElement {
   const { content, status, error, activeGeneration, metadata, isGenerating, generate, cancel, setContent, setStatus } =
     useGenerationStream();
 
-  const handleGenerateRef = React.useRef(handleGenerate);
-  handleGenerateRef.current = handleGenerate;
+  const handleGenerateRef = React.useRef(onPrimaryGenerate);
+  handleGenerateRef.current = onPrimaryGenerate;
   const cancelRef = React.useRef(cancel);
   cancelRef.current = cancel;
 
   const bindings = React.useMemo(
     () => [
-      { key: "Enter", ctrl: true, handler: () => { if (!isGenerating) void handleGenerateRef.current(false); } },
+      { key: "Enter", ctrl: true, handler: () => { if (!isGenerating && !outlineBusy) handleGenerateRef.current(); } },
       { key: "Escape", handler: () => { if (isGenerating) void cancelRef.current(); } },
     ],
-    [isGenerating],
+    [isGenerating, outlineBusy],
   );
   useKeyboard(bindings);
 
@@ -103,31 +111,37 @@ export function GeneratorWorkspace(): React.ReactElement {
     const timer = setTimeout(() => {
       const result = computePromptPreview({
         template: selectedTemplate, title, eventSummary,
-        locale: selectedPreset?.locale, customVariables: customVarValues,
+        locale: selectedPreset?.locale, customVariables: customVarValues, controls,
       });
       setPromptPreview({ systemPrompt: result.systemPrompt, userPrompt: result.userPrompt });
     }, 400);
     return () => clearTimeout(timer);
-  }, [title, eventSummary, templateId, selectedTemplate, selectedPreset?.locale, customVarValues]);
+  }, [title, eventSummary, templateId, selectedTemplate, selectedPreset?.locale, customVarValues, controls]);
 
-  async function handleGenerate(regenerate = false): Promise<void> {
+  async function ensureProviderOk(): Promise<boolean> {
     setProviderError(null);
     if (effectiveProviderId && bootstrap) {
       const profile = bootstrap.providerProfiles.find((p) => p.id === effectiveProviderId);
-      if (!profile) { setProviderError(t("providerNotFound")); return; }
-      if (!profile.enabled) { setProviderError(t("providerDisabled")); return; }
+      if (!profile) { setProviderError(t("providerNotFound")); return false; }
+      if (!profile.enabled) { setProviderError(t("providerDisabled")); return false; }
       try {
         const result = await testProviderProfile(effectiveProviderId);
-        if (!result.ok) { setProviderError(result.message); return; }
+        if (!result.ok) { setProviderError(result.message); return false; }
       } catch (err) {
         setProviderError(err instanceof Error ? err.message : t("providerCheckFailed"));
-        return;
+        return false;
       }
     }
+    return true;
+  }
+
+  async function handleGenerate(regenerate = false, outlineConstraint?: string): Promise<void> {
+    if (!(await ensureProviderOk())) return;
     await generate({
       title, eventSummary, presetId,
       providerProfileId: effectiveProviderId ?? "", regenerate,
       customVariables: customVarValues,
+      controls: outlineConstraint ? { ...controls, outline: outlineConstraint } : controls,
       onSuccess: (vars) => {
         if (!templateId) return;
         for (const [k, v] of Object.entries(vars)) {
@@ -135,6 +149,37 @@ export function GeneratorWorkspace(): React.ReactElement {
         }
       },
     });
+  }
+
+  // Step 1 of outline-first: produce an editable outline via one-shot completion.
+  async function generateOutline(): Promise<void> {
+    if (!presetId || !(await ensureProviderOk())) return;
+    setOutlineBusy(true);
+    try {
+      const { systemPrompt, prompt } = buildOutlinePrompt({ title, eventSummary, controls });
+      const result = await requestCompletion({
+        prompt, systemPrompt, presetId, providerProfileId: effectiveProviderId || undefined,
+      });
+      const items = parseOutline(result.content);
+      setOutline(items.length > 0 ? items : [""]);
+    } catch (err) {
+      setProviderError(err instanceof Error ? err.message : t("providerCheckFailed"));
+    } finally {
+      setOutlineBusy(false);
+    }
+  }
+
+  // Step 2: inject the confirmed outline as a constraint and stream the full article.
+  function expandOutline(): void {
+    const constraint = serializeOutline(outline ?? []);
+    if (!constraint) return;
+    setOutline(null);
+    void handleGenerate(false, constraint);
+  }
+
+  function onPrimaryGenerate(): void {
+    if (outlineMode) void generateOutline();
+    else void handleGenerate(false);
   }
 
   async function saveToHistory(): Promise<void> {
@@ -147,13 +192,21 @@ export function GeneratorWorkspace(): React.ReactElement {
   }
 
   async function copyMarkdown(): Promise<void> {
-    await navigator.clipboard.writeText(content);
-    setStatus(t("markdownCopied"));
+    try {
+      await navigator.clipboard.writeText(content);
+      setStatus(t("markdownCopied"));
+    } catch {
+      setStatus(t("copyFailed"));
+    }
   }
 
   async function copyPlainText(): Promise<void> {
-    await navigator.clipboard.writeText(stripMarkdown(content));
-    setStatus(t("plainTextCopied"));
+    try {
+      await navigator.clipboard.writeText(stripMarkdown(content));
+      setStatus(t("plainTextCopied"));
+    } catch {
+      setStatus(t("copyFailed"));
+    }
   }
 
   function exportLocal(format: "md" | "txt"): void {
@@ -165,7 +218,7 @@ export function GeneratorWorkspace(): React.ReactElement {
     const ts = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}_${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}`;
     link.download = `${title || "generation"}_${ts}.${format}`;
     link.click();
-    URL.revokeObjectURL(link.href);
+    setTimeout(() => URL.revokeObjectURL(link.href), 100);
     setStatus(t("exported", { format }));
   }
 
@@ -194,8 +247,9 @@ export function GeneratorWorkspace(): React.ReactElement {
         presetId={presetId}
         selectedProfileId={selectedProfileId}
         customVarValues={customVarValues}
+        controls={controls}
         providerError={providerError}
-        isGenerating={isGenerating}
+        isGenerating={isGenerating || outlineBusy}
         selectedTemplate={selectedTemplate}
         selectedPreset={selectedPreset}
         onTitleChange={setTitle}
@@ -205,27 +259,56 @@ export function GeneratorWorkspace(): React.ReactElement {
         onCustomVarChange={(varName, value) =>
           setCustomVarValues((prev) => ({ ...prev, [varName]: value }))
         }
-        onGenerate={() => void handleGenerate(false)}
+        onControlChange={(patch) => setControls((prev) => ({ ...prev, ...patch }))}
+        outlineMode={outlineMode}
+        onOutlineModeChange={setOutlineMode}
+        onGenerate={onPrimaryGenerate}
         onCancel={() => void cancel()}
       />
-      <OutputPanel
-        content={content}
-        status={status}
-        error={error}
-        rawMode={rawMode}
-        editorFontSize={editorFontSize}
-        isGenerating={isGenerating}
-        activeGeneration={activeGeneration}
-        onRawModeChange={setRawMode}
-        onContentChange={setContent}
-        onCopyMarkdown={copyMarkdown}
-        onCopyPlainText={copyPlainText}
-        onExportMd={() => exportLocal("md")}
-        onExportTxt={() => exportLocal("txt")}
-        onSave={saveToHistory}
-        onRegenerate={() => void handleGenerate(true)}
-        onFontSizeChange={setEditorFontSize}
-      />
+      {outline !== null ? (
+        <OutlinePanel
+          items={outline}
+          busy={outlineBusy}
+          onChangeItem={(i, v) => setOutline((prev) => (prev ?? []).map((it, idx) => (idx === i ? v : it)))}
+          onAddItem={() => setOutline((prev) => [...(prev ?? []), ""])}
+          onRemoveItem={(i) => setOutline((prev) => (prev ?? []).filter((_, idx) => idx !== i))}
+          onMoveItem={(i, dir) =>
+            setOutline((prev) => {
+              if (!prev) return prev;
+              const next = [...prev];
+              const j = i + dir;
+              if (j < 0 || j >= next.length) return prev;
+              [next[i], next[j]] = [next[j], next[i]];
+              return next;
+            })
+          }
+          onRegenerate={() => void generateOutline()}
+          onExpand={expandOutline}
+          onCancel={() => setOutline(null)}
+        />
+      ) : (
+        <OutputPanel
+          content={content}
+          status={status}
+          error={error}
+          rawMode={rawMode}
+          editorFontSize={editorFontSize}
+          isGenerating={isGenerating}
+          activeGeneration={activeGeneration}
+          title={title}
+          presetId={presetId}
+          providerProfileId={effectiveProviderId}
+          onRawModeChange={setRawMode}
+          onContentChange={setContent}
+          onCopyMarkdown={copyMarkdown}
+          onCopyPlainText={copyPlainText}
+          onExportMd={() => exportLocal("md")}
+          onExportTxt={() => exportLocal("txt")}
+          onSave={saveToHistory}
+          onRegenerate={() => void handleGenerate(true)}
+          onFontSizeChange={setEditorFontSize}
+        />
+      )}
       <ConfigSidebar
         selectedProvider={selectedProvider}
         selectedPreset={selectedPreset}

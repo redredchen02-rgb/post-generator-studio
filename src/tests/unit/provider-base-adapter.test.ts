@@ -1,5 +1,8 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { GeminiAdapter } from "@/infrastructure/providers/gemini";
+import { AnthropicAdapter } from "@/infrastructure/providers/anthropic";
+import { OllamaAdapter } from "@/infrastructure/providers/ollama";
+import { OpenAICompatibleAdapter } from "@/infrastructure/providers/openai-compatible";
 import {
   BaseAdapter,
   type ChunkParseResult,
@@ -147,5 +150,80 @@ describe("GeminiAdapter.complete (non-streaming)", () => {
     expect(result.content).toBe("FULL TEXT");
     expect(result.inputTokens).toBe(3);
     expect(result.outputTokens).toBe(9);
+  });
+});
+
+describe("complete() hardening", () => {
+  function jsonResponse(payload: unknown, status = 200): Response {
+    return new Response(JSON.stringify(payload), {
+      status,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+  function profileFor(kind: ProviderProfile["providerKind"]): ProviderProfile {
+    return {
+      id: "p",
+      name: "p",
+      providerKind: kind,
+      baseUrl: "http://x.local",
+      model: "m",
+      defaultTemperature: 0.7,
+      defaultMaxTokens: 100,
+      enabled: true,
+      createdAt: "",
+      updatedAt: "",
+    };
+  }
+
+  it("Anthropic complete() throws on a text-less (empty) response instead of returning empty content", async () => {
+    global.fetch = (async () =>
+      jsonResponse({ content: [{ type: "tool_use" }], model: "m" })) as typeof fetch;
+    await expect(
+      new AnthropicAdapter().complete(request, profileFor("anthropic"), { apiKey: "k" }),
+    ).rejects.toThrow("空补全");
+  });
+
+  it("OpenAI-compatible complete() parses a full non-streaming response", async () => {
+    global.fetch = (async () =>
+      jsonResponse({ choices: [{ message: { content: "HELLO" } }], model: "m", usage: { prompt_tokens: 2, completion_tokens: 4 } })) as typeof fetch;
+    const result = await new OpenAICompatibleAdapter({ id: "openai-compatible", defaultBaseUrl: "http://x", requiresApiKey: false }).complete(
+      request,
+      profileFor("openai-compatible"),
+    );
+    expect(result.content).toBe("HELLO");
+    expect(result.outputTokens).toBe(4);
+  });
+
+  it("Ollama complete() throws on empty content", async () => {
+    global.fetch = (async () => jsonResponse({ message: { content: "" }, model: "m" })) as typeof fetch;
+    await expect(new OllamaAdapter().complete(request, profileFor("ollama"))).rejects.toThrow("空补全");
+  });
+
+  it("guards a non-object JSON payload with an observable error", async () => {
+    global.fetch = (async () => jsonResponse("just a string")) as typeof fetch;
+    await expect(
+      new OpenAICompatibleAdapter({ id: "openai-compatible", defaultBaseUrl: "http://x", requiresApiKey: false }).complete(
+        request,
+        profileFor("openai-compatible"),
+      ),
+    ).rejects.toThrow("非预期的响应结构");
+  });
+
+  it("distinguishes user cancellation (COMPLETION_CANCELLED) from a timeout", async () => {
+    const controller = new AbortController();
+    controller.abort(); // user cancelled before the request went out
+    // Fetch rejects immediately for an already-aborted signal (mirrors real fetch).
+    global.fetch = ((_url: string, init?: RequestInit) =>
+      init?.signal?.aborted
+        ? Promise.reject(new DOMException("aborted", "AbortError"))
+        : new Promise<Response>(() => {})) as typeof fetch;
+
+    await expect(
+      new OpenAICompatibleAdapter({
+        id: "openai-compatible",
+        defaultBaseUrl: "http://x",
+        requiresApiKey: false,
+      }).complete(request, profileFor("openai-compatible"), { abortSignal: controller.signal }),
+    ).rejects.toMatchObject({ appError: { code: "COMPLETION_CANCELLED" } });
   });
 });

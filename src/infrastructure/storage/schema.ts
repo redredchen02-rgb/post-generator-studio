@@ -74,5 +74,20 @@ export const generations = sqliteTable("generations", {
   startedAt: text("started_at"),
   completedAt: text("completed_at"),
   createdAt: text("created_at").notNull(),
+  activeDraftId: text("active_draft_id"),
+});
+
+export const generationDrafts = sqliteTable("generation_drafts", {
+  id: text("id").primaryKey(),
+  generationId: text("generation_id")
+    .notNull()
+    .references(() => generations.id, { onDelete: "cascade" }),
+  label: text("label"),
+  content: text("content").notNull(),
+  // 'working' = live autosave buffer (single, updated in place); 'snapshot' = saved version.
+  kind: text("kind").notNull().default("snapshot"),
+  // 'generated' = raw model output; 'edited' = user edit; 'rewrite' = AI rewrite.
+  source: text("source").notNull().default("edited"),
+  createdAt: text("created_at").notNull(),
 });
 

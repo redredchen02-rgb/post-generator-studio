@@ -87,10 +87,10 @@ export abstract class BaseAdapter implements LLMProviderAdapter {
 
   async validateConfig(config: ProviderProfile, options?: GenerationOptions): Promise<ProviderValidationResult> {
     if (this.supportsApiKey && !options?.apiKey) {
-      return { ok: false, error: { code: "API_KEY_MISSING", message: "API Key 未配置" } };
+      return { ok: false, error: { code: "API_KEY_MISSING", message: "API Key not configured" } };
     }
     if (!config.model) {
-      return { ok: false, error: { code: "MODEL_MISSING", message: "模型未配置" } };
+      return { ok: false, error: { code: "MODEL_MISSING", message: "Model not configured" } };
     }
     return { ok: true };
   }
@@ -162,6 +162,10 @@ export abstract class BaseAdapter implements LLMProviderAdapter {
     try {
       response = await fetch(url, { ...init, signal });
     } catch (err) {
+      // Distinguish user cancellation from timeout from network error, matching generate().
+      if (options?.abortSignal?.aborted) {
+        throw new AppErrorException({ code: "COMPLETION_CANCELLED", message: `${this.id} 补全请求被取消` });
+      }
       if (timeout.aborted) {
         throw new AppErrorException({ code: "COMPLETION_TIMEOUT", message: `${this.id} 补全请求超时` });
       }
@@ -181,7 +185,20 @@ export abstract class BaseAdapter implements LLMProviderAdapter {
     } catch {
       throw new AppErrorException({ code: "COMPLETION_FAILED", message: `${this.id} 返回了无法解析的响应` });
     }
-    return this.parseCompletion(raw);
+    // Guard the unknown payload and coerce any non-AppError parse failure into an
+    // observable error, mirroring safeParseChunk on the streaming path.
+    if (raw === null || typeof raw !== "object") {
+      throw new AppErrorException({ code: "COMPLETION_FAILED", message: `${this.id} 返回了非预期的响应结构` });
+    }
+    try {
+      return this.parseCompletion(raw);
+    } catch (err) {
+      if (err instanceof AppErrorException) throw err;
+      throw new AppErrorException({
+        code: "COMPLETION_FAILED",
+        message: err instanceof Error ? err.message : `${this.id} 补全响应解析失败`,
+      });
+    }
   }
 
   /** Override when the non-streaming endpoint differs from the streaming one (e.g. Gemini). */

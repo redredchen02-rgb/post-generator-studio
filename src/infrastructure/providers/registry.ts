@@ -19,7 +19,7 @@ const adapterFactories: Record<ProviderKind, () => LLMProviderAdapter> = {
     defaultBaseUrl: "https://openrouter.ai/api",
     requiresApiKey: true,
     extraHeaders: {
-      "HTTP-Referer": "http://localhost:3000",
+      "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
       "X-Title": "Post Generator Studio",
     },
   }),

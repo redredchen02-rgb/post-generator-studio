@@ -12,6 +12,8 @@ import { useApi } from "@/presentation/lib/use-api";
 
 const PAGE_SIZE = 10;
 
+const MemoizedReactMarkdown = React.memo(ReactMarkdown);
+
 /**
  * Resolve which item should stay selected when the list changes: keep the
  * current selection if it is still present, otherwise fall back to the first
@@ -187,7 +189,7 @@ export function HistoryWorkspace(): React.ReactElement {
               </div>
             )}
             <article className="prose prose-neutral max-w-none dark:prose-invert">
-              <ReactMarkdown>{selected.outputContent || selected.errorMessage || t("noOutput")}</ReactMarkdown>
+              <MemoizedReactMarkdown>{selected.outputContent || selected.errorMessage || t("noOutput")}</MemoizedReactMarkdown>
             </article>
           </div>
         ) : (

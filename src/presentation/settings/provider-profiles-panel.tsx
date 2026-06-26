@@ -14,6 +14,7 @@ import { Input } from "@/presentation/components/ui/input";
 import { NativeSelect } from "@/presentation/components/ui/native-select";
 import { fetchJson, testProviderProfile } from "@/presentation/lib/api";
 import { Header } from "./settings-workspace";
+import { DEFAULT_TEMPERATURE, DEFAULT_MAX_TOKENS } from "@/domain/constants";
 
 type ProviderForm = z.infer<typeof providerProfileCreateSchema>;
 
@@ -34,8 +35,8 @@ const CREATE_DEFAULTS: ProviderForm = {
   baseUrl: "http://localhost:8000",
   model: "local-model",
   apiKey: "",
-  defaultTemperature: 0.7,
-  defaultMaxTokens: 3000,
+  defaultTemperature: DEFAULT_TEMPERATURE,
+  defaultMaxTokens: DEFAULT_MAX_TOKENS,
   enabled: false,
 };
 

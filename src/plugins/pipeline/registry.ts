@@ -2,6 +2,7 @@ import type { PipelineStep } from "@/domain/ports/pipeline";
 import { cleanGeneratedContent, formatOutput } from "@/application/content/cleaner";
 import { renderTemplate } from "@/application/prompt/renderer";
 import { resolvePromptVariables } from "@/application/prompt/variables";
+import { applyControlsToPrompts } from "@/application/prompt/controls";
 import type { GenerationRequest, NormalizedGenerationRequest } from "@/domain/schemas";
 
 export type ContextPayload = {
@@ -44,6 +45,32 @@ export const renderPromptStep: PipelineStep<ContextPayload, RenderedPromptPayloa
         temperature: context.preset.temperature ?? context.providerProfile.defaultTemperature,
         maxTokens: context.preset.maxTokens ?? context.providerProfile.defaultMaxTokens,
         stream: true,
+      },
+    };
+  },
+};
+
+/**
+ * Apply request-level controls (tone/length/audience/instruction) to the rendered
+ * prompt. No-ops when no controls are set, so it's safe to run unconditionally.
+ */
+export const applyControlsStep: PipelineStep<RenderedPromptPayload, RenderedPromptPayload> = {
+  id: "apply-controls",
+  name: "Apply Controls",
+  async execute(_context, input) {
+    const adjusted = applyControlsToPrompts(
+      { systemPrompt: input.systemPrompt, userPrompt: input.userPrompt, maxTokens: input.normalizedRequest.maxTokens },
+      input.request,
+    );
+    return {
+      request: input.request,
+      systemPrompt: adjusted.systemPrompt,
+      userPrompt: adjusted.userPrompt,
+      normalizedRequest: {
+        ...input.normalizedRequest,
+        systemPrompt: adjusted.systemPrompt,
+        userPrompt: adjusted.userPrompt,
+        maxTokens: adjusted.maxTokens ?? input.normalizedRequest.maxTokens,
       },
     };
   },

@@ -18,6 +18,7 @@ export function LanguageSwitcher(): React.ReactElement {
   const router = useRouter();
   const [mounted, setMounted] = React.useState(false);
   const [isRefreshing, setIsRefreshing] = React.useState(false);
+  const refreshTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   React.useEffect(() => {
     setMounted(true);
@@ -29,6 +30,12 @@ export function LanguageSwitcher(): React.ReactElement {
     }
   }, [setLocale]);
 
+  React.useEffect(() => {
+    return () => {
+      if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+    };
+  }, []);
+
   function switchLocale(next: Locale): void {
     if (isRefreshing) return;
     setIsRefreshing(true);
@@ -37,7 +44,7 @@ export function LanguageSwitcher(): React.ReactElement {
     setLocale(next);
     router.refresh();
     // Reset guard after 1s — sufficient for RSC refresh to settle
-    setTimeout(() => setIsRefreshing(false), 1000);
+    refreshTimerRef.current = setTimeout(() => setIsRefreshing(false), 1000);
   }
 
   if (!mounted) {

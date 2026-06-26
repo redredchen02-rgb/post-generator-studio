@@ -6,7 +6,7 @@ import { getStorage } from "@/infrastructure/storage/sqlite-storage";
 import { readSecret } from "@/infrastructure/security/secrets";
 import { getProviderAdapter } from "@/infrastructure/providers/registry";
 import { logger } from "@/infrastructure/logging/logger";
-import { buildContextStep, cleanContentStep, formatOutputStep, renderPromptStep } from "@/plugins/pipeline/registry";
+import { applyControlsStep, buildContextStep, cleanContentStep, formatOutputStep, renderPromptStep } from "@/plugins/pipeline/registry";
 import type { PipelineContext } from "@/domain/ports/pipeline";
 import { registerGenerationController, releaseGenerationController, cancelGenerationController } from "@/application/generation/cancel-registry";
 import type { StoragePort } from "@/domain/ports/storage";
@@ -111,7 +111,7 @@ async function prepareGeneration(
   const contextPayload = enabledSteps.has(PIPELINE_STEPS.BUILD_CONTEXT)
     ? await buildContextStep.execute(context, request)
     : { request, variables: {} };
-  const rendered = enabledSteps.has(PIPELINE_STEPS.RENDER_PROMPT)
+  const renderedBase = enabledSteps.has(PIPELINE_STEPS.RENDER_PROMPT)
     ? await renderPromptStep.execute(context, contextPayload)
     : {
         request: contextPayload.request,
@@ -126,6 +126,8 @@ async function prepareGeneration(
           stream: true as const,
         },
       };
+  // Request-level controls (tone/length/audience/instruction); no-ops when unset.
+  const rendered = await applyControlsStep.execute(context, renderedBase);
   const generation = await getStorage().generations.create({
     id: generationId,
     idempotencyKey: request.idempotencyKey,

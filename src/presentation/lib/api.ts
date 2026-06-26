@@ -37,14 +37,21 @@ export async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> 
     },
   });
   const data = (await response.json()) as T | { error: AppError };
-  if (!response.ok && isErrorPayload(data)) {
+  // Throw on any structured error payload, and on any non-OK status, so a failed
+  // request never slips through as a valid T (e.g. into result.content).
+  if (isErrorPayload(data)) {
     throw new ApiClientError(data.error);
+  }
+  if (!response.ok) {
+    throw new ApiClientError({ code: "HTTP_ERROR", message: `HTTP ${response.status}` });
   }
   return data as T;
 }
 
 function isErrorPayload(value: unknown): value is { error: AppError } {
-  return Boolean(value && typeof value === "object" && "error" in value);
+  if (!value || typeof value !== "object" || !("error" in value)) return false;
+  const err = (value as { error: unknown }).error;
+  return Boolean(err && typeof err === "object" && "code" in err && "message" in err);
 }
 
 export async function loadBootstrap(): Promise<BootstrapData> {
@@ -73,5 +80,33 @@ export async function testProviderProfile(
 }
 
 export async function deleteGenerationRecord(id: string): Promise<void> {
-  await fetch(`/api/generations/${id}`, { method: "DELETE" });
+  const response = await fetch(`/api/generations/${id}`, { method: "DELETE" });
+  if (!response.ok) {
+    throw new ApiClientError({ code: "HTTP_ERROR", message: `HTTP ${response.status}` });
+  }
+}
+
+export type CompletionResponse = {
+  content: string;
+  model?: string;
+  inputTokens?: number;
+  outputTokens?: number;
+};
+
+export type CompletionRequestInput = {
+  prompt: string;
+  systemPrompt?: string;
+  presetId: string;
+  providerProfileId?: string;
+  signal?: AbortSignal;
+};
+
+/** One-shot, non-streaming completion (selection rewrite, continue, etc.). */
+export async function requestCompletion(input: CompletionRequestInput): Promise<CompletionResponse> {
+  const { signal, ...body } = input;
+  return fetchJson<CompletionResponse>("/api/completions", {
+    method: "POST",
+    body: JSON.stringify(body),
+    signal,
+  });
 }

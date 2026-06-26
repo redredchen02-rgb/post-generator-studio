@@ -4,7 +4,7 @@ import { generationSchema, type Generation } from "@/domain/schemas";
 import type { GenerationCreateInput, GenerationListOpts, GenerationListResult, GenerationRepository, GenerationUpdateInput } from "@/domain/ports/storage";
 import { notFound } from "@/infrastructure/storage/repo-utils";
 import { getDb } from "@/infrastructure/storage/db";
-import { generations } from "@/infrastructure/storage/schema";
+import { generationDrafts, generations } from "@/infrastructure/storage/schema";
 
 type GenerationRow = typeof generations.$inferSelect;
 
@@ -30,6 +30,7 @@ function generationFromRow(row: GenerationRow): Generation {
     startedAt: row.startedAt || undefined,
     completedAt: row.completedAt || undefined,
     createdAt: row.createdAt,
+    activeDraftId: row.activeDraftId || undefined,
   });
 }
 
@@ -137,6 +138,12 @@ export class SqliteGenerationRepository implements GenerationRepository {
 
   async delete(id: string): Promise<void> {
     const db = await getDb();
-    await db.delete(generations).where(eq(generations.id, id));
+    // FK ON DELETE CASCADE also removes drafts, but delete them explicitly in the
+    // same transaction as defense-in-depth (the foreign_keys pragma is per-connection
+    // and easy to lose), so no orphan drafts can ever survive.
+    db.transaction((tx) => {
+      tx.delete(generationDrafts).where(eq(generationDrafts.generationId, id)).run();
+      tx.delete(generations).where(eq(generations.id, id)).run();
+    });
   }
 }

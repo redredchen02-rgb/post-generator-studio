@@ -5,6 +5,9 @@
 export const PIPELINE_STEPS = {
   BUILD_CONTEXT: "build-context",
   RENDER_PROMPT: "render-prompt",
+  // Request-level controls (tone/length/audience/instruction). Applied unconditionally
+  // after RENDER_PROMPT — not a preset-toggled step, so it stays out of ALL_PIPELINE_STEPS.
+  APPLY_CONTROLS: "apply-controls",
   CLEAN_CONTENT: "clean-content",
   FORMAT_OUTPUT: "format-output",
 } as const;

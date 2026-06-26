@@ -7,7 +7,8 @@
  */
 import { renderTemplate, extractTemplateVariables } from "@/application/prompt/renderer";
 import { resolvePromptVariables } from "@/application/prompt/variables";
-import type { PromptTemplate } from "@/domain/schemas";
+import { applyControlsToPrompts } from "@/application/prompt/controls";
+import type { GenerationControls, PromptTemplate } from "@/domain/schemas";
 
 export type PromptPreviewInput = {
   template?: PromptTemplate;
@@ -15,6 +16,7 @@ export type PromptPreviewInput = {
   eventSummary: string;
   locale?: string;
   customVariables?: Record<string, string>;
+  controls?: GenerationControls;
 };
 
 export type PromptPreviewResult = {
@@ -39,9 +41,14 @@ export function computePromptPreview(input: PromptPreviewInput): PromptPreviewRe
   const systemResult = renderTemplate(input.template.systemPrompt, variables);
   const userResult = renderTemplate(input.template.userPromptTemplate, variables);
 
+  const controlled = applyControlsToPrompts(
+    { systemPrompt: systemResult.content, userPrompt: userResult.content },
+    input.controls ?? {},
+  );
+
   return {
-    systemPrompt: systemResult.content,
-    userPrompt: userResult.content,
+    systemPrompt: controlled.systemPrompt,
+    userPrompt: controlled.userPrompt,
     usedVariables: [...new Set([...systemResult.usedVariables, ...userResult.usedVariables])],
   };
 }

@@ -25,8 +25,46 @@ export const generationSchema = z.object({
   startedAt: z.string().optional(),
   completedAt: z.string().optional(),
   createdAt: z.string(),
+  activeDraftId: z.string().optional(),
 });
 export type Generation = z.infer<typeof generationSchema>;
+
+export const draftKindSchema = z.enum(["working", "snapshot"]);
+export const draftSourceSchema = z.enum(["generated", "edited", "rewrite"]);
+
+export const generationDraftSchema = z.object({
+  id: z.string(),
+  generationId: z.string(),
+  label: z.string().optional(),
+  content: z.string(),
+  kind: draftKindSchema,
+  source: draftSourceSchema,
+  createdAt: z.string(),
+});
+export type GenerationDraft = z.infer<typeof generationDraftSchema>;
+export type DraftKind = z.infer<typeof draftKindSchema>;
+export type DraftSource = z.infer<typeof draftSourceSchema>;
+
+/** Request-level generation controls — not persisted into a preset. */
+export const toneOptionSchema = z.enum([
+  "professional",
+  "casual",
+  "enthusiastic",
+  "authoritative",
+  "friendly",
+]);
+export const lengthTargetSchema = z.enum(["short", "medium", "long"]);
+export const generationControlsSchema = z.object({
+  customInstruction: z.string().optional(),
+  tone: toneOptionSchema.optional(),
+  lengthTarget: lengthTargetSchema.optional(),
+  audience: z.string().optional(),
+  /** Confirmed outline (serialized) injected as a structure constraint (Unit 8). */
+  outline: z.string().optional(),
+});
+export type ToneOption = z.infer<typeof toneOptionSchema>;
+export type LengthTarget = z.infer<typeof lengthTargetSchema>;
+export type GenerationControls = z.infer<typeof generationControlsSchema>;
 
 export const generationRequestSchema = z.object({
   title: z.string().min(1, "Title is required"),
@@ -35,6 +73,11 @@ export const generationRequestSchema = z.object({
   providerProfileId: z.string().optional(),
   idempotencyKey: z.string().min(1).optional(),
   customVariables: z.record(z.string()).optional(),
+  customInstruction: z.string().optional(),
+  tone: toneOptionSchema.optional(),
+  lengthTarget: lengthTargetSchema.optional(),
+  audience: z.string().optional(),
+  outline: z.string().optional(),
 });
 export type GenerationRequest = z.infer<typeof generationRequestSchema>;
 

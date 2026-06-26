@@ -3,6 +3,7 @@ import { SqliteProviderProfileRepository } from "./provider-profile-repo";
 import { SqlitePromptTemplateRepository } from "./prompt-template-repo";
 import { SqliteGenerationPresetRepository } from "./generation-preset-repo";
 import { SqliteGenerationRepository } from "./generation-repo";
+import { SqliteGenerationDraftRepository } from "./generation-draft-repo";
 
 export function createSqliteStorage(): StoragePort {
   return {
@@ -10,6 +11,7 @@ export function createSqliteStorage(): StoragePort {
     promptTemplates: new SqlitePromptTemplateRepository(),
     generationPresets: new SqliteGenerationPresetRepository(),
     generations: new SqliteGenerationRepository(),
+    generationDrafts: new SqliteGenerationDraftRepository(),
   };
 }
 
