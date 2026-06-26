@@ -12,6 +12,12 @@ const nextConfig: NextConfig = {
     optimizePackageImports: ["lucide-react", "@radix-ui/react-dialog", "@radix-ui/react-dropdown-menu", "@radix-ui/react-select", "@radix-ui/react-switch", "@radix-ui/react-tabs", "@radix-ui/react-label"],
   },
   async headers() {
+    // Next.js dev (HMR/react-refresh) evaluates code and opens a websocket, which
+    // a strict CSP blocks. Relax only in development; production stays locked down.
+    const isDev = process.env.NODE_ENV === "development";
+    const scriptSrc = isDev ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'" : "script-src 'self' 'unsafe-inline'";
+    const connectSrc = isDev ? "connect-src 'self' ws:" : "connect-src 'self'";
+    const csp = `default-src 'self'; ${scriptSrc}; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; ${connectSrc}; frame-ancestors 'none'`;
     return [
       {
         source: "/(.*)",
@@ -19,7 +25,7 @@ const nextConfig: NextConfig = {
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "X-Frame-Options", value: "DENY" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-          { key: "Content-Security-Policy", value: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'" },
+          { key: "Content-Security-Policy", value: csp },
         ],
       },
     ];
