@@ -569,7 +569,7 @@ flowchart TB
 
 ---
 
-- [ ] **Unit 12: 从 History 恢复到工作区继续编辑**
+- [x] **Unit 12: 从 History 恢复到工作区继续编辑**
 
 **Goal:** History 选一篇过往生成，一键“恢复编辑”载入工作区（含活跃草稿），继续打磨。
 
