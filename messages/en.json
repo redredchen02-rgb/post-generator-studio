@@ -219,5 +219,19 @@
     "processing": "Working…",
     "emptyCompletion": "No suggestion returned",
     "diffStale": "The text changed — suggestion discarded"
+  },
+  "Outline": {
+    "title": "Outline",
+    "sectionPlaceholder": "Section title",
+    "addSection": "Add section",
+    "regenerate": "Regenerate outline",
+    "expand": "Expand to article",
+    "cancel": "Cancel",
+    "emptyHint": "Add at least one section to expand",
+    "generating": "Generating outline…",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "remove": "Remove",
+    "modeLabel": "Outline first"
   }
 }

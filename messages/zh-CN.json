@@ -219,5 +219,19 @@
     "processing": "处理中…",
     "emptyCompletion": "未返回任何建议",
     "diffStale": "文本已变动，建议已丢弃"
+  },
+  "Outline": {
+    "title": "文章大纲",
+    "sectionPlaceholder": "小节标题",
+    "addSection": "添加小节",
+    "regenerate": "重新生成大纲",
+    "expand": "扩写全文",
+    "cancel": "取消",
+    "emptyHint": "至少保留一个小节才能扩写",
+    "generating": "正在生成大纲…",
+    "moveUp": "上移",
+    "moveDown": "下移",
+    "remove": "删除",
+    "modeLabel": "大纲优先"
   }
 }

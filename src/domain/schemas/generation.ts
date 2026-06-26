@@ -59,6 +59,8 @@ export const generationControlsSchema = z.object({
   tone: toneOptionSchema.optional(),
   lengthTarget: lengthTargetSchema.optional(),
   audience: z.string().optional(),
+  /** Confirmed outline (serialized) injected as a structure constraint (Unit 8). */
+  outline: z.string().optional(),
 });
 export type ToneOption = z.infer<typeof toneOptionSchema>;
 export type LengthTarget = z.infer<typeof lengthTargetSchema>;
@@ -75,6 +77,7 @@ export const generationRequestSchema = z.object({
   tone: toneOptionSchema.optional(),
   lengthTarget: lengthTargetSchema.optional(),
   audience: z.string().optional(),
+  outline: z.string().optional(),
 });
 export type GenerationRequest = z.infer<typeof generationRequestSchema>;
 

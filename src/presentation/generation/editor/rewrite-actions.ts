@@ -7,6 +7,8 @@
  * so the result can be spliced straight back into the selection.
  */
 
+import type { GenerationControls } from "@/domain/schemas";
+
 export type RewriteActionId = "rewrite" | "expand" | "condense" | "tone";
 
 export type RewriteContext = {
@@ -141,6 +143,43 @@ export function buildContinuePrompt(ctx: { title: string; fullText: string }): {
     "续写内容：",
   ].join("\n");
   return { systemPrompt: CONTINUE_SYSTEM_PROMPT, prompt };
+}
+
+// --- Outline-first generation (Unit 8) ---
+
+const OUTLINE_SYSTEM_PROMPT =
+  "你是一位中文写作助手。只输出文章大纲——每行一个小节标题，不要正文、不要解释、不要编号以外的修饰。";
+
+export function buildOutlinePrompt(ctx: {
+  title: string;
+  eventSummary: string;
+  controls: GenerationControls;
+}): { systemPrompt: string; prompt: string } {
+  const audience = ctx.controls.audience?.trim() ? `\n目标受众：${ctx.controls.audience.trim()}` : "";
+  const prompt = [
+    `文章标题：${ctx.title}`,
+    `事件摘要：${ctx.eventSummary}${audience}`,
+    "",
+    "请为这篇文章列出 5–8 个小节的大纲，每行一个小节标题，覆盖完整结构：",
+  ].join("\n");
+  return { systemPrompt: OUTLINE_SYSTEM_PROMPT, prompt };
+}
+
+/** Parse a model outline reply into clean section titles (strip list/heading markers). */
+export function parseOutline(raw: string): string[] {
+  return raw
+    .split("\n")
+    .map((line) => line.replace(/^\s*(?:#{1,6}|[-*•]|\d+[.)])\s*/, "").trim())
+    .filter((line) => line.length > 0);
+}
+
+/** Serialize edited outline items back into a stable numbered list for the constraint. */
+export function serializeOutline(items: string[]): string {
+  return items
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0)
+    .map((item, i) => `${i + 1}. ${item}`)
+    .join("\n");
 }
 
 export function buildParagraphPrompt(ctx: {

@@ -56,12 +56,15 @@ type InputPanelProps = {
   onProfileIdChange: (id: string) => void;
   onCustomVarChange: (varName: string, value: string) => void;
   onControlChange: (patch: Partial<GenerationControls>) => void;
+  outlineMode: boolean;
+  onOutlineModeChange: (value: boolean) => void;
   onGenerate: () => void;
   onCancel: () => void;
 };
 
 export function InputPanel(props: InputPanelProps): React.ReactElement {
   const t = useTranslations("Generation");
+  const tOutline = useTranslations("Outline");
   const customVars = getCustomVars(props.selectedTemplate);
 
   return (
@@ -160,6 +163,14 @@ export function InputPanel(props: InputPanelProps): React.ReactElement {
           />
         </Field>
       </div>
+      <label className="flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={props.outlineMode}
+          onChange={(e) => props.onOutlineModeChange(e.target.checked)}
+        />
+        {tOutline("modeLabel")}
+      </label>
       <div className="grid grid-cols-2 gap-2">
         <Button disabled={props.isGenerating} onClick={props.onGenerate}>
           {props.isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}

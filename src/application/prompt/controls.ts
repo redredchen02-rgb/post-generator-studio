@@ -27,7 +27,9 @@ const LENGTH_TARGETS: Record<LengthTarget, { words: number; label: string; maxTo
 export type PromptParts = { systemPrompt: string; userPrompt: string; maxTokens?: number };
 
 function hasControls(c: GenerationControls): boolean {
-  return Boolean(c.customInstruction?.trim() || c.tone || c.lengthTarget || c.audience?.trim());
+  return Boolean(
+    c.customInstruction?.trim() || c.tone || c.lengthTarget || c.audience?.trim() || c.outline?.trim(),
+  );
 }
 
 /** Soft-adjust the token budget for a length target: short tightens, long raises. */
@@ -51,6 +53,9 @@ export function applyControlsToPrompts(parts: PromptParts, controls: GenerationC
   if (controls.lengthTarget) {
     const { words, label } = LENGTH_TARGETS[controls.lengthTarget];
     userAdditions.push(`目标长度：约 ${words} 字（${label}）。`);
+  }
+  if (controls.outline?.trim()) {
+    userAdditions.push(`请严格按以下大纲组织文章，逐节展开，不要遗漏小节：\n${controls.outline.trim()}`);
   }
 
   const join = (head: string, adds: string[]) => (adds.length ? `${head}\n\n${adds.join("\n")}` : head);
