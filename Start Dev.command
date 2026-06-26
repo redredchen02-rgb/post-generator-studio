@@ -15,6 +15,13 @@ trap 'echo "\n\n${YELLOW}已停止 Post Generator Studio${NC}\n"; exit 0' INT TE
 PROJECT_DIR="/Users/dex/YDEX/INPORTANT WORK/POST /Post Generator Studio"
 cd "$PROJECT_DIR" || err "找不到專案目錄：$PROJECT_DIR"
 
+# ── 自我修復：每次成功啟動都讓自己保持「可雙擊」狀態 ──
+# 若這個檔被同步/備份/解壓工具加上 macOS 隔離標記（Gatekeeper 會擋雙擊），或被
+# 編輯器還原時掉了可執行位，趁這次還跑得起來先把下一次修好。git 已用 755 追蹤，
+# clone/checkout 本來就乾淨；這兩行是 disk 端的額外保險。
+chmod +x "$0" 2>/dev/null
+xattr -d com.apple.quarantine "$0" 2>/dev/null
+
 # ── 防止重複啟動（自動回收，不再卡在詢問畫面）──────────
 # 舊版會在偵測到舊實例時停下來等你按 k/o/q —— 雙擊啟動時這一停就像「打不開」。
 # 現在改成：偵測到還活著的舊實例就直接關掉它，本次永遠是乾淨的單一實例。
