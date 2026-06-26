@@ -13,7 +13,7 @@ import { Field } from "@/presentation/components/ui/field";
 import { Input } from "@/presentation/components/ui/input";
 import { NativeSelect } from "@/presentation/components/ui/native-select";
 import { Textarea } from "@/presentation/components/ui/textarea";
-import { extractTemplateVariables } from "@/application/prompt/renderer";
+import { extractTemplateVariables } from "@/presentation/lib/preview-prompt";
 import { fetchJson } from "@/presentation/lib/api";
 import { useVarMemoryStore } from "@/presentation/store/var-memory-store";
 import { Header } from "./settings-workspace";

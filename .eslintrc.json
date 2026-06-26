@@ -1,7 +1,32 @@
 {
   "extends": ["next/core-web-vitals", "next/typescript"],
+  "plugins": ["import"],
   "rules": {
     "@typescript-eslint/no-unused-vars": ["warn", { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_" }],
-    "@typescript-eslint/consistent-type-imports": ["warn", { "prefer": "type-imports", "fixStyle": "separate-type-imports" }]
+    "@typescript-eslint/consistent-type-imports": ["warn", { "prefer": "type-imports", "fixStyle": "separate-type-imports" }],
+    "import/no-restricted-paths": ["error", {
+      "zones": [
+        {
+          "target": "./src/presentation",
+          "from": "./src/infrastructure",
+          "message": "Presentation must not import infrastructure directly — go through application services."
+        },
+        {
+          "target": "./src/domain",
+          "from": "./src/application",
+          "message": "Domain must not import application — dependency direction is application → domain."
+        },
+        {
+          "target": "./src/domain",
+          "from": "./src/infrastructure",
+          "message": "Domain must not import infrastructure — dependency direction is infrastructure → domain."
+        },
+        {
+          "target": "./src/presentation",
+          "from": "./src/application",
+          "message": "Presentation must not import application directly — import via src/presentation/lib/ bridge instead."
+        }
+      ]
+    }]
   }
 }

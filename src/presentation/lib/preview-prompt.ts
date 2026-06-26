@@ -5,8 +5,11 @@
  * Both `renderTemplate` and `resolvePromptVariables` are pure functions
  * with no Node.js dependencies — safe to run in the browser.
  */
+// eslint-disable-next-line import/no-restricted-paths -- presentation/lib/ is the sanctioned bridge layer for application imports
 import { renderTemplate, extractTemplateVariables } from "@/application/prompt/renderer";
+// eslint-disable-next-line import/no-restricted-paths -- bridge (see above)
 import { resolvePromptVariables } from "@/application/prompt/variables";
+// eslint-disable-next-line import/no-restricted-paths -- bridge (see above)
 import { applyControlsToPrompts } from "@/application/prompt/controls";
 import type { GenerationControls, PromptTemplate } from "@/domain/schemas";
 

@@ -1,7 +1,7 @@
-import { describe, expect, it, afterEach, vi } from "vitest";
+import { describe, expect, it, afterEach } from "vitest";
 import { getStorage } from "@/infrastructure/storage/sqlite-storage";
 import { exportGeneration } from "@/application/export/export-service";
-import { getExportAdapter, setExportAdapter, FsExportAdapter } from "@/infrastructure/export/fs-export-adapter";
+import { setExportAdapter, FsExportAdapter } from "@/infrastructure/export/fs-export-adapter";
 import type { ExportPort } from "@/domain/ports/export-port";
 
 async function createTestGeneration(title: string, outputContent?: string) {

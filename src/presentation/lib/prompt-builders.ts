@@ -7,6 +7,7 @@
  * directly, so the layering rule (presentation → lib bridge → application) is
  * enforced by the ESLint import/no-restricted-paths rule added in Unit 8.
  */
+/* eslint-disable import/no-restricted-paths -- presentation/lib/ is the sanctioned bridge layer; these re-exports are the crossing point */
 export {
   buildRewritePrompt,
   buildContinuePrompt,
@@ -17,3 +18,4 @@ export {
 } from "@/application/content/prompt-builders";
 
 export type { RewriteActionId, RewriteContext } from "@/application/content/prompt-builders";
+/* eslint-enable import/no-restricted-paths */

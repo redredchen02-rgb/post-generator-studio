@@ -131,7 +131,7 @@ export function GeneratorWorkspace(): React.ReactElement {
         setSelectedProfile(defaultPreset.providerProfileId);
       }
     }
-  }, [bootstrap, presetId, setSelectedProfile]);
+  }, [bootstrap, presetId, selectedProfileId, setSelectedProfile]);
 
   // SWR refresh on visibility change
   React.useEffect(() => {
