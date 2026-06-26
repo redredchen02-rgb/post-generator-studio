@@ -155,6 +155,13 @@
       "saveFailed": "Save failed",
       "deleteFailed": "Delete failed",
       "clearKeyFailed": "Clear key failed",
+      "empty": "No provider profiles yet. Add one above.",
+      "enableBtn": "Enable",
+      "disableBtn": "Disable",
+      "toggleFailed": "Failed to update",
+      "apiKeyGetLink": "Get API key →",
+      "showKey": "Show key",
+      "hideKey": "Hide key",
       "confirmDeleteTitle": "Delete this provider profile?",
       "confirmDeleteDesc": "This action cannot be undone. Generation presets that use this provider will stop working until you point them at another provider. Your generation history is unaffected."
     },

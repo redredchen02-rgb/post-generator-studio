@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { CheckCircle2, FlaskConical, KeyRound, Loader2, Pencil, Plus, Save, Trash2, XCircle } from "lucide-react";
+import { CheckCircle2, Eye, EyeOff, FlaskConical, KeyRound, Loader2, Pencil, Plus, Power, Save, Trash2, XCircle } from "lucide-react";
 import { useForm, useWatch } from "react-hook-form";
 import { useTranslations } from "next-intl";
 import type { ProviderKind, ProviderProfile } from "@/domain/schemas";
@@ -19,15 +19,22 @@ import { ConfirmDialog } from "@/presentation/components/ui/confirm-dialog";
 
 type ProviderForm = z.infer<typeof providerProfileCreateSchema>;
 
-const PROVIDER_DEFAULTS: Record<ProviderKind, { baseUrl?: string; model: string; requiresApiKey: boolean }> = {
-  openai: { baseUrl: "https://api.openai.com", model: "gpt-4o-mini", requiresApiKey: true },
-  anthropic: { model: "claude-sonnet-4-6", requiresApiKey: true },
-  gemini: { model: "gemini-2.0-flash", requiresApiKey: true },
-  ollama: { baseUrl: "http://localhost:11434", model: "llama3.2", requiresApiKey: false },
-  openrouter: { baseUrl: "https://openrouter.ai/api/v1", model: "openrouter/auto", requiresApiKey: true },
-  // Hosted OpenAI-compatible relays (proxies/gateways) usually require a key; the
-  // field stays optional via the schema so local no-auth relays can leave it blank.
-  "openai-compatible": { baseUrl: "http://localhost:8000", model: "", requiresApiKey: true },
+type ProviderMeta = {
+  baseUrl?: string;
+  model: string;
+  requiresApiKey: boolean;
+  displayName: string;
+  apiKeyUrl?: string;
+};
+
+const PROVIDER_META: Record<ProviderKind, ProviderMeta> = {
+  openai: { baseUrl: "https://api.openai.com", model: "gpt-4o-mini", requiresApiKey: true, displayName: "OpenAI", apiKeyUrl: "https://platform.openai.com/api-keys" },
+  anthropic: { model: "claude-sonnet-4-6", requiresApiKey: true, displayName: "Anthropic", apiKeyUrl: "https://console.anthropic.com/settings/keys" },
+  gemini: { model: "gemini-2.0-flash", requiresApiKey: true, displayName: "Google Gemini", apiKeyUrl: "https://aistudio.google.com/app/apikey" },
+  ollama: { baseUrl: "http://localhost:11434", model: "llama3.2", requiresApiKey: false, displayName: "Ollama (Local)" },
+  openrouter: { baseUrl: "https://openrouter.ai/api/v1", model: "openrouter/auto", requiresApiKey: true, displayName: "OpenRouter", apiKeyUrl: "https://openrouter.ai/keys" },
+  "openai-compatible": { baseUrl: "http://localhost:8000", model: "", requiresApiKey: true, displayName: "OpenAI-Compatible" },
+  grok: { baseUrl: "https://api.x.ai", model: "grok-3", requiresApiKey: true, displayName: "Grok (xAI)", apiKeyUrl: "https://console.x.ai/" },
 };
 
 const CREATE_DEFAULTS: ProviderForm = {
@@ -56,17 +63,21 @@ export function ProviderProfilesPanel({
   const [pendingDeleteId, setPendingDeleteId] = React.useState<string | null>(null);
   const [testStatus, setTestStatus] = React.useState<Record<string, "idle" | "testing" | "ok" | "error">>({});
   const [testMessage, setTestMessage] = React.useState<Record<string, string>>({});
+  const [toggleStatus, setToggleStatus] = React.useState<Record<string, "idle" | "toggling">>({});
+  const [showApiKey, setShowApiKey] = React.useState(false);
   const form = useForm<ProviderForm>({
     resolver: zodResolver(providerProfileCreateSchema),
     defaultValues: CREATE_DEFAULTS,
   });
 
   const watchedKind = useWatch({ control: form.control, name: "providerKind" });
-  const requiresApiKey = PROVIDER_DEFAULTS[watchedKind]?.requiresApiKey ?? true;
+  const meta = PROVIDER_META[watchedKind];
+  const requiresApiKey = meta?.requiresApiKey ?? true;
+  const apiKeyUrl = meta?.apiKeyUrl;
 
   React.useEffect(() => {
     if (editingId !== null) return;
-    const d = PROVIDER_DEFAULTS[watchedKind];
+    const d = PROVIDER_META[watchedKind];
     if (!d) return;
     form.setValue("baseUrl", d.baseUrl ?? "");
     form.setValue("model", d.model);
@@ -75,6 +86,7 @@ export function ProviderProfilesPanel({
 
   function loadForEdit(profile: ProviderProfile): void {
     setEditingId(profile.id);
+    setShowApiKey(false);
     setTestStatus((prev) => ({ ...prev, [profile.id]: "idle" }));
     form.reset({
       name: profile.name,
@@ -90,6 +102,7 @@ export function ProviderProfilesPanel({
 
   function cancelEdit(): void {
     setEditingId(null);
+    setShowApiKey(false);
     form.reset(CREATE_DEFAULTS);
   }
 
@@ -109,6 +122,7 @@ export function ProviderProfilesPanel({
           method: "POST",
           body: JSON.stringify(values),
         });
+        setShowApiKey(false);
         form.reset(CREATE_DEFAULTS);
         notify(t("savedMsg"));
       }
@@ -139,6 +153,21 @@ export function ProviderProfilesPanel({
       notify(t("keyClearedMsg"));
     } catch (err) {
       notify(err instanceof Error ? err.message : t("clearKeyFailed"));
+    }
+  }
+
+  async function handleToggleEnabled(profile: ProviderProfile): Promise<void> {
+    setToggleStatus((prev) => ({ ...prev, [profile.id]: "toggling" }));
+    try {
+      await fetchJson<ProviderProfile>(`/api/provider-profiles/${profile.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ enabled: !profile.enabled }),
+      });
+      await refresh();
+    } catch (err) {
+      notify(err instanceof Error ? err.message : t("toggleFailed"));
+    } finally {
+      setToggleStatus((prev) => ({ ...prev, [profile.id]: "idle" }));
     }
   }
 
@@ -184,7 +213,7 @@ export function ProviderProfilesPanel({
             <NativeSelect {...form.register("providerKind")}>
               {providerKindSchema.options.map((kind: ProviderKind) => (
                 <option key={kind} value={kind}>
-                  {kind}
+                  {PROVIDER_META[kind].displayName}
                 </option>
               ))}
             </NativeSelect>
@@ -196,13 +225,35 @@ export function ProviderProfilesPanel({
             <Input {...form.register("model")} />
           </Field>
           {requiresApiKey ? (
-            <Field label={editingId ? t("apiKeyEditLabel") : t("apiKeyLabel")}>
-              <Input
-                type="password"
-                placeholder={editingId ? t("apiKeyPlaceholder") : ""}
-                {...form.register("apiKey")}
-              />
-            </Field>
+            <div className="grid gap-1.5 text-sm">
+              <span className="font-medium">{editingId ? t("apiKeyEditLabel") : t("apiKeyLabel")}</span>
+              <div className="relative flex items-center">
+                <Input
+                  type={showApiKey ? "text" : "password"}
+                  className="pr-10"
+                  placeholder={editingId ? t("apiKeyPlaceholder") : ""}
+                  {...form.register("apiKey")}
+                />
+                <button
+                  type="button"
+                  aria-label={showApiKey ? t("hideKey") : t("showKey")}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  onClick={() => setShowApiKey((v) => !v)}
+                >
+                  {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+              {apiKeyUrl ? (
+                <a
+                  href={apiKeyUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-primary hover:underline"
+                >
+                  {t("apiKeyGetLink")}
+                </a>
+              ) : null}
+            </div>
           ) : null}
           <Field label={t("temperatureLabel")}>
             <Input type="number" step="0.1" {...form.register("defaultTemperature", { valueAsNumber: true })} />
@@ -220,6 +271,9 @@ export function ProviderProfilesPanel({
           {editingId ? t("updateBtn") : t("saveBtn")}
         </Button>
       </form>
+      {profiles.length === 0 ? (
+        <p className="py-4 text-sm text-muted-foreground">{t("empty")}</p>
+      ) : null}
       <div className="grid gap-2">
         {profiles.map((profile) => (
           <div
@@ -228,11 +282,14 @@ export function ProviderProfilesPanel({
               editingId === profile.id ? "border-primary" : ""
             }`}
           >
-            <div>
+            <div className={profile.enabled ? "" : "opacity-60"}>
               <h3 className="font-medium">{profile.name}</h3>
               <p className="text-sm text-muted-foreground">
-                {profile.providerKind} · {profile.model} · {profile.enabled ? tCommon("enabled") : tCommon("disabled")} ·{" "}
-                {profile.keyMasked || tCommon("noKey")}
+                {PROVIDER_META[profile.providerKind]?.displayName ?? profile.providerKind} · {profile.model} ·{" "}
+                <span className={profile.enabled ? "font-medium text-green-600 dark:text-green-400" : ""}>
+                  {profile.enabled ? tCommon("enabled") : tCommon("disabled")}
+                </span>{" "}
+                · {profile.keyMasked || tCommon("noKey")}
               </p>
               {testMessage[profile.id] ? (
                 <p className={`mt-1 text-xs ${testStatus[profile.id] === "ok" ? "text-green-600 dark:text-green-400" : "text-destructive"}`}>
@@ -241,6 +298,19 @@ export function ProviderProfilesPanel({
               ) : null}
             </div>
             <div className="flex flex-wrap gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={toggleStatus[profile.id] === "toggling"}
+                onClick={() => void handleToggleEnabled(profile)}
+              >
+                {toggleStatus[profile.id] === "toggling" ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Power className="h-4 w-4" />
+                )}
+                {profile.enabled ? t("disableBtn") : t("enableBtn")}
+              </Button>
               <Button variant="outline" size="sm" onClick={() => loadForEdit(profile)}>
                 <Pencil className="h-4 w-4" />
                 {t("editBtn")}

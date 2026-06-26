@@ -155,6 +155,13 @@
       "saveFailed": "保存失败",
       "deleteFailed": "删除失败",
       "clearKeyFailed": "清除密钥失败",
+      "empty": "暂无 Provider 配置，在上方添加一个。",
+      "enableBtn": "启用",
+      "disableBtn": "停用",
+      "toggleFailed": "更新失败",
+      "apiKeyGetLink": "获取 API Key →",
+      "showKey": "显示密钥",
+      "hideKey": "隐藏密钥",
       "confirmDeleteTitle": "删除这个 Provider 配置？",
       "confirmDeleteDesc": "此操作无法撤销。使用此 Provider 的生成预设将失效，需改指向其他 Provider。已生成的历史记录不受影响。"
     },

@@ -28,6 +28,11 @@ const adapterFactories: Record<ProviderKind, () => LLMProviderAdapter> = {
     defaultBaseUrl: "http://localhost:8000",
     requiresApiKey: false,
   }),
+  grok: () => new OpenAICompatibleAdapter({
+    id: "grok",
+    defaultBaseUrl: "https://api.x.ai",
+    requiresApiKey: true,
+  }),
 };
 
 const adapterCache: Partial<Record<ProviderKind, LLMProviderAdapter>> = {};

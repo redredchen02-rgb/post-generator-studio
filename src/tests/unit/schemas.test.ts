@@ -5,6 +5,7 @@ import {
   generationRequestSchema,
   promptTemplateCreateSchema,
   providerProfileCreateSchema,
+  providerKindSchema,
 } from "@/domain/schemas";
 
 describe("domain schemas", () => {
@@ -67,6 +68,14 @@ describe("domain schemas", () => {
     expect(() =>
       generationRequestSchema.parse({ title: "T", eventSummary: "S", presetId: "p", tone: "sarcastic" }),
     ).toThrow();
+  });
+
+  it("accepts grok as a valid providerKind", () => {
+    expect(providerKindSchema.parse("grok")).toBe("grok");
+  });
+
+  it("rejects unknown provider kind alias xai", () => {
+    expect(() => providerKindSchema.parse("xai")).toThrow();
   });
 });
 

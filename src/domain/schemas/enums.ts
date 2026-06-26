@@ -10,6 +10,7 @@ export const providerKindSchema = z.enum([
   "ollama",
   "openrouter",
   "openai-compatible",
+  "grok",
 ]);
 export type ProviderKind = z.infer<typeof providerKindSchema>;
 
