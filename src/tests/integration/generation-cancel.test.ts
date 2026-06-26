@@ -44,3 +44,40 @@ describe("cancelGeneration (integration)", () => {
     expect(after?.status).toBe(before?.status);
   });
 });
+
+describe("generation.update terminal-state guard (cancel-vs-complete race)", () => {
+  // better-sqlite3 transactions are synchronous and serialized, so the read +
+  // canTransition + write in update() runs atomically. These tests prove the
+  // *logical* race protection: whichever terminal status commits first wins,
+  // and a later conflicting terminal update is rejected without overwriting it.
+  it("keeps a completed generation when a late cancellation arrives", async () => {
+    const repo = getStorage().generations;
+    const id = await createStreamingGeneration(); // status: queued
+
+    const completed = await repo.update(id, { status: "completed", outputContent: "final text" });
+    expect(completed.status).toBe("completed");
+
+    const afterLateCancel = await repo.update(id, { status: "cancelled", errorMessage: "late cancel" });
+    expect(afterLateCancel.status).toBe("completed");
+    expect(afterLateCancel.outputContent).toBe("final text");
+
+    const stored = await repo.get(id);
+    expect(stored?.status).toBe("completed");
+    expect(stored?.outputContent).toBe("final text");
+  });
+
+  it("keeps a cancelled generation when a late completion arrives", async () => {
+    const repo = getStorage().generations;
+    const id = await createStreamingGeneration();
+
+    const cancelled = await repo.update(id, { status: "cancelled", errorMessage: "user cancelled" });
+    expect(cancelled.status).toBe("cancelled");
+
+    const afterLateComplete = await repo.update(id, { status: "completed", outputContent: "should be dropped" });
+    expect(afterLateComplete.status).toBe("cancelled");
+    expect(afterLateComplete.outputContent ?? null).toBeNull();
+
+    const stored = await repo.get(id);
+    expect(stored?.status).toBe("cancelled");
+  });
+});

@@ -224,7 +224,7 @@ flowchart TB
 
 ---
 
-- [ ] **Unit 3: 驗證 `generation.update()` 事務涵蓋 race（S3 — 已落地，改驗證）**
+- [x] **Unit 3: 驗證 `generation.update()` 事務涵蓋 race（S3 — 已落地，改驗證）** — ✅ update()@120 讀+canTransition+寫全在單一同步 db.transaction 內(better-sqlite3 序列化)，終態守衛完整、無需改碼；補 2 個真實 getDb() 整合測試固化 cancel-vs-complete(完成後晚到取消被拒、取消後晚到完成被拒)
 
 **Goal:** `update()` **已是 `db.transaction`**（`generation-repo.ts:119`，HEAD `d4b99699`）。本 unit 改為**驗證**：既有交易是否真的把存在性檢查 + `canTransition` + write 全包進去、確實涵蓋 cancel-vs-complete race，並補測試固化此保證。若驗證發現交易未完整覆蓋（如讀仍在交易外），才補小修。
 
