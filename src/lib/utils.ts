@@ -22,6 +22,13 @@ export function parseJson<T>(value: string, fallback: T): T {
   }
 }
 
+/** Trim, then unwrap a single enclosing markdown code fence (```), trimming the inner text. */
+export function stripCodeFence(raw: string): string {
+  const text = raw.trim();
+  const fenced = text.match(/^```[^\n]*\n([\s\S]*?)\n?```$/);
+  return (fenced ? fenced[1] : text).trim();
+}
+
 export function safeErrorMessage(error: unknown): string {
   if (error instanceof Error) {
     return error.message;

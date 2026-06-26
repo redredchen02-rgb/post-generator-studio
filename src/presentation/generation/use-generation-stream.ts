@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useTranslations } from "next-intl";
 import type { AppError, Generation, GenerationControls } from "@/domain/schemas";
 import { parseSSEStream } from "@/lib/sse";
 
@@ -22,9 +23,10 @@ type GenerationStreamState = {
 };
 
 export function useGenerationStream() {
+  const t = useTranslations("Generation");
   const [state, setState] = React.useState<GenerationStreamState>({
     content: "",
-    status: "Ready",
+    status: t("statusReady"),
     error: null,
     activeGeneration: null,
     metadata: {},
@@ -49,7 +51,7 @@ export function useGenerationStream() {
     }) => {
       const { title, eventSummary, presetId, providerProfileId, regenerate, customVariables, controls } = params;
       if (!presetId) {
-        setState((s) => ({ ...s, error: "请选择 Generation Preset" }));
+        setState((s) => ({ ...s, error: t("errorNoPreset") }));
         return;
       }
       setState((s) => ({
@@ -58,7 +60,7 @@ export function useGenerationStream() {
         error: null,
         content: "",
         metadata: {},
-        status: regenerate ? "Regenerating..." : "Generating...",
+        status: regenerate ? t("statusRegenerating") : t("statusGenerating"),
       }));
       const controller = new AbortController();
       abortRef.current = controller;
@@ -98,7 +100,7 @@ export function useGenerationStream() {
       });
 
       if (!response.body) {
-        setState((s) => ({ ...s, error: "Streaming response unavailable", isGenerating: false }));
+        setState((s) => ({ ...s, error: t("errorNoStream"), isGenerating: false }));
         return;
       }
 
@@ -106,7 +108,7 @@ export function useGenerationStream() {
         for await (const msg of parseSSEStream(response.body)) {
           const payload = JSON.parse(msg.data) as StreamPayload;
           if (payload.type === "generation") {
-            setState((s) => ({ ...s, activeGeneration: payload.generation, status: "Streaming response..." }));
+            setState((s) => ({ ...s, activeGeneration: payload.generation, status: t("statusStreaming") }));
           }
           if (payload.type === "token") {
             bufferRef.current += payload.value;
@@ -117,8 +119,8 @@ export function useGenerationStream() {
           if (payload.type === "error") {
             setState((s) => ({
               ...s,
-              error: payload.message || payload.error?.message || "生成失败",
-              status: "Failed",
+              error: payload.message || payload.error?.message || t("statusFailed"),
+              status: t("statusFailed"),
             }));
           }
           if (payload.type === "final") {
@@ -127,7 +129,7 @@ export function useGenerationStream() {
               ...s,
               activeGeneration: payload.generation,
               content: payload.content,
-              status: payload.generation.status === "completed" ? "Completed" : payload.generation.status,
+              status: payload.generation.status === "completed" ? t("statusCompleted") : payload.generation.status,
             }));
             if (payload.generation.status === "completed") {
               params.onSuccess?.(params.customVariables ?? {});
@@ -138,7 +140,7 @@ export function useGenerationStream() {
         if (!controller.signal.aborted) {
           setState((s) => ({
             ...s,
-            error: streamError instanceof Error ? streamError.message : "Streaming failed",
+            error: streamError instanceof Error ? streamError.message : t("statusStreamFailed"),
           }));
         }
       } finally {
@@ -152,7 +154,7 @@ export function useGenerationStream() {
         abortRef.current = null;
       }
     },
-    [],
+    [t],
   );
 
   const cancel = React.useCallback(async () => {
@@ -161,8 +163,8 @@ export function useGenerationStream() {
       await fetch(`/api/generations/${gen.id}/cancel`, { method: "POST" });
     }
     abortRef.current?.abort();
-    setState((s) => ({ ...s, isGenerating: false, status: "Cancelled" }));
-  }, []);
+    setState((s) => ({ ...s, isGenerating: false, status: t("statusCancelled") }));
+  }, [t]);
 
   const setContent = React.useCallback((content: string) => {
     setState((s) => ({ ...s, content }));
@@ -172,5 +174,13 @@ export function useGenerationStream() {
     setState((s) => ({ ...s, status }));
   }, []);
 
-  return { ...state, generate, cancel, setContent, setStatus };
+  // Point the main editor at an externally-produced generation (e.g. a selected variant).
+  const setActiveGeneration = React.useCallback(
+    (generation: Generation, content: string) => {
+      setState((s) => ({ ...s, activeGeneration: generation, content, status: t("statusCompleted"), error: null }));
+    },
+    [t],
+  );
+
+  return { ...state, generate, cancel, setContent, setStatus, setActiveGeneration };
 }

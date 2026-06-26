@@ -1,7 +1,18 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, renderHook } from "@testing-library/react";
+import * as React from "react";
+import { NextIntlClientProvider } from "next-intl";
 import { useGenerationStream } from "@/presentation/generation/use-generation-stream";
+import en from "../../../messages/en.json";
+
+function wrapper({ children }: { children: React.ReactNode }) {
+  return (
+    <NextIntlClientProvider locale="en" messages={en}>
+      {children}
+    </NextIntlClientProvider>
+  );
+}
 
 function streamResponse(payloads: Array<Record<string, unknown>>): Response {
   const encoder = new TextEncoder();
@@ -43,7 +54,7 @@ describe("useGenerationStream", () => {
       ])) as typeof fetch;
 
     const onSuccess = vi.fn();
-    const { result } = renderHook(() => useGenerationStream());
+    const { result } = renderHook(() => useGenerationStream(), { wrapper });
 
     await act(async () => {
       await result.current.generate({ ...baseParams, onSuccess });
@@ -60,7 +71,7 @@ describe("useGenerationStream", () => {
     global.fetch = (async () =>
       streamResponse([{ type: "error", message: "boom" }])) as typeof fetch;
 
-    const { result } = renderHook(() => useGenerationStream());
+    const { result } = renderHook(() => useGenerationStream(), { wrapper });
     await act(async () => {
       await result.current.generate(baseParams);
     });
@@ -74,13 +85,13 @@ describe("useGenerationStream", () => {
     const fetchSpy = vi.fn();
     global.fetch = fetchSpy as unknown as typeof fetch;
 
-    const { result } = renderHook(() => useGenerationStream());
+    const { result } = renderHook(() => useGenerationStream(), { wrapper });
     await act(async () => {
       await result.current.generate({ title: "T", eventSummary: "E", presetId: "" });
     });
 
     expect(fetchSpy).not.toHaveBeenCalled();
-    expect(result.current.error).toBe("请选择 Generation Preset");
+    expect(result.current.error).toBe("Please select a Generation Preset");
   });
 
   it("cancel posts to the cancel endpoint and marks the state cancelled", async () => {
@@ -88,11 +99,10 @@ describe("useGenerationStream", () => {
     global.fetch = (async (url: string) => {
       calls.push(String(url));
       if (String(url).includes("/cancel")) return new Response(null, { status: 200 });
-      // Long-lived stream that yields a generation then stays open until aborted.
       return streamResponse([{ type: "generation", generation: gen("streaming") }]);
     }) as typeof fetch;
 
-    const { result } = renderHook(() => useGenerationStream());
+    const { result } = renderHook(() => useGenerationStream(), { wrapper });
     await act(async () => {
       await result.current.generate(baseParams);
     });

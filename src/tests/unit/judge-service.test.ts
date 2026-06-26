@@ -132,6 +132,28 @@ describe("judge-service", () => {
     await expect(scoreGeneration(generationId, { presetId: preset.id })).rejects.toThrow();
   });
 
+  it("rejects scoring a generation that does not exist", async () => {
+    mockJudgeReply(JSON.stringify(JUDGE_FIXTURE));
+    await expect(scoreGeneration("generation_missing", { presetId: "x" })).rejects.toThrow();
+  });
+
+  it("overwrites a previous score on re-scoring", async () => {
+    const { preset, generationId } = await seedPresetAndGeneration({ content: "Body.", genModel: "gen-model" });
+    mockJudgeReply(JSON.stringify(JUDGE_FIXTURE));
+    const first = await scoreGeneration(generationId, { presetId: preset.id });
+    expect(first.overall).toBe(4);
+
+    vi.restoreAllMocks();
+    const lower = { ...JUDGE_FIXTURE, relevance: { score: 1, justification: "Off topic." } };
+    mockJudgeReply(JSON.stringify(lower));
+    const second = await scoreGeneration(generationId, { presetId: preset.id });
+
+    // (1+4+4+3+4)/5 = 3.2
+    expect(second.overall).toBe(3.2);
+    const reloaded = await getStorage().generations.get(generationId);
+    expect(reloaded?.qualityScore?.overall).toBe(3.2);
+  });
+
   it("refuses to score an empty generation", async () => {
     const { preset, generationId } = await seedPresetAndGeneration({ content: "   ", genModel: "gen-model" });
     const spy = mockJudgeReply(JSON.stringify(JUDGE_FIXTURE));

@@ -16,6 +16,7 @@ export async function getDb(): Promise<BetterSQLite3Database<typeof schema>> {
   if (!database) {
     const sqlite = new Database(getDatabasePath());
     sqlite.pragma("journal_mode = WAL");
+    sqlite.pragma("busy_timeout = 5000");
     // FK enforcement is per-connection and OFF by default in SQLite; without
     // this, ON DELETE CASCADE is silently ignored and orphan rows accumulate.
     sqlite.pragma("foreign_keys = ON");

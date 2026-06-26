@@ -58,7 +58,12 @@ export function CodeMirrorEditor({
   const mountedRef = React.useRef(true);
   const [selection, setSelection] = React.useState<Selection | null>(null);
   const [busy, setBusy] = React.useState(false);
-  const [diff, setDiff] = React.useState<PendingDiff | null>(null);
+  const [diff, _setDiff] = React.useState<PendingDiff | null>(null);
+  const diffRef = React.useRef<PendingDiff | null>(null);
+  const setDiff = React.useCallback((value: PendingDiff | null) => {
+    diffRef.current = value;
+    _setDiff(value);
+  }, []);
   const [error, setError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
@@ -132,11 +137,14 @@ export function CodeMirrorEditor({
       if (update.selectionSet || update.docChanged || update.focusChanged) {
         cursorRef.current = update.state.selection.main.head;
         // A pending diff is anchored to a stale range; drop it if the user moves on.
-        if (diff && update.docChanged) setDiff(null);
+        if (diffRef.current && update.docChanged) {
+          diffRef.current = null;
+          setDiff(null);
+        }
         refreshSelection(update.view);
       }
     },
-    [diff, refreshSelection],
+    [refreshSelection],
   );
 
   const runAction = React.useCallback(
@@ -168,6 +176,7 @@ export function CodeMirrorEditor({
     void executeCompletion(
       () => buildContinuePrompt({ title, fullText }),
       (text) => {
+        if (!mountedRef.current) return;
         const v = viewRef.current;
         if (!v) return;
         // Append at the live document end with current-state separator, not a stale length.
@@ -195,7 +204,10 @@ export function CodeMirrorEditor({
           before: doc.slice(Math.max(0, range.from - CONTEXT_CHARS), range.from),
           after: doc.slice(range.to, range.to + CONTEXT_CHARS),
         }),
-      (text) => setDiff({ from: range.from, to: range.to, original, suggestion: text }),
+      (text) => {
+        if (!mountedRef.current) return;
+        setDiff({ from: range.from, to: range.to, original, suggestion: text });
+      },
     );
   }, [title, executeCompletion, t]);
 
