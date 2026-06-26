@@ -1,7 +1,7 @@
 ---
 title: "feat: S5 Local DB Backup & Restore (rebuilt against post-003 main)"
 type: feat
-status: active
+status: completed
 date: 2026-06-26
 deepened: 2026-06-26
 origin: docs/brainstorms/2026-06-26-comprehensive-optimization-roadmap-requirements.md
