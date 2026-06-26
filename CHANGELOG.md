@@ -6,7 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-06-26
+
+### Added
+- Foreign-key constraints with `ON DELETE` policies (presets→provider/template RESTRICT, template_versions→template CASCADE, generation.active_draft_id→draft SET NULL), retrofitted onto existing databases via a guarded, idempotent table-rebuild migration
+- Stability re-verification pass (S1–S4) with documented root-cause findings
+
 ### Fixed
+- Referential integrity: deleting a provider/template still used by a preset now returns a clear 409 instead of silently orphaning data
+- `isDefault` clear-then-set and prompt-template version snapshot-then-update wrapped in single transactions (prevents duplicate defaults / corrupt version history)
+- Cancel-vs-complete generation race arbitrated inside one transaction (S3)
+- SSE stream now checks `response.ok` before parsing, surfacing server 4xx/5xx as clear errors instead of a "broken stream"
+- `parseJsonLines` releases the body reader lock on early/cancelled streams
+- Provider adapters surface bare-string error chunks (`{"error":"..."}`) as the actual message
+- `generation.create` is idempotent on UNIQUE(idempotency_key) — concurrent retries return the existing row instead of a 500
+- Per-adapter malformed-chunk shape guards (S2); delete confirmation dialogs on destructive actions (H1)
+- Generation status/error strings fully internationalized incl. wrapped provider errors (H3)
 - SQLite busy_timeout for concurrent write safety
 - ReactMarkdown XSS prevention with allowedElements whitelist
 - Content-Security-Policy header added
