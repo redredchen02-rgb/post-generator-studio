@@ -65,4 +65,12 @@ describe("useBootstrapStore", () => {
     await useBootstrapStore.getState().refetch();
     expect(loadBootstrap).toHaveBeenCalledTimes(1);
   });
+
+  it("invalidate marks fresh data stale so the next fetchIfNeeded refetches", async () => {
+    useBootstrapStore.setState({ data, loadedAt: Date.now() });
+    useBootstrapStore.getState().invalidate();
+    loadBootstrap.mockResolvedValueOnce(data);
+    await useBootstrapStore.getState().fetchIfNeeded();
+    expect(loadBootstrap).toHaveBeenCalledTimes(1);
+  });
 });

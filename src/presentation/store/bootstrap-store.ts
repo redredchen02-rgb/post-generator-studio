@@ -17,6 +17,8 @@ type BootstrapState = {
   fetchIfNeeded: () => Promise<void>;
   /** Force refetch */
   refetch: () => Promise<void>;
+  /** Mark data stale so the next fetchIfNeeded refetches (e.g. after a settings mutation) */
+  invalidate: () => void;
 };
 
 /**
@@ -74,4 +76,6 @@ export const useBootstrapStore = create<BootstrapState>()((set, get) => ({
       });
     }
   },
+
+  invalidate: () => set({ loadedAt: 0 }),
 }));

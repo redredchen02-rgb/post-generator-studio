@@ -5,6 +5,7 @@ import { Copy, Database, KeyRound, Layers, Loader2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { loadBootstrap } from "@/presentation/lib/api";
 import { useApi } from "@/presentation/lib/use-api";
+import { useBootstrapStore } from "@/presentation/store/bootstrap-store";
 import { ProviderProfilesPanel } from "./provider-profiles-panel";
 import { PromptTemplatesPanel } from "./prompt-templates-panel";
 import { GenerationPresetsPanel } from "./generation-presets-panel";
@@ -27,6 +28,14 @@ export function SettingsWorkspace(): React.ReactElement {
   const [message, setMessage] = React.useState<string | null>(null);
   const messageTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const { data: bootstrap, loading, isRefetching, error, refetch } = useApi(loadBootstrap);
+  const invalidateBootstrap = useBootstrapStore((s) => s.invalidate);
+
+  // Refresh this page's view AND mark the generator's bootstrap store stale, so a
+  // provider/template/preset change here is reflected when the user returns to it.
+  const refresh = React.useCallback(async () => {
+    await refetch();
+    invalidateBootstrap();
+  }, [refetch, invalidateBootstrap]);
 
   React.useEffect(() => {
     return () => {
@@ -63,14 +72,14 @@ export function SettingsWorkspace(): React.ReactElement {
           <div className="flex h-full items-center justify-center text-sm text-muted-foreground">{t("loading")}</div>
         ) : bootstrap ? (
           <>
-            {tab === "providers" ? <ProviderProfilesPanel profiles={bootstrap.providerProfiles} refresh={refetch} notify={notify} /> : null}
-            {tab === "templates" ? <PromptTemplatesPanel templates={bootstrap.promptTemplates} refresh={refetch} notify={notify} /> : null}
+            {tab === "providers" ? <ProviderProfilesPanel profiles={bootstrap.providerProfiles} refresh={refresh} notify={notify} /> : null}
+            {tab === "templates" ? <PromptTemplatesPanel templates={bootstrap.promptTemplates} refresh={refresh} notify={notify} /> : null}
             {tab === "presets" ? (
               <GenerationPresetsPanel
                 presets={bootstrap.generationPresets}
                 providers={bootstrap.providerProfiles}
                 templates={bootstrap.promptTemplates}
-                refresh={refetch}
+                refresh={refresh}
                 notify={notify}
               />
             ) : null}
