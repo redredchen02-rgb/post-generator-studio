@@ -88,6 +88,7 @@ export class OpenAICompatibleAdapter extends BaseAdapter {
   }
 
   protected validateChunkShape(raw: Record<string, unknown>): string | null {
+    if (typeof raw.error === "string") return raw.error;
     if (typeof raw.error === "object" && raw.error !== null) {
       const err = raw.error as Record<string, unknown>;
       if (typeof err.message === "string") return err.message;

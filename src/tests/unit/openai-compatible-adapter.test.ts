@@ -196,4 +196,10 @@ describe("OpenAICompatibleAdapter chunk shape guard", () => {
     const events = await streamWith('data: {"error":{"message":"context length exceeded"}}\n\n');
     expect(events.some((e) => e.type === "error" && /context length/.test(String(e.message)))).toBe(true);
   });
+
+  it("surfaces a bare-string error chunk as the actual message", async () => {
+    const events = await streamWith('data: {"error":"rate_limit_exceeded"}\n\n');
+    expect(events.some((e) => e.type === "error" && /rate_limit_exceeded/.test(String(e.message)))).toBe(true);
+    expect(events.some((e) => e.type === "token")).toBe(false);
+  });
 });

@@ -136,4 +136,26 @@ describe("AnthropicAdapter", () => {
 
     expect(events.some((e) => e.type === "error" && /overloaded/.test(String(e.message)))).toBe(true);
   });
+
+  it("surfaces a bare-string error chunk as the actual message", async () => {
+    const adapter = new AnthropicAdapter();
+    const originalFetch = global.fetch;
+    global.fetch = async () =>
+      new Response('data: {"error":"overloaded_error"}\n\n', {
+        status: 200,
+        headers: { "Content-Type": "text/event-stream" },
+      });
+
+    const events = [];
+    for await (const event of adapter.generate(
+      { systemPrompt: "S", userPrompt: "U", model: "claude-3", temperature: 0.7, maxTokens: 100, stream: true },
+      makeProfile(),
+      { apiKey: "sk-test" },
+    )) {
+      events.push(event);
+    }
+    global.fetch = originalFetch;
+
+    expect(events.some((e) => e.type === "error" && /overloaded_error/.test(String(e.message)))).toBe(true);
+  });
 });

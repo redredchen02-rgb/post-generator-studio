@@ -16,3 +16,10 @@ export function isForeignKeyConstraintError(error: unknown): boolean {
   const code = (error as { code?: string }).code ?? "";
   return code.startsWith("SQLITE_CONSTRAINT") && /foreign key/i.test(error.message);
 }
+
+/** True when an error is a SQLite UNIQUE constraint violation. */
+export function isUniqueConstraintError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  const code = (error as { code?: string }).code ?? "";
+  return code.startsWith("SQLITE_CONSTRAINT") && /unique/i.test(error.message);
+}

@@ -134,7 +134,16 @@ export function useGenerationStream() {
             bufferRef.current += payload.value;
           }
           if (payload.type === "metadata") {
-            setState((s) => ({ ...s, metadata: { ...s.metadata, ...payload } }));
+            // Pick only the metadata fields; spreading the whole payload would
+            // leak the discriminant `type: "metadata"` into the state object.
+            setState((s) => ({
+              ...s,
+              metadata: {
+                model: payload.model ?? s.metadata.model,
+                inputTokens: payload.inputTokens ?? s.metadata.inputTokens,
+                outputTokens: payload.outputTokens ?? s.metadata.outputTokens,
+              },
+            }));
           }
           if (payload.type === "error") {
             // Localize the main message; keep the raw provider/server text in

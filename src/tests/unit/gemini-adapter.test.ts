@@ -82,4 +82,26 @@ describe("GeminiAdapter", () => {
 
     expect(events.some((e) => e.type === "error")).toBe(true);
   });
+
+  it("surfaces a bare-string error chunk as the actual message", async () => {
+    const adapter = new GeminiAdapter();
+    const originalFetch = global.fetch;
+    global.fetch = async () =>
+      new Response('data: {"error":"RESOURCE_EXHAUSTED"}\n\n', {
+        status: 200,
+        headers: { "Content-Type": "text/event-stream" },
+      });
+
+    const events = [];
+    for await (const event of adapter.generate(
+      { systemPrompt: "S", userPrompt: "U", model: "gemini-pro", temperature: 0.7, maxTokens: 100, stream: true },
+      makeProfile(),
+      { apiKey: "test-key" },
+    )) {
+      events.push(event);
+    }
+    global.fetch = originalFetch;
+
+    expect(events.some((e) => e.type === "error" && /RESOURCE_EXHAUSTED/.test(String(e.message)))).toBe(true);
+  });
 });

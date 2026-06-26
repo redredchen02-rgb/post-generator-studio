@@ -2,7 +2,7 @@ import { desc, eq, like, sql } from "drizzle-orm";
 import { nowIso, parseJson } from "@/lib/utils";
 import { generationSchema, type Generation, type QualityScore } from "@/domain/schemas";
 import type { GenerationCreateInput, GenerationListOpts, GenerationListResult, GenerationRepository, GenerationUpdateInput } from "@/domain/ports/storage";
-import { notFound } from "@/infrastructure/storage/repo-utils";
+import { isUniqueConstraintError, notFound } from "@/infrastructure/storage/repo-utils";
 import { getDb } from "@/infrastructure/storage/db";
 import { generationDrafts, generations } from "@/infrastructure/storage/schema";
 
@@ -74,28 +74,39 @@ export class SqliteGenerationRepository implements GenerationRepository {
   async create(input: GenerationCreateInput): Promise<Generation> {
     const db = await getDb();
     const timestamp = nowIso();
-    await db.insert(generations).values({
-      id: input.id,
-      idempotencyKey: input.idempotencyKey ?? null,
-      title: input.title,
-      eventSummary: input.eventSummary,
-      providerProfileSnapshot: JSON.stringify(input.providerProfileSnapshot),
-      promptTemplateSnapshot: JSON.stringify(input.promptTemplateSnapshot),
-      generationPresetSnapshot: JSON.stringify(input.generationPresetSnapshot),
-      renderedSystemPrompt: input.renderedSystemPrompt,
-      renderedUserPrompt: input.renderedUserPrompt,
-      outputContent: null,
-      status: "queued",
-      errorMessage: null,
-      model: input.model ?? null,
-      providerKind: input.providerKind ?? null,
-      inputTokens: null,
-      outputTokens: null,
-      totalTokens: null,
-      startedAt: null,
-      completedAt: null,
-      createdAt: timestamp,
-    });
+    try {
+      await db.insert(generations).values({
+        id: input.id,
+        idempotencyKey: input.idempotencyKey ?? null,
+        title: input.title,
+        eventSummary: input.eventSummary,
+        providerProfileSnapshot: JSON.stringify(input.providerProfileSnapshot),
+        promptTemplateSnapshot: JSON.stringify(input.promptTemplateSnapshot),
+        generationPresetSnapshot: JSON.stringify(input.generationPresetSnapshot),
+        renderedSystemPrompt: input.renderedSystemPrompt,
+        renderedUserPrompt: input.renderedUserPrompt,
+        outputContent: null,
+        status: "queued",
+        errorMessage: null,
+        model: input.model ?? null,
+        providerKind: input.providerKind ?? null,
+        inputTokens: null,
+        outputTokens: null,
+        totalTokens: null,
+        startedAt: null,
+        completedAt: null,
+        createdAt: timestamp,
+      });
+    } catch (error) {
+      // Idempotent retry: a concurrent request already inserted a row with this
+      // idempotencyKey. Return that existing generation instead of throwing a
+      // raw UNIQUE violation (which would surface as a 500).
+      if (input.idempotencyKey && isUniqueConstraintError(error)) {
+        const existing = await this.getByIdempotencyKey(input.idempotencyKey);
+        if (existing) return existing;
+      }
+      throw error;
+    }
     const created = await this.get(input.id);
     return created ?? notFound("Generation");
   }

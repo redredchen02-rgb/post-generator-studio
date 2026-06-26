@@ -17,25 +17,31 @@ export async function* parseJsonLines(response: Response): AsyncIterable<unknown
   const decoder = new TextDecoder();
   const reader = response.body.getReader();
   let buffer = "";
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) {
-      break;
-    }
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split("\n");
-    buffer = lines.pop() || "";
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed) {
-        continue;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) {
+        break;
       }
-      yield safeJsonParse(trimmed);
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) {
+          continue;
+        }
+        yield safeJsonParse(trimmed);
+      }
     }
-  }
-  const tail = buffer.trim();
-  if (tail) {
-    yield safeJsonParse(tail);
+    const tail = buffer.trim();
+    if (tail) {
+      yield safeJsonParse(tail);
+    }
+  } finally {
+    // Release the lock even when the consumer aborts early (break/throw out of
+    // the for-await), so a cancelled stream never leaves the body reader locked.
+    reader.releaseLock();
   }
 }
 
