@@ -56,28 +56,12 @@ function isErrorPayload(value: unknown): value is { error: AppError } {
   return Boolean(err && typeof err === "object" && "code" in err && "message" in err);
 }
 
-let bootstrapCache: BootstrapData | null = null;
-let bootstrapPromise: Promise<BootstrapData> | null = null;
-
-export function invalidateBootstrapCache(): void {
-  bootstrapCache = null;
-}
-
+// No module-level cache here: the bootstrap store (Zustand) is the single
+// source of truth and owns SWR staleness + de-duplication. A second cache here
+// silently defeated refetch() — settings mutations appeared not to refresh
+// because loadBootstrap returned the never-invalidated module cache.
 export async function loadBootstrap(): Promise<BootstrapData> {
-  if (bootstrapCache) return bootstrapCache;
-  if (bootstrapPromise) return bootstrapPromise;
-  bootstrapPromise = fetchJson<BootstrapData>("/api/bootstrap").then(
-    (data) => {
-      bootstrapCache = data;
-      bootstrapPromise = null;
-      return data;
-    },
-    (err) => {
-      bootstrapPromise = null;
-      throw err;
-    },
-  );
-  return bootstrapPromise;
+  return fetchJson<BootstrapData>("/api/bootstrap");
 }
 
 export async function loadGenerations(search?: string, offset?: number, limit?: number): Promise<PaginatedGenerations> {

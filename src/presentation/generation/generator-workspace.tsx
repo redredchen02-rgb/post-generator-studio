@@ -36,7 +36,9 @@ export function GeneratorWorkspace(): React.ReactElement {
   const searchParams = useSearchParams();
   const bootstrap = useBootstrapStore((s) => s.data);
   const bootstrapLoading = useBootstrapStore((s) => s.loading);
+  const bootstrapError = useBootstrapStore((s) => s.error);
   const fetchBootstrap = useBootstrapStore((s) => s.fetchIfNeeded);
+  const refetchBootstrap = useBootstrapStore((s) => s.refetch);
 
   const [title, setTitle] = React.useState(searchParams.get("title") || sampleTitle);
   const [eventSummary, setEventSummary] = React.useState(searchParams.get("summary") || sampleSummary);
@@ -323,7 +325,8 @@ export function GeneratorWorkspace(): React.ReactElement {
     setStatus(t("exported", { format }));
   }
 
-  if (bootstrapLoading && !bootstrap) {
+  // Show spinner: actively loading, OR first render (not yet started — loading=false, error=null, data=null)
+  if (bootstrapLoading || (!bootstrap && !bootstrapError)) {
     return (
       <main className="mx-auto flex max-w-[1680px] items-center justify-center px-4 py-16">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -333,8 +336,17 @@ export function GeneratorWorkspace(): React.ReactElement {
 
   if (!bootstrap) {
     return (
-      <main className="mx-auto flex max-w-[1680px] items-center justify-center px-4 py-16 text-muted-foreground">
-        {t("failedToLoad")}
+      <main className="mx-auto flex max-w-[1680px] items-center justify-center px-4 py-16">
+        <div className="flex flex-col items-center gap-3 text-muted-foreground">
+          <p>{t("failedToLoad")}</p>
+          {bootstrapError && <p className="text-sm text-destructive">{bootstrapError}</p>}
+          <button
+            onClick={() => void refetchBootstrap()}
+            className="mt-1 rounded-md border px-4 py-1.5 text-sm hover:bg-accent"
+          >
+            {t("retry")}
+          </button>
+        </div>
       </main>
     );
   }

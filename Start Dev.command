@@ -129,15 +129,16 @@ else
   warn "遷移有警告，繼續啟動"
 fi
 
-# ── 6. 啟動伺服器 ─────────────────────────────────────
-step "6/6  啟動 Dev Server"
+# ── 6. 啟動伺服器（正式版，單一實例）──────────────────
+step "6/6  啟動伺服器"
 
-# 檢查 port
 PORT=3000
-if lsof -ti:$PORT &>/dev/null; then
-  echo "  ${YELLOW}Port $PORT 被佔用，使用 port 3001${NC}"
-  PORT=3001
-fi
+
+# 回收 port：清掉殘留的舊實例，永遠固定用 3000。
+# （舊版在 port 被佔用時會退讓到 3001，導致每次啟動都疊加一個新 server —
+#   這正是「畫面卡住 / 功能全部不能用」的根因。現在改成回收，不再疊加。）
+info "清理殘留的舊實例並回收 port $PORT..."
+node scripts/free-port.mjs $PORT 2>/dev/null || { lsof -ti:$PORT 2>/dev/null | xargs kill 2>/dev/null; sleep 1; }
 
 # 檢查 .next cache 是否損壞（build-manifest 必須存在）
 if [ -d ".next" ] && [ ! -f ".next/build-manifest.json" ]; then
@@ -145,6 +146,11 @@ if [ -d ".next" ] && [ ! -f ".next/build-manifest.json" ]; then
   rm -rf .next
   ok ".next cache 已清除"
 fi
+
+# 正式建置：CSP 最嚴格、最接近真實行為，且比 dev 模式更穩定、更省資源。
+step "建置正式版（首次或程式碼改動後需要約 30–60 秒）"
+pnpm build 2>&1 | tail -3 || err "建置失敗"
+ok "建置完成"
 
 info "本地網址：http://localhost:$PORT"
 info "按 Ctrl+C 停止服務"
@@ -162,4 +168,4 @@ echo ""
   done
 ) &
 
-PORT=$PORT pnpm dev
+pnpm start
