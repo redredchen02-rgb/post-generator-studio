@@ -184,5 +184,18 @@
     "enabled": "启用",
     "disabled": "禁用",
     "noKey": "无密钥"
+  },
+  "Editor": {
+    "rewrite": "改写",
+    "expand": "扩写",
+    "condense": "精简",
+    "tone": "换语气",
+    "defaultTone": "更生动自然",
+    "rewriting": "改写中…",
+    "rewriteFailed": "改写失败",
+    "accept": "接受",
+    "reject": "拒绝",
+    "original": "原文",
+    "suggestion": "建议"
   }
 }

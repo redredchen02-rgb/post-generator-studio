@@ -75,3 +75,28 @@ export async function testProviderProfile(
 export async function deleteGenerationRecord(id: string): Promise<void> {
   await fetch(`/api/generations/${id}`, { method: "DELETE" });
 }
+
+export type CompletionResponse = {
+  content: string;
+  model?: string;
+  inputTokens?: number;
+  outputTokens?: number;
+};
+
+export type CompletionRequestInput = {
+  prompt: string;
+  systemPrompt?: string;
+  presetId: string;
+  providerProfileId?: string;
+  signal?: AbortSignal;
+};
+
+/** One-shot, non-streaming completion (selection rewrite, continue, etc.). */
+export async function requestCompletion(input: CompletionRequestInput): Promise<CompletionResponse> {
+  const { signal, ...body } = input;
+  return fetchJson<CompletionResponse>("/api/completions", {
+    method: "POST",
+    body: JSON.stringify(body),
+    signal,
+  });
+}

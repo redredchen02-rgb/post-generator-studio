@@ -1,8 +1,13 @@
 "use client";
 
 import * as React from "react";
-import CodeMirror, { EditorView } from "@uiw/react-codemirror";
+import CodeMirror, { EditorView, type ViewUpdate } from "@uiw/react-codemirror";
 import { markdown } from "@codemirror/lang-markdown";
+import { useTranslations } from "next-intl";
+import { Button } from "@/presentation/components/ui/button";
+import { requestCompletion } from "@/presentation/lib/api";
+import { SelectionToolbar, type ToolbarPosition } from "./selection-toolbar";
+import { buildRewritePrompt, type RewriteActionId } from "./rewrite-actions";
 
 type CodeMirrorEditorProps = {
   value: string;
@@ -12,10 +17,18 @@ type CodeMirrorEditorProps = {
   fontSize?: number;
   placeholder?: string;
   className?: string;
+  /** Article title and preset, used for selection rewrites. Rewrite is off without a preset. */
+  title?: string;
+  presetId?: string;
+  providerProfileId?: string;
 };
 
 // Prose, not code: wrap long lines and drop the code-editor chrome (gutters, line numbers).
 const EXTENSIONS = [markdown(), EditorView.lineWrapping];
+const CONTEXT_CHARS = 240;
+
+type Selection = { from: number; to: number; pos: ToolbarPosition };
+type PendingDiff = { from: number; to: number; original: string; suggestion: string };
 
 export function CodeMirrorEditor({
   value,
@@ -24,29 +37,165 @@ export function CodeMirrorEditor({
   fontSize,
   placeholder,
   className,
+  title = "",
+  presetId,
+  providerProfileId,
 }: CodeMirrorEditorProps): React.ReactElement {
+  const t = useTranslations("Editor");
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  const viewRef = React.useRef<EditorView | null>(null);
+  const [selection, setSelection] = React.useState<Selection | null>(null);
+  const [busy, setBusy] = React.useState(false);
+  const [diff, setDiff] = React.useState<PendingDiff | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
+
+  const rewriteEnabled = Boolean(presetId) && !readOnly;
+
+  const refreshSelection = React.useCallback(
+    (view: EditorView) => {
+      if (!rewriteEnabled) {
+        setSelection(null);
+        return;
+      }
+      const range = view.state.selection.main;
+      if (range.empty) {
+        setSelection(null);
+        return;
+      }
+      const coords = view.coordsAtPos(range.from);
+      const box = containerRef.current?.getBoundingClientRect();
+      if (!coords || !box) {
+        setSelection(null);
+        return;
+      }
+      setSelection({
+        from: range.from,
+        to: range.to,
+        pos: { top: coords.top - box.top, left: coords.left - box.left },
+      });
+    },
+    [rewriteEnabled],
+  );
+
+  const handleUpdate = React.useCallback(
+    (update: ViewUpdate) => {
+      if (update.selectionSet || update.docChanged || update.focusChanged) {
+        // A pending diff is anchored to a stale range; drop it if the user moves on.
+        if (diff && update.docChanged) setDiff(null);
+        refreshSelection(update.view);
+      }
+    },
+    [diff, refreshSelection],
+  );
+
+  const runAction = React.useCallback(
+    async (id: RewriteActionId) => {
+      const view = viewRef.current;
+      if (!view || !selection || !presetId) return;
+      const { from, to } = selection;
+      const doc = view.state.doc.toString();
+      const original = doc.slice(from, to);
+      const ctx = {
+        title,
+        selection: original,
+        before: doc.slice(Math.max(0, from - CONTEXT_CHARS), from),
+        after: doc.slice(to, to + CONTEXT_CHARS),
+        tone: id === "tone" ? t("defaultTone") : undefined,
+      };
+      const { systemPrompt, prompt } = buildRewritePrompt(id, ctx);
+      setBusy(true);
+      setError(null);
+      try {
+        const result = await requestCompletion({ prompt, systemPrompt, presetId, providerProfileId });
+        const suggestion = result.content.trim();
+        if (suggestion) setDiff({ from, to, original, suggestion });
+      } catch (e) {
+        setError(e instanceof Error ? e.message : t("rewriteFailed"));
+      } finally {
+        setBusy(false);
+      }
+    },
+    [selection, presetId, providerProfileId, title, t],
+  );
+
+  const acceptDiff = React.useCallback(() => {
+    const view = viewRef.current;
+    if (!view || !diff) return;
+    // Replace only the selected range; head and tail stay byte-identical.
+    view.dispatch({ changes: { from: diff.from, to: diff.to, insert: diff.suggestion } });
+    setDiff(null);
+    setSelection(null);
+  }, [diff]);
+
+  const rejectDiff = React.useCallback(() => {
+    setDiff(null);
+  }, []);
+
   return (
-    <CodeMirror
-      value={value}
-      onChange={onChange}
-      readOnly={readOnly}
-      // editable=false also drops the DOM contenteditable, so streaming tokens can't
-      // race a cursor in the document; readOnly alone keeps it focusable/selectable.
-      editable={!readOnly}
-      placeholder={placeholder}
-      extensions={EXTENSIONS}
-      theme="none"
-      height="100%"
-      className={className}
-      style={fontSize ? { fontSize } : undefined}
-      basicSetup={{
-        lineNumbers: false,
-        foldGutter: false,
-        highlightActiveLine: !readOnly,
-        highlightActiveLineGutter: false,
-        highlightSelectionMatches: false,
-        searchKeymap: false,
-      }}
-    />
+    <div ref={containerRef} className="relative h-full">
+      <CodeMirror
+        value={value}
+        onChange={onChange}
+        onCreateEditor={(view) => {
+          viewRef.current = view;
+        }}
+        onUpdate={handleUpdate}
+        readOnly={readOnly}
+        // editable=false also drops the DOM contenteditable, so streaming tokens can't
+        // race a cursor in the document; readOnly alone keeps it focusable/selectable.
+        editable={!readOnly}
+        placeholder={placeholder}
+        extensions={EXTENSIONS}
+        theme="none"
+        height="100%"
+        className={className}
+        style={fontSize ? { fontSize } : undefined}
+        basicSetup={{
+          lineNumbers: false,
+          foldGutter: false,
+          highlightActiveLine: !readOnly,
+          highlightActiveLineGutter: false,
+          highlightSelectionMatches: false,
+          searchKeymap: false,
+        }}
+      />
+
+      {!diff ? (
+        <SelectionToolbar
+          position={selection?.pos ?? null}
+          selectionChars={selection ? selection.to - selection.from : 0}
+          disabled={readOnly}
+          busy={busy}
+          onAction={runAction}
+        />
+      ) : null}
+
+      {diff ? (
+        <div
+          role="dialog"
+          aria-label="Rewrite suggestion"
+          className="absolute left-1/2 top-4 z-30 w-[min(32rem,90%)] -translate-x-1/2 rounded-md border bg-popover p-3 text-sm shadow-lg"
+        >
+          <p className="mb-1 text-xs font-medium text-muted-foreground">{t("original")}</p>
+          <p className="mb-2 whitespace-pre-wrap text-muted-foreground line-through">{diff.original}</p>
+          <p className="mb-1 text-xs font-medium text-muted-foreground">{t("suggestion")}</p>
+          <p className="mb-3 whitespace-pre-wrap">{diff.suggestion}</p>
+          <div className="flex justify-end gap-2">
+            <Button size="sm" variant="outline" onClick={rejectDiff}>
+              {t("reject")}
+            </Button>
+            <Button size="sm" onClick={acceptDiff}>
+              {t("accept")}
+            </Button>
+          </div>
+        </div>
+      ) : null}
+
+      {error ? (
+        <div className="absolute bottom-2 left-1/2 z-30 -translate-x-1/2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-1 text-xs text-destructive">
+          {error}
+        </div>
+      ) : null}
+    </div>
   );
 }

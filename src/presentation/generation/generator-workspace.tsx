@@ -216,6 +216,9 @@ export function GeneratorWorkspace(): React.ReactElement {
         editorFontSize={editorFontSize}
         isGenerating={isGenerating}
         activeGeneration={activeGeneration}
+        title={title}
+        presetId={presetId}
+        providerProfileId={effectiveProviderId}
         onRawModeChange={setRawMode}
         onContentChange={setContent}
         onCopyMarkdown={copyMarkdown}

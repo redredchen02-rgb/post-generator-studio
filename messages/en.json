@@ -184,5 +184,18 @@
     "enabled": "enabled",
     "disabled": "disabled",
     "noKey": "no key"
+  },
+  "Editor": {
+    "rewrite": "Rewrite",
+    "expand": "Expand",
+    "condense": "Condense",
+    "tone": "Tone",
+    "defaultTone": "more engaging and natural",
+    "rewriting": "Rewriting…",
+    "rewriteFailed": "Rewrite failed",
+    "accept": "Accept",
+    "reject": "Reject",
+    "original": "Original",
+    "suggestion": "Suggestion"
   }
 }

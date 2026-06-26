@@ -17,6 +17,9 @@ type OutputPanelProps = {
   editorFontSize: number;
   isGenerating: boolean;
   activeGeneration: Generation | null;
+  title: string;
+  presetId: string;
+  providerProfileId?: string;
   onRawModeChange: (v: boolean) => void;
   onContentChange: (v: string) => void;
   onCopyMarkdown: () => void;
@@ -60,6 +63,9 @@ export function OutputPanel(props: OutputPanelProps): React.ReactElement {
             fontSize={props.editorFontSize}
             placeholder={t("streamingPlaceholder")}
             className="h-full min-h-[540px] overflow-auto text-sm"
+            title={props.title}
+            presetId={props.presetId}
+            providerProfileId={props.providerProfileId}
           />
         ) : (
           <article className="prose prose-neutral max-w-none overflow-auto p-4 dark:prose-invert">
