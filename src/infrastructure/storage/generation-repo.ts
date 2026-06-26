@@ -46,7 +46,8 @@ export class SqliteGenerationRepository implements GenerationRepository {
   async list(opts: GenerationListOpts = {}): Promise<GenerationListResult> {
     const { search, offset = 0, limit = 30 } = opts;
     const db = await getDb();
-    const filter = search ? like(generations.title, `%${search}%`) : undefined;
+    const escaped = search ? search.replace(/%/g, "\\%").replace(/_/g, "\\_") : undefined;
+    const filter = escaped ? like(generations.title, `%${escaped}%`) : undefined;
     const [rows, [{ total }]] = await Promise.all([
       filter
         ? db.select().from(generations).where(filter).orderBy(desc(generations.createdAt)).limit(limit).offset(offset)

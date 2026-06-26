@@ -58,9 +58,24 @@ export function useVariantGeneration() {
   const abortRef = React.useRef<AbortController | null>(null);
   const currentGenIdRef = React.useRef<string | null>(null);
   const cancelledRef = React.useRef(false);
+  const tokenBufferRef = React.useRef<Map<number, string>>(new Map());
+  const flushTimerRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
 
   const patchSlot = React.useCallback((index: number, patch: Partial<VariantSlot>) => {
     setVariants((prev) => prev.map((slot) => (slot.index === index ? { ...slot, ...patch } : slot)));
+  }, []);
+
+  const flushTokens = React.useCallback(() => {
+    const buffer = tokenBufferRef.current;
+    if (buffer.size === 0) return;
+    const entries = Array.from(buffer.entries());
+    buffer.clear();
+    setVariants((prev) =>
+      prev.map((slot) => {
+        const chunk = entries.find(([i]) => i === slot.index);
+        return chunk ? { ...slot, content: slot.content + chunk[1] } : slot;
+      }),
+    );
   }, []);
 
   const streamOne = React.useCallback(
@@ -90,12 +105,11 @@ export function useVariantGeneration() {
           currentGenIdRef.current = payload.generation.id;
           patchSlot(index, { generation: payload.generation });
         } else if (payload.type === "token") {
-          setVariants((prev) =>
-            prev.map((slot) => (slot.index === index ? { ...slot, content: slot.content + payload.value } : slot)),
-          );
+          tokenBufferRef.current.set(index, (tokenBufferRef.current.get(index) || "") + payload.value);
         } else if (payload.type === "error") {
           patchSlot(index, { status: "failed", error: payload.message || payload.error?.message || "生成失败" });
         } else if (payload.type === "final") {
+          tokenBufferRef.current.delete(index);
           patchSlot(index, {
             generation: payload.generation,
             content: payload.content,
@@ -112,6 +126,9 @@ export function useVariantGeneration() {
       cancelledRef.current = false;
       setIsGenerating(true);
       setVariants(emptySlots(count));
+      tokenBufferRef.current.clear();
+      if (flushTimerRef.current) clearInterval(flushTimerRef.current);
+      flushTimerRef.current = setInterval(flushTokens, 100);
       for (let i = 0; i < count; i++) {
         if (cancelledRef.current) break;
         const controller = new AbortController();
@@ -133,14 +150,23 @@ export function useVariantGeneration() {
           ),
         );
       }
+      if (flushTimerRef.current) {
+        clearInterval(flushTimerRef.current);
+        flushTimerRef.current = null;
+      }
+      flushTokens();
       abortRef.current = null;
       setIsGenerating(false);
     },
-    [patchSlot, streamOne],
+    [patchSlot, streamOne, flushTokens],
   );
 
   const cancel = React.useCallback(async () => {
     cancelledRef.current = true;
+    if (flushTimerRef.current) {
+      clearInterval(flushTimerRef.current);
+      flushTimerRef.current = null;
+    }
     const genId = currentGenIdRef.current;
     if (genId) {
       await fetch(`/api/generations/${genId}/cancel`, { method: "POST" }).catch(() => {});

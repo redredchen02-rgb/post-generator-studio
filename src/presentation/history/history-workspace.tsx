@@ -9,8 +9,19 @@ import { Button } from "@/presentation/components/ui/button";
 import { Input } from "@/presentation/components/ui/input";
 import { deleteGenerationRecord, loadGenerations } from "@/presentation/lib/api";
 import { useApi } from "@/presentation/lib/use-api";
+import { ConfirmDialog } from "@/presentation/components/ui/confirm-dialog";
 
 const PAGE_SIZE = 10;
+
+const ALLOWED_ELEMENTS = [
+  "h1", "h2", "h3", "h4", "h5", "h6",
+  "p", "br", "hr",
+  "a", "img",
+  "ul", "ol", "li",
+  "code", "pre", "blockquote",
+  "table", "thead", "tbody", "tr", "th", "td",
+  "strong", "em", "del", "sup", "sub",
+];
 
 const MemoizedReactMarkdown = React.memo(ReactMarkdown);
 
@@ -30,6 +41,7 @@ export function HistoryWorkspace(): React.ReactElement {
   const t = useTranslations("History");
   const [search, setSearch] = React.useState("");
   const [offset, setOffset] = React.useState(0);
+  const [pendingDeleteId, setPendingDeleteId] = React.useState<string | null>(null);
   const { data: paginated, loading, error, refetch } = useApi(
     React.useCallback(() => loadGenerations(search, offset, PAGE_SIZE), [search, offset]),
   );
@@ -111,7 +123,7 @@ export function HistoryWorkspace(): React.ReactElement {
                   size="icon"
                   className="h-7 w-7 shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
                   aria-label={t("deleteAriaLabel")}
-                  onClick={() => void handleDelete(generation)}
+                  onClick={() => setPendingDeleteId(generation.id)}
                 >
                   <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
                 </Button>
@@ -189,13 +201,28 @@ export function HistoryWorkspace(): React.ReactElement {
               </div>
             )}
             <article className="prose prose-neutral max-w-none dark:prose-invert">
-              <MemoizedReactMarkdown>{selected.outputContent || selected.errorMessage || t("noOutput")}</MemoizedReactMarkdown>
+              <MemoizedReactMarkdown allowedElements={ALLOWED_ELEMENTS}>{selected.outputContent || selected.errorMessage || t("noOutput")}</MemoizedReactMarkdown>
             </article>
           </div>
         ) : (
           <div className="flex h-full items-center justify-center text-sm text-muted-foreground">{t("selectRecord")}</div>
         )}
       </section>
+      <ConfirmDialog
+        open={pendingDeleteId !== null}
+        onOpenChange={(open) => { if (!open) setPendingDeleteId(null); }}
+        title={t("confirmDeleteTitle")}
+        description={t("confirmDeleteDesc")}
+        confirmLabel={t("deleteBtn")}
+        onConfirm={async () => {
+          if (pendingDeleteId) {
+            const generation = generations.find((g) => g.id === pendingDeleteId);
+            if (generation) await handleDelete(generation);
+          }
+          setPendingDeleteId(null);
+        }}
+        variant="destructive"
+      />
     </main>
   );
 }

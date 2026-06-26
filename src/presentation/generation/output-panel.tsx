@@ -10,6 +10,16 @@ import { QualityBadge } from "@/presentation/generation/quality-badge";
 import { computeTextMetrics } from "@/lib/text-metrics";
 import type { Generation, QualityScore } from "@/domain/schemas";
 
+const ALLOWED_ELEMENTS = [
+  "h1", "h2", "h3", "h4", "h5", "h6",
+  "p", "br", "hr",
+  "a", "img",
+  "ul", "ol", "li",
+  "code", "pre", "blockquote",
+  "table", "thead", "tbody", "tr", "th", "td",
+  "strong", "em", "del", "sup", "sub",
+];
+
 const MemoizedReactMarkdown = React.memo(ReactMarkdown);
 
 type OutputPanelProps = {
@@ -83,7 +93,7 @@ export function OutputPanel(props: OutputPanelProps): React.ReactElement {
           />
         ) : (
           <article className="prose prose-neutral max-w-none overflow-auto p-4 dark:prose-invert">
-            <MemoizedReactMarkdown>{props.content || t("streamingPlaceholder")}</MemoizedReactMarkdown>
+            <MemoizedReactMarkdown allowedElements={ALLOWED_ELEMENTS}>{props.content || t("streamingPlaceholder")}</MemoizedReactMarkdown>
           </article>
         )}
       </div>
