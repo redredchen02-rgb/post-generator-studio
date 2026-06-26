@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { errorResponse, toAppError } from "@/application/errors";
+import { errorResponse } from "@/app/api/api-helpers";
+import { toAppError } from "@/application/errors";
 import { listGenerations, streamGeneration } from "@/application/generation/generation-service";
 import { generationListQuerySchema } from "@/domain/schemas";
 import { parseBody } from "@/app/api/parse-body";

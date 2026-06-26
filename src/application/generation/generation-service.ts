@@ -200,7 +200,16 @@ export async function* streamGeneration(input: unknown): AsyncIterable<Generatio
       return;
     }
 
-    yield* streamToProvider(adapter, validated, generation, context, rendered, enabledSteps, apiKey, controller);
+    yield* streamToProvider({
+      adapter,
+      validated,
+      generation,
+      pipelineContext: context,
+      rendered,
+      enabledSteps,
+      apiKey,
+      controller,
+    });
   } catch (error) {
     // Setup between registration and streaming can throw — e.g. a corrupt secret
     // file or an AES key mismatch makes readSecret throw (not just return ""). Without
@@ -219,16 +228,19 @@ export async function* streamGeneration(input: unknown): AsyncIterable<Generatio
   }
 }
 
-async function* streamToProvider(
-  adapter: ReturnType<typeof getProviderAdapter>,
-  validated: ValidatedRequest,
-  generation: Generation,
-  context: PipelineContext,
-  rendered: { normalizedRequest: NormalizedGenerationRequest },
-  enabledSteps: Set<string>,
-  apiKey: string,
-  controller: AbortController,
-): AsyncIterable<GenerationStreamEvent> {
+type StreamContext = {
+  adapter: ReturnType<typeof getProviderAdapter>;
+  validated: ValidatedRequest;
+  generation: Generation;
+  pipelineContext: PipelineContext;
+  rendered: { normalizedRequest: NormalizedGenerationRequest };
+  enabledSteps: Set<string>;
+  apiKey: string;
+  controller: AbortController;
+};
+
+async function* streamToProvider(ctx: StreamContext): AsyncIterable<GenerationStreamEvent> {
+  const { adapter, validated, generation, pipelineContext, rendered, enabledSteps, apiKey, controller } = ctx;
   let accumulated = "";
   let metadata: Partial<Pick<Generation, "model" | "inputTokens" | "outputTokens" | "totalTokens">> = {};
   try {
@@ -259,17 +271,16 @@ async function* streamToProvider(
         });
         yield event;
         yield { type: "final", generation: failed, content: accumulated };
-        releaseGenerationController(generation.id);
-        return;
+        return; // finally will release the controller
       } else {
         let formatted = accumulated;
         if (enabledSteps.has(PIPELINE_STEPS.CLEAN_CONTENT)) {
-          const cleaned = await cleanContentStep.execute(context, { content: accumulated, title: validated.request.title });
+          const cleaned = await cleanContentStep.execute(pipelineContext, { content: accumulated, title: validated.request.title });
           formatted = enabledSteps.has(PIPELINE_STEPS.FORMAT_OUTPUT)
-            ? await formatOutputStep.execute(context, cleaned)
+            ? await formatOutputStep.execute(pipelineContext, cleaned)
             : cleaned;
         } else if (enabledSteps.has(PIPELINE_STEPS.FORMAT_OUTPUT)) {
-          formatted = await formatOutputStep.execute(context, accumulated);
+          formatted = await formatOutputStep.execute(pipelineContext, accumulated);
         }
         const completed = await getStorage().generations.update(generation.id, {
           outputContent: formatted,
@@ -282,8 +293,7 @@ async function* streamToProvider(
         });
         yield { type: "complete" };
         yield { type: "final", generation: completed, content: formatted };
-        releaseGenerationController(generation.id);
-        return;
+        return; // finally will release the controller
       }
     }
   } catch (error) {
@@ -310,7 +320,5 @@ async function* streamToProvider(
     });
     yield { type: "error", message, retryable: true };
     yield { type: "final", generation: updated, content: accumulated };
-  } finally {
-    releaseGenerationController(generation.id);
   }
 }
