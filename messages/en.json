@@ -153,7 +153,7 @@
       "deleteFailed": "Delete failed",
       "clearKeyFailed": "Clear key failed",
       "confirmDeleteTitle": "Delete this provider profile?",
-      "confirmDeleteDesc": "This action cannot be undone. Any presets or templates referencing this provider will need to be updated."
+      "confirmDeleteDesc": "This action cannot be undone. Generation presets that use this provider will stop working until you point them at another provider. Your generation history is unaffected."
     },
     "templates": {
       "title": "Prompt Templates",

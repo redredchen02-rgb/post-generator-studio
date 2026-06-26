@@ -153,7 +153,7 @@
       "deleteFailed": "删除失败",
       "clearKeyFailed": "清除密钥失败",
       "confirmDeleteTitle": "删除这个 Provider 配置？",
-      "confirmDeleteDesc": "此操作不可撤销。引用该 Provider 的预设或模板可能需要重新配置。"
+      "confirmDeleteDesc": "此操作无法撤销。使用此 Provider 的生成预设将失效，需改指向其他 Provider。已生成的历史记录不受影响。"
     },
     "templates": {
       "title": "Prompt 模板",

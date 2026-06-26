@@ -344,7 +344,7 @@ flowchart TB
 
 ---
 
-- [ ] **Unit 5: 驗證刪除確認 + 補測試/連帶文案（H1 — 已落地，改驗證+收殘留）**
+- [x] **Unit 5: 驗證刪除確認 + 補測試/連帶文案（H1 — 已落地，改驗證+收殘留）** — ✅ 建 confirm-dialog.test.tsx(open/closed/confirm/cancel 4 測試)；provider 連帶文案**已存在**(計劃「仍用通用文案」過時)，但原文不準(templates 不引用 provider)→修正為準確版(presets 失效需重指/歷史不受影響，en+zh)；schema 查證：preset.provider_profile_id 無 FK=懸空非級聯刪、generations 存快照不受影響。panel-flow 測試低邊際價值故未擴(ConfirmDialog 契約已測、四 panel 同 pattern)
 
 **Goal:** H1 **已端到端落地**（HEAD `fc7e14aa`）：`@radix-ui/react-alert-dialog@^1.1.17` 已裝、`confirm-dialog.tsx` 已存在且 API＝`{open,onOpenChange,title,description,confirmLabel,onConfirm,variant}`、四刪除點皆已用 `pendingDeleteId` state + gated `onConfirm` 接好。本 unit 只收**兩個真殘留**：(1) `confirm-dialog.test.tsx` 不存在；(2) provider 刪除仍用通用文案，未依 KTD-7 加「連帶影響 presets/templates/history」的更強警示。
 
