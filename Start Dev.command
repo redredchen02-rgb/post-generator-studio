@@ -15,22 +15,17 @@ trap 'echo "\n\n${YELLOW}已停止 Post Generator Studio${NC}\n"; exit 0' INT TE
 PROJECT_DIR="/Users/dex/YDEX/INPORTANT WORK/POST /Post Generator Studio"
 cd "$PROJECT_DIR" || err "找不到專案目錄：$PROJECT_DIR"
 
-# ── 防止重複啟動 ──────────────────────────────────────
+# ── 防止重複啟動（自動回收，不再卡在詢問畫面）──────────
+# 舊版會在偵測到舊實例時停下來等你按 k/o/q —— 雙擊啟動時這一停就像「打不開」。
+# 現在改成：偵測到還活著的舊實例就直接關掉它，本次永遠是乾淨的單一實例。
+# （佔住 3000 的舊 server 會在下方 pnpm start:clean 的 free-port 階段一併回收。）
 LOCK_FILE="/tmp/post-generator-studio.lock"
 if [ -f "$LOCK_FILE" ]; then
-  OLD_PID=$(cat "$LOCK_FILE")
-  if kill -0 "$OLD_PID" 2>/dev/null; then
-    echo "${YELLOW}⚠ 偵測到已有實例在執行 (PID $OLD_PID)${NC}"
-    echo "  [k] 終止舊實例並重新啟動"
-    echo "  [o] 直接開啟瀏覽器"
-    echo "  [q] 取消"
-    read -k1 choice
-    echo
-    case $choice in
-      k) kill "$OLD_PID" 2>/dev/null; sleep 1 ;;
-      o) open http://localhost:3000; exit 0 ;;
-      *) exit 0 ;;
-    esac
+  OLD_PID=$(cat "$LOCK_FILE" 2>/dev/null)
+  if [ -n "$OLD_PID" ] && [ "$OLD_PID" != "$$" ] && kill -0 "$OLD_PID" 2>/dev/null; then
+    warn "偵測到舊實例 (PID $OLD_PID)，自動關閉並重新啟動..."
+    kill "$OLD_PID" 2>/dev/null
+    sleep 1
   fi
 fi
 echo $$ > "$LOCK_FILE"
@@ -44,40 +39,22 @@ echo "  ║     Post Generator Studio  v0.2.0        ║"
 echo "  ╚══════════════════════════════════════════╝${NC}"
 echo "  $(date '+%Y-%m-%d %H:%M:%S')  •  $PROJECT_DIR\n"
 
-# ── 1. Node.js ────────────────────────────────────────
-step "1/6  執行環境"
-export PATH="/opt/homebrew/bin:/usr/local/bin:$HOME/.nvm/versions/node/$(ls $HOME/.nvm/versions/node 2>/dev/null | sort -V | tail -1)/bin:$PATH"
-
-if ! command -v node &>/dev/null; then
-  err "找不到 Node.js，請先安裝：https://nodejs.org"
-fi
-
-NODE_VER=$(node -v)
-NODE_MAJOR=${NODE_VER#v}; NODE_MAJOR=${NODE_MAJOR%%.*}
-if [ "$NODE_MAJOR" -lt 18 ]; then
-  err "Node.js 版本過低 ($NODE_VER)，需要 v18 以上"
-fi
-ok "Node.js $NODE_VER"
-
-# ── 2. pnpm 版本對齊 ──────────────────────────────────
-step "2/6  套件管理器"
+# ── 1. 套件管理器（pnpm 會自動鎖定 Node 22.22.3）──────
+# 所有 node 相關步驟一律經由 pnpm 執行：.npmrc 的 use-node-version 會強制使用
+# Node 22.22.3，不管 shell PATH 裡是哪個 Node（這台機器同時有 22 / 24 / 26）。
+# 這是 better-sqlite3 ABI 崩潰的根本解。
+step "1/4  套件管理器"
 REQUIRED_PNPM="10.33.0"
-
 if ! command -v pnpm &>/dev/null; then
   warn "找不到 pnpm，正在安裝 $REQUIRED_PNPM..."
   npm install -g "pnpm@$REQUIRED_PNPM" || err "pnpm 安裝失敗"
 fi
-
-CURRENT_PNPM=$(pnpm -v 2>/dev/null)
-if [ "$CURRENT_PNPM" != "$REQUIRED_PNPM" ]; then
-  warn "pnpm 版本不符（目前 $CURRENT_PNPM，需要 $REQUIRED_PNPM），正在更新..."
-  npm install -g "pnpm@$REQUIRED_PNPM" 2>&1 | tail -1
-fi
 ok "pnpm $(pnpm -v)"
+NODE_VER=$(pnpm exec node -v 2>/dev/null)
+ok "Node $NODE_VER  (pnpm 已鎖定 22.22.3)"
 
-# ── 3. 環境設定 ───────────────────────────────────────
-step "3/6  環境設定"
-
+# ── 2. 環境設定 ───────────────────────────────────────
+step "2/4  環境設定"
 if [ ! -f ".env" ]; then
   warn ".env 不存在，從 .env.example 建立..."
   cp .env.example .env
@@ -86,79 +63,45 @@ if [ ! -f ".env" ]; then
   info "      執行：echo POST_GENERATOR_SECRET_KEY=\$(openssl rand -hex 32) >> .env"
 else
   ok ".env 已存在"
-  # 檢查 .env.example 有沒有新增的 key
   NEW_KEYS=$(comm -23 <(grep -o '^[^=]*' .env.example | sort) <(grep -o '^[^=]*' .env | sort) 2>/dev/null)
   if [ -n "$NEW_KEYS" ]; then
     warn ".env.example 有新的設定項尚未加入 .env："
     echo "$NEW_KEYS" | while read k; do info "  缺少：$k"; done
   fi
 fi
-
-# 確保 data 目錄存在
 DATA_DIR="${POST_GENERATOR_HOME:-$HOME/.post-generator}"
 mkdir -p "$DATA_DIR"
 ok "資料目錄：$DATA_DIR"
 
-# ── 4. 依賴安裝 ───────────────────────────────────────
-step "4/6  套件依賴 (monorepo)"
-
-# 用 pnpm-lock.yaml 判斷是否需要更新
+# ── 3. 依賴安裝（lockfile 有變才裝）───────────────────
+step "3/4  套件依賴"
 LOCK_HASH_FILE="/tmp/post-generator-lock-hash"
 CURRENT_HASH=$(md5 -q pnpm-lock.yaml 2>/dev/null)
 LAST_HASH=$(cat "$LOCK_HASH_FILE" 2>/dev/null)
-
 if [ "$CURRENT_HASH" = "$LAST_HASH" ] && [ -d "node_modules" ]; then
   ok "依賴無變更，跳過安裝"
 else
   info "偵測到依賴變更，安裝中..."
-  pnpm install --frozen-lockfile 2>&1 | grep -E '(packages|warn|error|ERR)' | head -5
-  if [ $? -ne 0 ]; then
+  if ! pnpm install --frozen-lockfile 2>&1 | grep -E '(packages|warn|error|ERR)' | head -5; then
     warn "frozen-lockfile 失敗，嘗試一般安裝..."
     pnpm install || err "依賴安裝失敗"
   fi
   echo "$CURRENT_HASH" > "$LOCK_HASH_FILE"
-  ok "所有 workspace 套件已就緒"
+  ok "套件已就緒"
 fi
 
-# ── 5. 資料庫 ─────────────────────────────────────────
-step "5/6  資料庫"
-pnpm db:migrate 2>&1 | grep -v "^$"
-if [ $? -eq 0 ]; then
-  ok "資料庫已是最新版本"
-else
-  warn "遷移有警告，繼續啟動"
-fi
-
-# ── 6. 啟動伺服器（正式版，單一實例）──────────────────
-step "6/6  啟動伺服器"
-
+# ── 4. 啟動（單一實例 / 正式版）───────────────────────
+# pnpm start:clean 一條龍：回收 port 3000 → 自癒 native 模組(ABI) → 遷移 DB
+# → 正式建置 → 啟動。全部走 pnpm 鎖定的 Node 22，所以這裡不再手動 build/抢 port。
+step "4/4  啟動伺服器（首次或改動後建置約 30–60 秒）"
 PORT=3000
-
-# 回收 port：清掉殘留的舊實例，永遠固定用 3000。
-# （舊版在 port 被佔用時會退讓到 3001，導致每次啟動都疊加一個新 server —
-#   這正是「畫面卡住 / 功能全部不能用」的根因。現在改成回收，不再疊加。）
-info "清理殘留的舊實例並回收 port $PORT..."
-node scripts/free-port.mjs $PORT 2>/dev/null || { lsof -ti:$PORT 2>/dev/null | xargs kill 2>/dev/null; sleep 1; }
-
-# 檢查 .next cache 是否損壞（build-manifest 必須存在）
-if [ -d ".next" ] && [ ! -f ".next/build-manifest.json" ]; then
-  warn ".next cache 損壞，清除中..."
-  rm -rf .next
-  ok ".next cache 已清除"
-fi
-
-# 正式建置：CSP 最嚴格、最接近真實行為，且比 dev 模式更穩定、更省資源。
-step "建置正式版（首次或程式碼改動後需要約 30–60 秒）"
-pnpm build 2>&1 | tail -3 || err "建置失敗"
-ok "建置完成"
-
 info "本地網址：http://localhost:$PORT"
 info "按 Ctrl+C 停止服務"
 echo ""
 
 # 健康偵測 → 成功才開瀏覽器
 (
-  for i in $(seq 1 30); do
+  for i in $(seq 1 60); do
     sleep 2
     if curl -sf "http://localhost:$PORT" &>/dev/null; then
       echo "${GREEN}  ✓ 伺服器已就緒，開啟瀏覽器${NC}"
@@ -168,4 +111,4 @@ echo ""
   done
 ) &
 
-pnpm start
+pnpm start:clean || err "啟動失敗"
