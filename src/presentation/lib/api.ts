@@ -49,7 +49,9 @@ export async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> 
 }
 
 function isErrorPayload(value: unknown): value is { error: AppError } {
-  return Boolean(value && typeof value === "object" && "error" in value);
+  if (!value || typeof value !== "object" || !("error" in value)) return false;
+  const err = (value as { error: unknown }).error;
+  return Boolean(err && typeof err === "object" && "code" in err && "message" in err);
 }
 
 export async function loadBootstrap(): Promise<BootstrapData> {
@@ -78,7 +80,10 @@ export async function testProviderProfile(
 }
 
 export async function deleteGenerationRecord(id: string): Promise<void> {
-  await fetch(`/api/generations/${id}`, { method: "DELETE" });
+  const response = await fetch(`/api/generations/${id}`, { method: "DELETE" });
+  if (!response.ok) {
+    throw new ApiClientError({ code: "HTTP_ERROR", message: `HTTP ${response.status}` });
+  }
 }
 
 export type CompletionResponse = {

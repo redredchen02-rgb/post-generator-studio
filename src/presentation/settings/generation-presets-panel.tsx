@@ -15,6 +15,7 @@ import { Input } from "@/presentation/components/ui/input";
 import { NativeSelect } from "@/presentation/components/ui/native-select";
 import { fetchJson } from "@/presentation/lib/api";
 import { Header } from "./settings-workspace";
+import { DEFAULT_TEMPERATURE, DEFAULT_MAX_TOKENS } from "@/domain/constants";
 
 type PresetForm = z.infer<typeof generationPresetCreateSchema>;
 
@@ -23,8 +24,8 @@ function makeDefaults(providers: ProviderProfile[], templates: PromptTemplate[])
     name: "New Preset",
     providerProfileId: providers[0]?.id || "",
     promptTemplateId: templates[0]?.id || "",
-    temperature: 0.7,
-    maxTokens: 3000,
+    temperature: DEFAULT_TEMPERATURE,
+    maxTokens: DEFAULT_MAX_TOKENS,
     locale: "zh-CN",
     outputFormat: "markdown",
     enabledPipelineSteps: [...ALL_PIPELINE_STEPS],

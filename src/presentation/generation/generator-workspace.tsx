@@ -192,13 +192,21 @@ export function GeneratorWorkspace(): React.ReactElement {
   }
 
   async function copyMarkdown(): Promise<void> {
-    await navigator.clipboard.writeText(content);
-    setStatus(t("markdownCopied"));
+    try {
+      await navigator.clipboard.writeText(content);
+      setStatus(t("markdownCopied"));
+    } catch {
+      setStatus(t("copyFailed"));
+    }
   }
 
   async function copyPlainText(): Promise<void> {
-    await navigator.clipboard.writeText(stripMarkdown(content));
-    setStatus(t("plainTextCopied"));
+    try {
+      await navigator.clipboard.writeText(stripMarkdown(content));
+      setStatus(t("plainTextCopied"));
+    } catch {
+      setStatus(t("copyFailed"));
+    }
   }
 
   function exportLocal(format: "md" | "txt"): void {
@@ -210,7 +218,7 @@ export function GeneratorWorkspace(): React.ReactElement {
     const ts = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}_${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}`;
     link.download = `${title || "generation"}_${ts}.${format}`;
     link.click();
-    URL.revokeObjectURL(link.href);
+    setTimeout(() => URL.revokeObjectURL(link.href), 100);
     setStatus(t("exported", { format }));
   }
 

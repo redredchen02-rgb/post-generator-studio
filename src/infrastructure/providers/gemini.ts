@@ -40,10 +40,10 @@ export class GeminiAdapter extends BaseAdapter {
   ): Promise<RequestBuildResult> {
     const baseUrl = (config.baseUrl || "https://generativelanguage.googleapis.com").replace(/\/$/, "");
     return {
-      url: `${baseUrl}/v1beta/models/${encodeURIComponent(request.model)}:streamGenerateContent?alt=sse&key=${encodeURIComponent(options?.apiKey || "")}`,
+      url: `${baseUrl}/v1beta/models/${encodeURIComponent(request.model)}:streamGenerateContent?alt=sse`,
       init: {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-goog-api-key": options?.apiKey || "" },
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: request.systemPrompt }] },
           contents: [{ role: "user", parts: [{ text: request.userPrompt }] }],
@@ -85,10 +85,10 @@ export class GeminiAdapter extends BaseAdapter {
     // Non-streaming uses :generateContent (no ?alt=sse) rather than :streamGenerateContent.
     const baseUrl = (config.baseUrl || "https://generativelanguage.googleapis.com").replace(/\/$/, "");
     return {
-      url: `${baseUrl}/v1beta/models/${encodeURIComponent(request.model)}:generateContent?key=${encodeURIComponent(options?.apiKey || "")}`,
+      url: `${baseUrl}/v1beta/models/${encodeURIComponent(request.model)}:generateContent`,
       init: {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-goog-api-key": options?.apiKey || "" },
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: request.systemPrompt }] },
           contents: [{ role: "user", parts: [{ text: request.userPrompt }] }],
@@ -120,7 +120,9 @@ export class GeminiAdapter extends BaseAdapter {
       return [];
     }
     const baseUrl = (config.baseUrl || "https://generativelanguage.googleapis.com").replace(/\/$/, "");
-    const response = await fetch(`${baseUrl}/v1beta/models?key=${encodeURIComponent(options.apiKey)}`, {
+    const response = await fetch(`${baseUrl}/v1beta/models`, {
+      method: "GET",
+      headers: { "x-goog-api-key": options.apiKey },
       signal: options.abortSignal,
     });
     if (!response.ok) {

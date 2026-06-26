@@ -87,10 +87,10 @@ export abstract class BaseAdapter implements LLMProviderAdapter {
 
   async validateConfig(config: ProviderProfile, options?: GenerationOptions): Promise<ProviderValidationResult> {
     if (this.supportsApiKey && !options?.apiKey) {
-      return { ok: false, error: { code: "API_KEY_MISSING", message: "API Key 未配置" } };
+      return { ok: false, error: { code: "API_KEY_MISSING", message: "API Key not configured" } };
     }
     if (!config.model) {
-      return { ok: false, error: { code: "MODEL_MISSING", message: "模型未配置" } };
+      return { ok: false, error: { code: "MODEL_MISSING", message: "Model not configured" } };
     }
     return { ok: true };
   }

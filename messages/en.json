@@ -23,6 +23,7 @@
     "saveFailed": "Save failed",
     "markdownCopied": "Markdown copied",
     "plainTextCopied": "Plain text copied",
+    "copyFailed": "Copy failed",
     "exported": "Exported .{format}",
     "controlsLabel": "Generation controls",
     "customInstructionLabel": "Custom instruction",

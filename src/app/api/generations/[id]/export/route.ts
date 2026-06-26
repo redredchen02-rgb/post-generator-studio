@@ -20,7 +20,6 @@ export async function GET(request: Request, context: RouteContext): Promise<Next
       headers: {
         "Content-Type": format === "md" ? "text/markdown; charset=utf-8" : "text/plain; charset=utf-8",
         "Content-Disposition": `attachment; filename="${exported.filename}"`,
-        "X-Export-Path": exported.path,
       },
     });
   } catch (error) {

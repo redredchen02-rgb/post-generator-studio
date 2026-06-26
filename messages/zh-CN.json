@@ -23,6 +23,7 @@
     "saveFailed": "保存失败",
     "markdownCopied": "Markdown 已复制",
     "plainTextCopied": "纯文本已复制",
+    "copyFailed": "复制失败",
     "exported": "已导出 .{format}",
     "controlsLabel": "生成控制",
     "customInstructionLabel": "自定义指令",
