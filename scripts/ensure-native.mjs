@@ -11,52 +11,68 @@
 // Fast path: when the module already loads, this exits in a few ms — a no-op.
 // It only rebuilds on a genuine ABI mismatch, and never masks other failures.
 //
+// IMPORTANT: every load probe runs in a FRESH child process. Re-dlopen-ing a
+// just-rebuilt addon inside a process that already attempted (and failed) the
+// load segfaults on Linux/CI (NODE_MODULE_VERSION 127 vs 147 → "install: Done"
+// → SIGSEGV exit 139). Isolating each probe in its own process avoids that.
+//
 // Usage: node scripts/ensure-native.mjs
 
 import { createRequire } from "node:module";
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 
-const require = createRequire(import.meta.url);
 const PKG = "better-sqlite3";
+const SELF = process.argv[1];
 
-function loadError() {
+// --probe: child mode. Force the real native load and report via exit code:
+// 0 = loads cleanly, 1 = failed (reason written to stderr).
+if (process.argv.includes("--probe")) {
   try {
-    // better-sqlite3 lazy-loads its native addon: require() alone does NOT
-    // dlopen the binary, so it would pass even with a mismatched ABI. Opening an
-    // in-memory database forces the real native load — that's what surfaces the
-    // ABI/dlopen failure we want to heal.
+    const require = createRequire(import.meta.url);
+    // require() alone does NOT dlopen the addon (better-sqlite3 v11 lazy-loads);
+    // opening an in-memory DB is what forces the real native load.
     const Database = require(PKG);
     new Database(":memory:").close();
-    return null;
+    process.exit(0);
   } catch (err) {
-    return err;
+    process.stderr.write(String(err?.message ?? err ?? ""));
+    process.exit(1);
   }
 }
 
-const err = loadError();
-if (!err) process.exit(0);
+// Probe in a fresh process using the SAME Node that's running this guard
+// (process.execPath), so the result reflects the Node the app will actually use.
+function probe() {
+  try {
+    execFileSync(process.execPath, [SELF, "--probe"], { stdio: ["ignore", "ignore", "pipe"] });
+    return { ok: true, output: "" };
+  } catch (err) {
+    return { ok: false, output: String(err?.stderr ?? err?.message ?? "") };
+  }
+}
 
-const message = String(err?.message ?? "");
-const isAbiMismatch = /NODE_MODULE_VERSION/.test(message) || err?.code === "ERR_DLOPEN_FAILED";
+const first = probe();
+if (first.ok) process.exit(0);
 
+const isAbiMismatch = /NODE_MODULE_VERSION/.test(first.output) || /ERR_DLOPEN_FAILED/.test(first.output);
 if (!isAbiMismatch) {
   // A different problem (missing dependency, corrupt install). Surface it as-is
   // instead of triggering a rebuild that won't help.
-  console.error(`  ✗ ${PKG} failed to load for an unexpected reason:\n${message}`);
+  console.error(`  ✗ ${PKG} failed to load for an unexpected reason:\n${first.output}`);
   process.exit(1);
 }
 
 console.log(`  ⚠ ${PKG} was built for a different Node ABI — rebuilding for ${process.version}...`);
 try {
-  execSync(`pnpm rebuild ${PKG}`, { stdio: "inherit" });
+  execFileSync("pnpm", ["rebuild", PKG], { stdio: "inherit" });
 } catch {
   console.error(`  ✗ rebuild failed. Run manually: pnpm rebuild ${PKG}`);
   process.exit(1);
 }
 
-const stillBroken = loadError();
-if (stillBroken) {
-  console.error(`  ✗ ${PKG} still failing after rebuild:\n${String(stillBroken?.message ?? "")}`);
+const after = probe();
+if (!after.ok) {
+  console.error(`  ✗ ${PKG} still failing after rebuild:\n${after.output}`);
   process.exit(1);
 }
 console.log(`  ✓ ${PKG} rebuilt for ${process.version}`);
