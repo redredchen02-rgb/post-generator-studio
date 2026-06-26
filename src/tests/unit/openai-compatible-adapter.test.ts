@@ -169,3 +169,31 @@ describe("OpenAICompatibleAdapter.listModels early return", () => {
     }
   });
 });
+
+describe("OpenAICompatibleAdapter chunk shape guard", () => {
+  async function streamWith(body: string) {
+    const originalFetch = global.fetch;
+    global.fetch = (async () =>
+      new Response(body, { status: 200, headers: { "Content-Type": "text/event-stream" } })) as typeof fetch;
+    const events = [];
+    try {
+      for await (const event of makeAdapter().generate(request, makeProfile("http://localhost:8000"), { apiKey: "k" })) {
+        events.push(event);
+      }
+    } finally {
+      global.fetch = originalFetch;
+    }
+    return events;
+  }
+
+  it("surfaces an observable error for an object chunk with no choices/usage/model", async () => {
+    const events = await streamWith('data: {"unexpected":"shape"}\n\n');
+    expect(events.some((e) => e.type === "error")).toBe(true);
+    expect(events.some((e) => e.type === "token")).toBe(false);
+  });
+
+  it("surfaces an inline HTTP-200 error chunk (e.g. context length) as an observable error", async () => {
+    const events = await streamWith('data: {"error":{"message":"context length exceeded"}}\n\n');
+    expect(events.some((e) => e.type === "error" && /context length/.test(String(e.message)))).toBe(true);
+  });
+});

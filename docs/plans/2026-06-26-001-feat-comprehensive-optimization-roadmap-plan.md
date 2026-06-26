@@ -196,7 +196,7 @@ flowchart TB
 
 ---
 
-- [ ] **Unit 2: 驗證 Provider `parseChunk` 欄位驗證 + 補測試（S2 — 已落地，改驗證）**
+- [x] **Unit 2: 驗證 Provider `parseChunk` 欄位驗證 + 補測試（S2 — 已落地，改驗證）** — ✅ 四 adapter validateChunkShape 確認涵蓋(SSE+ndjson 兩路徑皆走 safeParseChunk)；補 anthropic/ollama/openai per-adapter malformed-shape + inline-error fixture(+5 測試)；gemini 已在 base-adapter 測試代表
 
 **Goal:** S2 的欄位形狀驗證**已落地**——`base-adapter.ts:223` 有 `validateChunkShape` hook，在 `safeParseChunk:240` 內於 parseChunk **之前**呼叫，且四個 adapter 皆已實作（`anthropic:63`、`ollama:70`、`gemini:59`、`openai-compatible:90`，例如 openai-compatible 已偵測 HTTP-200 的 `{error:...}` body 與缺 `choices`）。`raw as XChunk` casts 仍在但已被上游 guard 保護。本 unit 改為**驗證涵蓋面 + 補缺測試**。
 

@@ -85,4 +85,27 @@ describe("OllamaAdapter", () => {
 
     expect(events.some((e) => e.type === "error")).toBe(true);
   });
+
+  it("surfaces an observable error for a JSON line with an unexpected shape", async () => {
+    const adapter = new OllamaAdapter();
+    const originalFetch = global.fetch;
+    global.fetch = async () =>
+      new Response(JSON.stringify({ unexpected: "shape" }) + "\n", {
+        status: 200,
+        headers: { "Content-Type": "application/x-ndjson" },
+      });
+
+    const events = [];
+    for await (const event of adapter.generate(
+      { systemPrompt: "S", userPrompt: "U", model: "llama3", temperature: 0.7, maxTokens: 100, stream: true },
+      makeProfile(),
+    )) {
+      events.push(event);
+    }
+    global.fetch = originalFetch;
+
+    // object-but-wrong-shape line surfaces an observable error rather than being silently dropped
+    expect(events.some((e) => e.type === "error")).toBe(true);
+    expect(events.some((e) => e.type === "token")).toBe(false);
+  });
 });

@@ -90,4 +90,50 @@ describe("AnthropicAdapter", () => {
 
     expect(events.some((e) => e.type === "error")).toBe(true);
   });
+
+  it("surfaces an observable error for an object chunk with an unexpected shape", async () => {
+    const adapter = new AnthropicAdapter();
+    const originalFetch = global.fetch;
+    global.fetch = async () =>
+      new Response(['data: {"unexpected":"shape"}', "", 'data: {"type":"content_block_delta","delta":{"text":"leak"}}', ""].join("\n"), {
+        status: 200,
+        headers: { "Content-Type": "text/event-stream" },
+      });
+
+    const events = [];
+    for await (const event of adapter.generate(
+      { systemPrompt: "S", userPrompt: "U", model: "claude-3", temperature: 0.7, maxTokens: 100, stream: true },
+      makeProfile(),
+      { apiKey: "sk-test" },
+    )) {
+      events.push(event);
+    }
+    global.fetch = originalFetch;
+
+    // shape-invalid chunk is reported and stops the stream — no later token leaks through
+    expect(events.some((e) => e.type === "error")).toBe(true);
+    expect(events.some((e) => e.type === "token")).toBe(false);
+  });
+
+  it("surfaces an inline HTTP-200 error chunk as an observable error", async () => {
+    const adapter = new AnthropicAdapter();
+    const originalFetch = global.fetch;
+    global.fetch = async () =>
+      new Response('data: {"error":{"message":"overloaded"}}\n\n', {
+        status: 200,
+        headers: { "Content-Type": "text/event-stream" },
+      });
+
+    const events = [];
+    for await (const event of adapter.generate(
+      { systemPrompt: "S", userPrompt: "U", model: "claude-3", temperature: 0.7, maxTokens: 100, stream: true },
+      makeProfile(),
+      { apiKey: "sk-test" },
+    )) {
+      events.push(event);
+    }
+    global.fetch = originalFetch;
+
+    expect(events.some((e) => e.type === "error" && /overloaded/.test(String(e.message)))).toBe(true);
+  });
 });
