@@ -37,8 +37,13 @@ export async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> 
     },
   });
   const data = (await response.json()) as T | { error: AppError };
-  if (!response.ok && isErrorPayload(data)) {
+  // Throw on any structured error payload, and on any non-OK status, so a failed
+  // request never slips through as a valid T (e.g. into result.content).
+  if (isErrorPayload(data)) {
     throw new ApiClientError(data.error);
+  }
+  if (!response.ok) {
+    throw new ApiClientError({ code: "HTTP_ERROR", message: `HTTP ${response.status}` });
   }
   return data as T;
 }

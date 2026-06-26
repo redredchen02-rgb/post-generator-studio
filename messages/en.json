@@ -200,6 +200,8 @@
     "continue": "Continue",
     "regenParagraph": "Regenerate paragraph",
     "noParagraph": "Place the cursor inside a paragraph first",
-    "processing": "Working…"
+    "processing": "Working…",
+    "emptyCompletion": "No suggestion returned",
+    "diffStale": "The text changed — suggestion discarded"
   }
 }

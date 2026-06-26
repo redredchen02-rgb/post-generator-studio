@@ -6,7 +6,24 @@ import {
   buildParagraphPrompt,
   buildRewritePrompt,
   replaceRange,
+  sanitizeCompletion,
 } from "@/presentation/generation/editor/rewrite-actions";
+
+describe("sanitizeCompletion", () => {
+  it("trims surrounding whitespace", () => {
+    expect(sanitizeCompletion("  hello  ")).toBe("hello");
+  });
+
+  it("unwraps a fully fenced reply (with language tag)", () => {
+    expect(sanitizeCompletion("```markdown\nthe rewrite\n```")).toBe("the rewrite");
+    expect(sanitizeCompletion("```\nplain fence\n```")).toBe("plain fence");
+  });
+
+  it("leaves inline backticks and partial fences untouched", () => {
+    expect(sanitizeCompletion("use `code` here")).toBe("use `code` here");
+    expect(sanitizeCompletion("no fence at all")).toBe("no fence at all");
+  });
+});
 
 describe("replaceRange (replace the middle, leave head and tail byte-identical)", () => {
   const doc = "para one.\npara two.\npara three.";

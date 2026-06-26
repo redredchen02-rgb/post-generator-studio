@@ -200,6 +200,8 @@
     "continue": "续写",
     "regenParagraph": "重生成本段",
     "noParagraph": "请先把光标放到某一段落内",
-    "processing": "处理中…"
+    "processing": "处理中…",
+    "emptyCompletion": "未返回任何建议",
+    "diffStale": "文本已变动，建议已丢弃"
   }
 }

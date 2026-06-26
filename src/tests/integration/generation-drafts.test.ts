@@ -80,6 +80,12 @@ describe("generation drafts (real connection)", () => {
     expect((await storage.generationDrafts.listByGeneration(genId))).toHaveLength(1);
   });
 
+  it("setActive rejects a draft id that does not belong to the generation (no dangling pointer)", async () => {
+    const genId = await seedGeneration();
+    await expect(storage.generationDrafts.setActive(genId, "draft_does_not_exist")).rejects.toThrow();
+    expect((await storage.generations.get(genId))?.activeDraftId).toBeUndefined();
+  });
+
   it("INITIAL_SQL defines the drafts table and the active_draft_id column (schema parity)", () => {
     expect(INITIAL_SQL).toContain("generation_drafts");
     expect(INITIAL_SQL).toContain("active_draft_id");

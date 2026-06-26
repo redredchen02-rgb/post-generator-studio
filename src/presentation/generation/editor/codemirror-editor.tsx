@@ -12,6 +12,7 @@ import {
   buildParagraphPrompt,
   buildRewritePrompt,
   paragraphRangeAt,
+  sanitizeCompletion,
   type RewriteActionId,
 } from "./rewrite-actions";
 
@@ -51,12 +52,54 @@ export function CodeMirrorEditor({
   const containerRef = React.useRef<HTMLDivElement>(null);
   const viewRef = React.useRef<EditorView | null>(null);
   const cursorRef = React.useRef(0);
+  // Monotonic request id: only the newest in-flight completion may touch state,
+  // so out-of-order responses and post-unmount resolves are ignored.
+  const seqRef = React.useRef(0);
+  const mountedRef = React.useRef(true);
   const [selection, setSelection] = React.useState<Selection | null>(null);
   const [busy, setBusy] = React.useState(false);
   const [diff, setDiff] = React.useState<PendingDiff | null>(null);
   const [error, setError] = React.useState<string | null>(null);
 
+  React.useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
   const rewriteEnabled = Boolean(presetId) && !readOnly;
+
+  /**
+   * Shared completion runner: guards busy/error state, ignores stale/unmounted
+   * responses, sanitizes the reply, and surfaces empty results instead of failing
+   * silently. `onText` only runs for the newest request with a non-empty result.
+   */
+  const executeCompletion = React.useCallback(
+    async (build: () => { systemPrompt: string; prompt: string }, onText: (text: string) => void) => {
+      if (!presetId) return;
+      const seq = ++seqRef.current;
+      const { systemPrompt, prompt } = build();
+      setBusy(true);
+      setError(null);
+      try {
+        const result = await requestCompletion({ prompt, systemPrompt, presetId, providerProfileId });
+        if (!mountedRef.current || seq !== seqRef.current) return;
+        const text = sanitizeCompletion(result.content);
+        if (!text) {
+          setError(t("emptyCompletion"));
+          return;
+        }
+        onText(text);
+      } catch (e) {
+        if (!mountedRef.current || seq !== seqRef.current) return;
+        setError(e instanceof Error ? e.message : t("rewriteFailed"));
+      } finally {
+        if (mountedRef.current && seq === seqRef.current) setBusy(false);
+      }
+    },
+    [presetId, providerProfileId, t],
+  );
 
   const refreshSelection = React.useCallback(
     (view: EditorView) => {
@@ -97,59 +140,46 @@ export function CodeMirrorEditor({
   );
 
   const runAction = React.useCallback(
-    async (id: RewriteActionId) => {
+    (id: RewriteActionId) => {
       const view = viewRef.current;
-      if (!view || !selection || !presetId) return;
+      if (!view || !selection) return;
       const { from, to } = selection;
       const doc = view.state.doc.toString();
       const original = doc.slice(from, to);
-      const ctx = {
-        title,
-        selection: original,
-        before: doc.slice(Math.max(0, from - CONTEXT_CHARS), from),
-        after: doc.slice(to, to + CONTEXT_CHARS),
-        tone: id === "tone" ? t("defaultTone") : undefined,
-      };
-      const { systemPrompt, prompt } = buildRewritePrompt(id, ctx);
-      setBusy(true);
-      setError(null);
-      try {
-        const result = await requestCompletion({ prompt, systemPrompt, presetId, providerProfileId });
-        const suggestion = result.content.trim();
-        if (suggestion) setDiff({ from, to, original, suggestion });
-      } catch (e) {
-        setError(e instanceof Error ? e.message : t("rewriteFailed"));
-      } finally {
-        setBusy(false);
-      }
+      void executeCompletion(
+        () =>
+          buildRewritePrompt(id, {
+            title,
+            selection: original,
+            before: doc.slice(Math.max(0, from - CONTEXT_CHARS), from),
+            after: doc.slice(to, to + CONTEXT_CHARS),
+            tone: id === "tone" ? t("defaultTone") : undefined,
+          }),
+        (text) => setDiff({ from, to, original, suggestion: text }),
+      );
     },
-    [selection, presetId, providerProfileId, title, t],
+    [selection, title, executeCompletion, t],
   );
 
-  const runContinue = React.useCallback(async () => {
+  const runContinue = React.useCallback(() => {
     const view = viewRef.current;
-    if (!view || !presetId) return;
+    if (!view) return;
     const fullText = view.state.doc.toString();
-    const { systemPrompt, prompt } = buildContinuePrompt({ title, fullText });
-    setBusy(true);
-    setError(null);
-    try {
-      const result = await requestCompletion({ prompt, systemPrompt, presetId, providerProfileId });
-      const addition = result.content.trim();
-      if (!addition) return;
-      const end = view.state.doc.length;
-      const insert = (fullText.trim() ? "\n\n" : "") + addition;
-      view.dispatch({ changes: { from: end, to: end, insert } });
-    } catch (e) {
-      setError(e instanceof Error ? e.message : t("rewriteFailed"));
-    } finally {
-      setBusy(false);
-    }
-  }, [presetId, providerProfileId, title, t]);
+    void executeCompletion(
+      () => buildContinuePrompt({ title, fullText }),
+      (text) => {
+        const v = viewRef.current;
+        if (!v) return;
+        // Append at the live document end with current-state separator, not a stale length.
+        const end = v.state.doc.length;
+        v.dispatch({ changes: { from: end, to: end, insert: (end > 0 ? "\n\n" : "") + text } });
+      },
+    );
+  }, [title, executeCompletion]);
 
-  const runParagraphRegen = React.useCallback(async () => {
+  const runParagraphRegen = React.useCallback(() => {
     const view = viewRef.current;
-    if (!view || !presetId) return;
+    if (!view) return;
     const doc = view.state.doc.toString();
     const range = paragraphRangeAt(doc, cursorRef.current);
     if (!range) {
@@ -157,33 +187,33 @@ export function CodeMirrorEditor({
       return;
     }
     const original = doc.slice(range.from, range.to);
-    const { systemPrompt, prompt } = buildParagraphPrompt({
-      title,
-      paragraph: original,
-      before: doc.slice(Math.max(0, range.from - CONTEXT_CHARS), range.from),
-      after: doc.slice(range.to, range.to + CONTEXT_CHARS),
-    });
-    setBusy(true);
-    setError(null);
-    try {
-      const result = await requestCompletion({ prompt, systemPrompt, presetId, providerProfileId });
-      const suggestion = result.content.trim();
-      if (suggestion) setDiff({ from: range.from, to: range.to, original, suggestion });
-    } catch (e) {
-      setError(e instanceof Error ? e.message : t("rewriteFailed"));
-    } finally {
-      setBusy(false);
-    }
-  }, [presetId, providerProfileId, title, t]);
+    void executeCompletion(
+      () =>
+        buildParagraphPrompt({
+          title,
+          paragraph: original,
+          before: doc.slice(Math.max(0, range.from - CONTEXT_CHARS), range.from),
+          after: doc.slice(range.to, range.to + CONTEXT_CHARS),
+        }),
+      (text) => setDiff({ from: range.from, to: range.to, original, suggestion: text }),
+    );
+  }, [title, executeCompletion, t]);
 
   const acceptDiff = React.useCallback(() => {
     const view = viewRef.current;
     if (!view || !diff) return;
+    // Guard against a stale anchor: if the document changed under the suggestion
+    // (edit landed while the request was in flight), refuse rather than corrupt.
+    if (view.state.doc.sliceString(diff.from, diff.to) !== diff.original) {
+      setError(t("diffStale"));
+      setDiff(null);
+      return;
+    }
     // Replace only the selected range; head and tail stay byte-identical.
     view.dispatch({ changes: { from: diff.from, to: diff.to, insert: diff.suggestion } });
     setDiff(null);
     setSelection(null);
-  }, [diff]);
+  }, [diff, t]);
 
   const rejectDiff = React.useCallback(() => {
     setDiff(null);

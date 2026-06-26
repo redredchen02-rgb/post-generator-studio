@@ -89,6 +89,17 @@ export function replaceRange(doc: string, from: number, to: number, replacement:
 }
 
 /**
+ * Normalize a model completion before it touches the document: trim, and unwrap a
+ * single enclosing markdown code fence (models often wrap a rewrite in ```), which
+ * would otherwise be spliced verbatim into the prose.
+ */
+export function sanitizeCompletion(raw: string): string {
+  const text = raw.trim();
+  const fenced = text.match(/^```[^\n]*\n([\s\S]*?)\n?```$/);
+  return (fenced ? fenced[1] : text).trim();
+}
+
+/**
  * The paragraph (maximal run of non-blank lines) containing `pos`, or null when
  * the cursor sits on a blank separator line or the document is empty. Used to
  * regenerate just the paragraph under the cursor without touching its neighbours.

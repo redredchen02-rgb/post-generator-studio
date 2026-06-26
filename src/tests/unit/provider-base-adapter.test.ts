@@ -208,4 +208,22 @@ describe("complete() hardening", () => {
       ),
     ).rejects.toThrow("非预期的响应结构");
   });
+
+  it("distinguishes user cancellation (COMPLETION_CANCELLED) from a timeout", async () => {
+    const controller = new AbortController();
+    controller.abort(); // user cancelled before the request went out
+    // Fetch rejects immediately for an already-aborted signal (mirrors real fetch).
+    global.fetch = ((_url: string, init?: RequestInit) =>
+      init?.signal?.aborted
+        ? Promise.reject(new DOMException("aborted", "AbortError"))
+        : new Promise<Response>(() => {})) as typeof fetch;
+
+    await expect(
+      new OpenAICompatibleAdapter({
+        id: "openai-compatible",
+        defaultBaseUrl: "http://x",
+        requiresApiKey: false,
+      }).complete(request, profileFor("openai-compatible"), { abortSignal: controller.signal }),
+    ).rejects.toMatchObject({ appError: { code: "COMPLETION_CANCELLED" } });
+  });
 });

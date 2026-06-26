@@ -70,6 +70,14 @@ export class SqliteGenerationDraftRepository implements GenerationDraftRepositor
 
   async setActive(generationId: string, draftId: string | null): Promise<void> {
     const db = await getDb();
+    // Never point a generation at a draft that doesn't exist (no FK enforces this
+    // direction), which would leave a dangling active_draft_id pointer.
+    if (draftId !== null) {
+      const draft = await this.get(draftId);
+      if (!draft || draft.generationId !== generationId) {
+        notFound("GenerationDraft");
+      }
+    }
     await db.update(generations).set({ activeDraftId: draftId }).where(eq(generations.id, generationId));
   }
 
