@@ -2,7 +2,7 @@ import { desc, eq } from "drizzle-orm";
 import { nowIso } from "@/lib/utils";
 import { providerProfileSchema, type ProviderProfile, type ProviderProfileCreate, type ProviderProfileUpdate } from "@/domain/schemas";
 import type { ProviderProfileRepository } from "@/domain/ports/storage";
-import { notFound } from "@/infrastructure/storage/repo-utils";
+import { conflict, isForeignKeyConstraintError, notFound } from "@/infrastructure/storage/repo-utils";
 import { getDb } from "@/infrastructure/storage/db";
 import { providerProfiles } from "@/infrastructure/storage/schema";
 
@@ -86,6 +86,13 @@ export class SqliteProviderProfileRepository implements ProviderProfileRepositor
 
   async delete(id: string): Promise<void> {
     const db = await getDb();
-    await db.delete(providerProfiles).where(eq(providerProfiles.id, id));
+    try {
+      await db.delete(providerProfiles).where(eq(providerProfiles.id, id));
+    } catch (error) {
+      if (isForeignKeyConstraintError(error)) {
+        conflict("无法删除该 Provider：仍有生成预设在使用它，请先移除相关预设。");
+      }
+      throw error;
+    }
   }
 }

@@ -11,8 +11,8 @@ describe("preset-service", () => {
   it("creates and retrieves a preset", async () => {
     const created = await createGenerationPreset({
       name: "Test Preset",
-      providerProfileId: "provider_test",
-      promptTemplateId: "template_test",
+      providerProfileId: "provider_ollama_local",
+      promptTemplateId: "template_news_writing",
       locale: "zh-CN",
       outputFormat: "markdown",
       enabledPipelineSteps: ["build-context", "render-prompt"],
@@ -31,8 +31,8 @@ describe("preset-service", () => {
   it("lists presets", async () => {
     await createGenerationPreset({
       name: "List Preset",
-      providerProfileId: "provider_test",
-      promptTemplateId: "template_test",
+      providerProfileId: "provider_ollama_local",
+      promptTemplateId: "template_news_writing",
       locale: "en-US",
       outputFormat: "markdown",
       enabledPipelineSteps: [],
@@ -46,8 +46,8 @@ describe("preset-service", () => {
   it("updates a preset", async () => {
     const created = await createGenerationPreset({
       name: "Update Preset",
-      providerProfileId: "provider_test",
-      promptTemplateId: "template_test",
+      providerProfileId: "provider_ollama_local",
+      promptTemplateId: "template_news_writing",
       locale: "zh-CN",
       outputFormat: "markdown",
       enabledPipelineSteps: [],
@@ -61,8 +61,8 @@ describe("preset-service", () => {
   it("deletes a preset", async () => {
     const created = await createGenerationPreset({
       name: "Delete Preset",
-      providerProfileId: "provider_test",
-      promptTemplateId: "template_test",
+      providerProfileId: "provider_ollama_local",
+      promptTemplateId: "template_news_writing",
       locale: "zh-CN",
       outputFormat: "markdown",
       enabledPipelineSteps: [],

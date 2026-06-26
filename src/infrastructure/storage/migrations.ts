@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS prompt_templates (
 
 CREATE TABLE IF NOT EXISTS prompt_template_versions (
   id TEXT PRIMARY KEY,
-  template_id TEXT NOT NULL,
+  template_id TEXT NOT NULL REFERENCES prompt_templates(id) ON DELETE CASCADE,
   version INTEGER NOT NULL,
   snapshot TEXT NOT NULL,
   created_at TEXT NOT NULL
@@ -45,8 +45,8 @@ CREATE TABLE IF NOT EXISTS prompt_template_versions (
 CREATE TABLE IF NOT EXISTS generation_presets (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
-  provider_profile_id TEXT NOT NULL,
-  prompt_template_id TEXT NOT NULL,
+  provider_profile_id TEXT NOT NULL REFERENCES provider_profiles(id) ON DELETE RESTRICT,
+  prompt_template_id TEXT NOT NULL REFERENCES prompt_templates(id) ON DELETE RESTRICT,
   temperature REAL,
   max_tokens INTEGER,
   locale TEXT NOT NULL,
@@ -78,7 +78,7 @@ CREATE TABLE IF NOT EXISTS generations (
   started_at TEXT,
   completed_at TEXT,
   created_at TEXT NOT NULL,
-  active_draft_id TEXT,
+  active_draft_id TEXT REFERENCES generation_drafts(id) ON DELETE SET NULL,
   quality_score TEXT
 );
 
@@ -129,8 +129,140 @@ export async function runMigrations(): Promise<void> {
     if (!genColumns.some((c) => c.name === "quality_score")) {
       database.exec("ALTER TABLE generations ADD COLUMN quality_score TEXT");
     }
+    // Migration: retrofit foreign-key constraints onto pre-FK installs.
+    // SQLite cannot ALTER TABLE ADD CONSTRAINT, so this rebuilds the affected
+    // tables. No-op on fresh installs (INITIAL_SQL already creates them with FKs).
+    migrateForeignKeyConstraints(database);
   } finally {
     database.close();
+  }
+}
+
+type SqliteDb = InstanceType<typeof Database>;
+
+function tableHasFk(database: SqliteDb, table: string, fromColumn?: string): boolean {
+  const fks = database.pragma(`foreign_key_list(${table})`) as Array<{ from: string }>;
+  if (!Array.isArray(fks) || fks.length === 0) return false;
+  return fromColumn ? fks.some((fk) => fk.from === fromColumn) : true;
+}
+
+/**
+ * Retrofit FK constraints onto existing tables via the SQLite-recommended
+ * table-rebuild procedure (create-copy-drop-rename). Idempotent: each table is
+ * rebuilt only if it is missing the constraint. Orphan child rows (which would
+ * violate the new constraint) are removed/nulled first so foreign_key_check
+ * stays clean after the rebuild.
+ */
+export function migrateForeignKeyConstraints(database: SqliteDb): void {
+  const needsPresets = !tableHasFk(database, "generation_presets");
+  const needsVersions = !tableHasFk(database, "prompt_template_versions");
+  const needsGenerations = !tableHasFk(database, "generations", "active_draft_id");
+  if (!needsPresets && !needsVersions && !needsGenerations) return;
+
+  // The FK pragma is a no-op inside a transaction, so toggle it around the tx.
+  database.pragma("foreign_keys = OFF");
+  const rebuild = database.transaction(() => {
+    if (needsPresets) {
+      database.exec(`
+        DELETE FROM generation_presets
+        WHERE provider_profile_id NOT IN (SELECT id FROM provider_profiles)
+           OR prompt_template_id NOT IN (SELECT id FROM prompt_templates);
+        CREATE TABLE generation_presets_new (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          provider_profile_id TEXT NOT NULL REFERENCES provider_profiles(id) ON DELETE RESTRICT,
+          prompt_template_id TEXT NOT NULL REFERENCES prompt_templates(id) ON DELETE RESTRICT,
+          temperature REAL,
+          max_tokens INTEGER,
+          locale TEXT NOT NULL,
+          output_format TEXT NOT NULL,
+          enabled_pipeline_steps TEXT NOT NULL,
+          is_default INTEGER NOT NULL,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        );
+        INSERT INTO generation_presets_new
+          (id, name, provider_profile_id, prompt_template_id, temperature, max_tokens,
+           locale, output_format, enabled_pipeline_steps, is_default, created_at, updated_at)
+        SELECT id, name, provider_profile_id, prompt_template_id, temperature, max_tokens,
+               locale, output_format, enabled_pipeline_steps, is_default, created_at, updated_at
+        FROM generation_presets;
+        DROP TABLE generation_presets;
+        ALTER TABLE generation_presets_new RENAME TO generation_presets;
+      `);
+    }
+    if (needsVersions) {
+      database.exec(`
+        DELETE FROM prompt_template_versions
+        WHERE template_id NOT IN (SELECT id FROM prompt_templates);
+        CREATE TABLE prompt_template_versions_new (
+          id TEXT PRIMARY KEY,
+          template_id TEXT NOT NULL REFERENCES prompt_templates(id) ON DELETE CASCADE,
+          version INTEGER NOT NULL,
+          snapshot TEXT NOT NULL,
+          created_at TEXT NOT NULL
+        );
+        INSERT INTO prompt_template_versions_new (id, template_id, version, snapshot, created_at)
+        SELECT id, template_id, version, snapshot, created_at FROM prompt_template_versions;
+        DROP TABLE prompt_template_versions;
+        ALTER TABLE prompt_template_versions_new RENAME TO prompt_template_versions;
+      `);
+    }
+    if (needsGenerations) {
+      database.exec(`
+        UPDATE generations SET active_draft_id = NULL
+        WHERE active_draft_id IS NOT NULL
+          AND active_draft_id NOT IN (SELECT id FROM generation_drafts);
+        CREATE TABLE generations_new (
+          id TEXT PRIMARY KEY,
+          idempotency_key TEXT UNIQUE,
+          title TEXT NOT NULL,
+          event_summary TEXT NOT NULL,
+          provider_profile_snapshot TEXT NOT NULL,
+          prompt_template_snapshot TEXT NOT NULL,
+          generation_preset_snapshot TEXT NOT NULL,
+          rendered_system_prompt TEXT NOT NULL,
+          rendered_user_prompt TEXT NOT NULL,
+          output_content TEXT,
+          status TEXT NOT NULL,
+          error_message TEXT,
+          model TEXT,
+          provider_kind TEXT,
+          input_tokens INTEGER,
+          output_tokens INTEGER,
+          total_tokens INTEGER,
+          started_at TEXT,
+          completed_at TEXT,
+          created_at TEXT NOT NULL,
+          active_draft_id TEXT REFERENCES generation_drafts(id) ON DELETE SET NULL,
+          quality_score TEXT
+        );
+        INSERT INTO generations_new
+          (id, idempotency_key, title, event_summary, provider_profile_snapshot,
+           prompt_template_snapshot, generation_preset_snapshot, rendered_system_prompt,
+           rendered_user_prompt, output_content, status, error_message, model, provider_kind,
+           input_tokens, output_tokens, total_tokens, started_at, completed_at, created_at,
+           active_draft_id, quality_score)
+        SELECT id, idempotency_key, title, event_summary, provider_profile_snapshot,
+               prompt_template_snapshot, generation_preset_snapshot, rendered_system_prompt,
+               rendered_user_prompt, output_content, status, error_message, model, provider_kind,
+               input_tokens, output_tokens, total_tokens, started_at, completed_at, created_at,
+               active_draft_id, quality_score
+        FROM generations;
+        DROP TABLE generations;
+        ALTER TABLE generations_new RENAME TO generations;
+        CREATE INDEX IF NOT EXISTS generations_status_idx ON generations(status);
+        CREATE INDEX IF NOT EXISTS generations_created_at_idx ON generations(created_at);
+      `);
+    }
+  });
+  rebuild();
+  const violations = database.pragma("foreign_key_check") as unknown[];
+  database.pragma("foreign_keys = ON");
+  if (Array.isArray(violations) && violations.length > 0) {
+    throw new Error(
+      `FK migration left ${violations.length} integrity violation(s); database not modified safely.`,
+    );
   }
 }
 

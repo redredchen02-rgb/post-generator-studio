@@ -104,6 +104,21 @@ export function useGenerationStream() {
         }),
       });
 
+      if (!response.ok) {
+        // Server returned 4xx/5xx with a non-SSE body. Surface a clear error
+        // instead of feeding the error payload into the SSE parser (which would
+        // throw a JSON parse error and read as "stream broke").
+        const detail = await response.text().catch(() => null);
+        setState((s) => ({
+          ...s,
+          error: t("errorProvider"),
+          errorDetail: detail || null,
+          status: t("statusFailed"),
+          isGenerating: false,
+        }));
+        return;
+      }
+
       if (!response.body) {
         setState((s) => ({ ...s, error: t("errorNoStream"), isGenerating: false }));
         return;

@@ -41,22 +41,28 @@ export class SqliteGenerationPresetRepository implements GenerationPresetReposit
   async create(input: GenerationPresetCreate & { id: string }): Promise<GenerationPreset> {
     const db = await getDb();
     const timestamp = nowIso();
-    if (input.isDefault) {
-      await db.update(generationPresets).set({ isDefault: false });
-    }
-    await db.insert(generationPresets).values({
-      id: input.id,
-      name: input.name,
-      providerProfileId: input.providerProfileId,
-      promptTemplateId: input.promptTemplateId,
-      temperature: input.temperature ?? null,
-      maxTokens: input.maxTokens ?? null,
-      locale: input.locale,
-      outputFormat: input.outputFormat,
-      enabledPipelineSteps: JSON.stringify(input.enabledPipelineSteps),
-      isDefault: input.isDefault,
-      createdAt: timestamp,
-      updatedAt: timestamp,
+    // Clear-then-set the default flag atomically so two concurrent creates
+    // can't both clear and both set, leaving multiple presets marked default.
+    db.transaction((tx) => {
+      if (input.isDefault) {
+        tx.update(generationPresets).set({ isDefault: false }).run();
+      }
+      tx.insert(generationPresets)
+        .values({
+          id: input.id,
+          name: input.name,
+          providerProfileId: input.providerProfileId,
+          promptTemplateId: input.promptTemplateId,
+          temperature: input.temperature ?? null,
+          maxTokens: input.maxTokens ?? null,
+          locale: input.locale,
+          outputFormat: input.outputFormat,
+          enabledPipelineSteps: JSON.stringify(input.enabledPipelineSteps),
+          isDefault: input.isDefault,
+          createdAt: timestamp,
+          updatedAt: timestamp,
+        })
+        .run();
     });
     const created = await this.get(input.id);
     return created ?? notFound("Generation preset");
@@ -68,24 +74,27 @@ export class SqliteGenerationPresetRepository implements GenerationPresetReposit
       notFound("Generation preset");
     }
     const db = await getDb();
-    if (input.isDefault) {
-      await db.update(generationPresets).set({ isDefault: false });
-    }
-    await db
-      .update(generationPresets)
-      .set({
-        name: input.name ?? existing.name,
-        providerProfileId: input.providerProfileId ?? existing.providerProfileId,
-        promptTemplateId: input.promptTemplateId ?? existing.promptTemplateId,
-        temperature: input.temperature ?? existing.temperature ?? null,
-        maxTokens: input.maxTokens ?? existing.maxTokens ?? null,
-        locale: input.locale ?? existing.locale,
-        outputFormat: input.outputFormat ?? existing.outputFormat,
-        enabledPipelineSteps: JSON.stringify(input.enabledPipelineSteps ?? existing.enabledPipelineSteps),
-        isDefault: input.isDefault ?? existing.isDefault,
-        updatedAt: nowIso(),
-      })
-      .where(eq(generationPresets.id, id));
+    const timestamp = nowIso();
+    db.transaction((tx) => {
+      if (input.isDefault) {
+        tx.update(generationPresets).set({ isDefault: false }).run();
+      }
+      tx.update(generationPresets)
+        .set({
+          name: input.name ?? existing.name,
+          providerProfileId: input.providerProfileId ?? existing.providerProfileId,
+          promptTemplateId: input.promptTemplateId ?? existing.promptTemplateId,
+          temperature: input.temperature ?? existing.temperature ?? null,
+          maxTokens: input.maxTokens ?? existing.maxTokens ?? null,
+          locale: input.locale ?? existing.locale,
+          outputFormat: input.outputFormat ?? existing.outputFormat,
+          enabledPipelineSteps: JSON.stringify(input.enabledPipelineSteps ?? existing.enabledPipelineSteps),
+          isDefault: input.isDefault ?? existing.isDefault,
+          updatedAt: timestamp,
+        })
+        .where(eq(generationPresets.id, id))
+        .run();
+    });
     const updated = await this.get(id);
     return updated ?? notFound("Generation preset");
   }

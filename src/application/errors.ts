@@ -27,7 +27,11 @@ export function toAppError(error: unknown): AppError {
 export function errorResponse(error: unknown, status = 400): NextResponse<{ error: AppError }> {
   const appError = toAppError(error);
   logger.error("API error", { code: appError.code, message: appError.message, raw: safeErrorMessage(error) });
-  const httpStatus = appError.code === "NOT_FOUND" ? 404 : appError.code === "INTERNAL_ERROR" ? 500 : status;
+  const httpStatus =
+    appError.code === "NOT_FOUND" ? 404
+    : appError.code === "CONFLICT" ? 409
+    : appError.code === "INTERNAL_ERROR" ? 500
+    : status;
   return NextResponse.json({ error: appError }, { status: httpStatus });
 }
 

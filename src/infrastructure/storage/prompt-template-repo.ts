@@ -2,7 +2,7 @@ import { desc, eq } from "drizzle-orm";
 import { createId, nowIso, parseJson } from "@/lib/utils";
 import { promptTemplateSchema, type PromptTemplate, type PromptTemplateCreate, type PromptTemplateUpdate } from "@/domain/schemas";
 import type { PromptTemplateRepository } from "@/domain/ports/storage";
-import { notFound } from "@/infrastructure/storage/repo-utils";
+import { conflict, isForeignKeyConstraintError, notFound } from "@/infrastructure/storage/repo-utils";
 import { getDb } from "@/infrastructure/storage/db";
 import { promptTemplates, promptTemplateVersions } from "@/infrastructure/storage/schema";
 
@@ -41,22 +41,27 @@ export class SqlitePromptTemplateRepository implements PromptTemplateRepository 
   async create(input: PromptTemplateCreate & { id: string }): Promise<PromptTemplate> {
     const db = await getDb();
     const timestamp = nowIso();
-    if (input.isDefault) {
-      await db.update(promptTemplates).set({ isDefault: false });
-    }
-    await db.insert(promptTemplates).values({
-      id: input.id,
-      name: input.name,
-      description: input.description || null,
-      systemPrompt: input.systemPrompt,
-      userPromptTemplate: input.userPromptTemplate,
-      supportedVariables: JSON.stringify(input.supportedVariables),
-      customVariableDefaults: JSON.stringify(input.customVariableDefaults ?? {}),
-      outputFormat: input.outputFormat,
-      version: 1,
-      isDefault: input.isDefault,
-      createdAt: timestamp,
-      updatedAt: timestamp,
+    // Atomic clear-then-set of the default flag (see preset repo for rationale).
+    db.transaction((tx) => {
+      if (input.isDefault) {
+        tx.update(promptTemplates).set({ isDefault: false }).run();
+      }
+      tx.insert(promptTemplates)
+        .values({
+          id: input.id,
+          name: input.name,
+          description: input.description || null,
+          systemPrompt: input.systemPrompt,
+          userPromptTemplate: input.userPromptTemplate,
+          supportedVariables: JSON.stringify(input.supportedVariables),
+          customVariableDefaults: JSON.stringify(input.customVariableDefaults ?? {}),
+          outputFormat: input.outputFormat,
+          version: 1,
+          isDefault: input.isDefault,
+          createdAt: timestamp,
+          updatedAt: timestamp,
+        })
+        .run();
     });
     const created = await this.get(input.id);
     return created ?? notFound("Prompt template");
@@ -68,40 +73,55 @@ export class SqlitePromptTemplateRepository implements PromptTemplateRepository 
       notFound("Prompt template");
     }
     const db = await getDb();
-    if (input.isDefault) {
-      await db.update(promptTemplates).set({ isDefault: false });
-    }
+    const timestamp = nowIso();
     const nextVersion = input.systemPrompt || input.userPromptTemplate ? existing.version + 1 : existing.version;
-    if (nextVersion !== existing.version) {
-      await db.insert(promptTemplateVersions).values({
-        id: createId("template_version"),
-        templateId: existing.id,
-        version: existing.version,
-        snapshot: JSON.stringify(existing),
-        createdAt: nowIso(),
-      });
-    }
-    await db
-      .update(promptTemplates)
-      .set({
-        name: input.name ?? existing.name,
-        description: input.description ?? existing.description ?? null,
-        systemPrompt: input.systemPrompt ?? existing.systemPrompt,
-        userPromptTemplate: input.userPromptTemplate ?? existing.userPromptTemplate,
-        supportedVariables: JSON.stringify(input.supportedVariables ?? existing.supportedVariables),
-        customVariableDefaults: JSON.stringify(input.customVariableDefaults ?? existing.customVariableDefaults ?? {}),
-        outputFormat: input.outputFormat ?? existing.outputFormat,
-        version: nextVersion,
-        isDefault: input.isDefault ?? existing.isDefault,
-        updatedAt: nowIso(),
-      })
-      .where(eq(promptTemplates.id, id));
+    // Snapshot the old version and apply the update in one transaction so the
+    // version history can never end up missing a snapshot or orphaning one if a
+    // mid-sequence write fails.
+    db.transaction((tx) => {
+      if (input.isDefault) {
+        tx.update(promptTemplates).set({ isDefault: false }).run();
+      }
+      if (nextVersion !== existing.version) {
+        tx.insert(promptTemplateVersions)
+          .values({
+            id: createId("template_version"),
+            templateId: existing.id,
+            version: existing.version,
+            snapshot: JSON.stringify(existing),
+            createdAt: timestamp,
+          })
+          .run();
+      }
+      tx.update(promptTemplates)
+        .set({
+          name: input.name ?? existing.name,
+          description: input.description ?? existing.description ?? null,
+          systemPrompt: input.systemPrompt ?? existing.systemPrompt,
+          userPromptTemplate: input.userPromptTemplate ?? existing.userPromptTemplate,
+          supportedVariables: JSON.stringify(input.supportedVariables ?? existing.supportedVariables),
+          customVariableDefaults: JSON.stringify(input.customVariableDefaults ?? existing.customVariableDefaults ?? {}),
+          outputFormat: input.outputFormat ?? existing.outputFormat,
+          version: nextVersion,
+          isDefault: input.isDefault ?? existing.isDefault,
+          updatedAt: timestamp,
+        })
+        .where(eq(promptTemplates.id, id))
+        .run();
+    });
     const updated = await this.get(id);
     return updated ?? notFound("Prompt template");
   }
 
   async delete(id: string): Promise<void> {
     const db = await getDb();
-    await db.delete(promptTemplates).where(eq(promptTemplates.id, id));
+    try {
+      await db.delete(promptTemplates).where(eq(promptTemplates.id, id));
+    } catch (error) {
+      if (isForeignKeyConstraintError(error)) {
+        conflict("无法删除该模板：仍有生成预设在使用它，请先移除相关预设。");
+      }
+      throw error;
+    }
   }
 }
