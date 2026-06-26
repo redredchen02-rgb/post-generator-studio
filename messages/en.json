@@ -41,7 +41,17 @@
     "toneFriendly": "Friendly",
     "lengthShort": "Short",
     "lengthMedium": "Medium",
-    "lengthLong": "Long"
+    "lengthLong": "Long",
+    "statusReady": "Ready",
+    "statusGenerating": "Generating…",
+    "statusRegenerating": "Regenerating…",
+    "statusStreaming": "Streaming response…",
+    "statusCompleted": "Completed",
+    "statusFailed": "Failed",
+    "statusCancelled": "Cancelled",
+    "statusStreamFailed": "Streaming failed",
+    "errorNoPreset": "Please select a Generation Preset",
+    "errorNoStream": "Streaming response unavailable"
   },
   "Output": {
     "title": "Output",
@@ -98,7 +108,10 @@
     "selectRecord": "Select a record to view",
     "reuseAriaLabel": "Reuse in generator",
     "deleteAriaLabel": "Delete generation",
-    "refreshAriaLabel": "Refresh history"
+    "refreshAriaLabel": "Refresh history",
+    "confirmDeleteTitle": "Delete this generation?",
+    "confirmDeleteDesc": "This generation record and its output content will be permanently deleted.",
+    "deleteBtn": "Delete"
   },
   "Settings": {
     "refreshing": "Refreshing...",
@@ -136,7 +149,9 @@
       "keyClearedMsg": "API key cleared",
       "saveFailed": "Save failed",
       "deleteFailed": "Delete failed",
-      "clearKeyFailed": "Clear key failed"
+      "clearKeyFailed": "Clear key failed",
+      "confirmDeleteTitle": "Delete this provider profile?",
+      "confirmDeleteDesc": "This action cannot be undone. Any presets or templates referencing this provider will need to be updated."
     },
     "templates": {
       "title": "Prompt Templates",
@@ -162,7 +177,9 @@
       "deletedMsg": "Prompt template deleted",
       "saveFailed": "Save failed",
       "deleteFailed": "Delete failed",
-      "previewFailed": "Preview failed"
+      "previewFailed": "Preview failed",
+      "confirmDeleteTitle": "Delete this prompt template?",
+      "confirmDeleteDesc": "This action cannot be undone. Any presets using this template may need to be reconfigured."
     },
     "presets": {
       "title": "Generation Presets",
@@ -187,7 +204,9 @@
       "updatedMsg": "Generation preset updated",
       "deletedMsg": "Generation preset deleted",
       "saveFailed": "Save failed",
-      "deleteFailed": "Delete failed"
+      "deleteFailed": "Delete failed",
+      "confirmDeleteTitle": "Delete this generation preset?",
+      "confirmDeleteDesc": "This action cannot be undone."
     },
     "storage": {
       "title": "Storage & Security",
@@ -201,7 +220,8 @@
     "none": "None",
     "enabled": "enabled",
     "disabled": "disabled",
-    "noKey": "no key"
+    "noKey": "no key",
+    "cancel": "Cancel"
   },
   "Editor": {
     "rewrite": "Rewrite",
@@ -235,6 +255,24 @@
     "moveDown": "Move down",
     "remove": "Remove",
     "modeLabel": "Outline first"
+  },
+  "Variant": {
+    "title": "Compare variants",
+    "subtitle": "Edit any draft, then pick the one to continue with.",
+    "variantLabel": "Variant {n}",
+    "selectBtn": "Use this one",
+    "cancelBtn": "Stop",
+    "discardBtn": "Discard",
+    "streamingPlaceholder": "Generating…",
+    "words": "{count} words",
+    "countLabel": "Variants",
+    "status": {
+      "pending": "Queued",
+      "streaming": "Writing…",
+      "completed": "Ready",
+      "failed": "Failed",
+      "cancelled": "Cancelled"
+    }
   },
   "Quality": {
     "scoreBtn": "Score quality",

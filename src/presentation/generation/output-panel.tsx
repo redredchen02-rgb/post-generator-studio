@@ -2,8 +2,6 @@
 
 import * as React from "react";
 import ReactMarkdown from "react-markdown";
-
-const MemoizedReactMarkdown = React.memo(ReactMarkdown);
 import { Clipboard, Download, FileText, RotateCcw, Save } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/presentation/components/ui/button";
@@ -11,6 +9,8 @@ import { CodeMirrorEditor } from "@/presentation/generation/editor/codemirror-ed
 import { QualityBadge } from "@/presentation/generation/quality-badge";
 import { computeTextMetrics } from "@/lib/text-metrics";
 import type { Generation, QualityScore } from "@/domain/schemas";
+
+const MemoizedReactMarkdown = React.memo(ReactMarkdown);
 
 type OutputPanelProps = {
   content: string;

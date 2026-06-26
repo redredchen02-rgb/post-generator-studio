@@ -17,6 +17,8 @@ import type { GenerationControls, QualityScore } from "@/domain/schemas";
 import { InputPanel } from "./input-panel";
 import { OutputPanel } from "./output-panel";
 import { OutlinePanel } from "./outline-panel";
+import { VariantCompare } from "./variant-compare";
+import { useVariantGeneration } from "./use-variant-generation";
 import { ConfigSidebar } from "./config-sidebar";
 import { requestCompletion } from "@/presentation/lib/api";
 import { buildOutlinePrompt, parseOutline, serializeOutline } from "./editor/rewrite-actions";
@@ -40,26 +42,41 @@ export function GeneratorWorkspace(): React.ReactElement {
   const [outlineMode, setOutlineMode] = React.useState(false);
   const [outline, setOutline] = React.useState<string[] | null>(null);
   const [outlineBusy, setOutlineBusy] = React.useState(false);
+  const [variantCount, setVariantCount] = React.useState(1);
   const [qualityScore, setQualityScore] = React.useState<QualityScore | null>(null);
   const [scoring, setScoring] = React.useState(false);
   const [providerError, setProviderError] = React.useState<string | null>(null);
   const [promptPreview, setPromptPreview] = React.useState<{ systemPrompt: string; userPrompt: string } | null>(null);
   const [promptPreviewOpen, setPromptPreviewOpen] = React.useState(false);
   const { rawMode, setRawMode, editorFontSize, setEditorFontSize } = useUiStore();
-  const { content, status, error, activeGeneration, metadata, isGenerating, generate, cancel, setContent, setStatus } =
+  const { content, status, error, activeGeneration, metadata, isGenerating, generate, cancel, setContent, setStatus, setActiveGeneration } =
     useGenerationStream();
+  const {
+    variants,
+    isGenerating: variantsBusy,
+    generateVariants,
+    cancel: cancelVariants,
+    setVariantContent,
+    reset: resetVariants,
+  } = useVariantGeneration();
+
+  // Tracks the currently-active generation id so async handlers can detect a
+  // generation switch that happened while their request was in flight.
+  const activeGenIdRef = React.useRef<string | undefined>(activeGeneration?.id);
+  activeGenIdRef.current = activeGeneration?.id;
 
   const handleGenerateRef = React.useRef(onPrimaryGenerate);
   handleGenerateRef.current = onPrimaryGenerate;
-  const cancelRef = React.useRef(cancel);
-  cancelRef.current = cancel;
+  const cancelRef = React.useRef(cancelActive);
+  cancelRef.current = cancelActive;
 
+  const busy = isGenerating || outlineBusy || variantsBusy;
   const bindings = React.useMemo(
     () => [
-      { key: "Enter", ctrl: true, handler: () => { if (!isGenerating && !outlineBusy) handleGenerateRef.current(); } },
-      { key: "Escape", handler: () => { if (isGenerating) void cancelRef.current(); } },
+      { key: "Enter", ctrl: true, handler: () => { if (!busy) handleGenerateRef.current(); } },
+      { key: "Escape", handler: () => { if (busy) cancelRef.current(); } },
     ],
-    [isGenerating, outlineBusy],
+    [busy],
   );
   useKeyboard(bindings);
 
@@ -153,6 +170,23 @@ export function GeneratorWorkspace(): React.ReactElement {
     });
   }
 
+  // Multi-variant: run N independent generations and show them side by side (Unit 10).
+  async function handleGenerateVariants(): Promise<void> {
+    if (!presetId || !(await ensureProviderOk())) return;
+    await generateVariants(
+      { title, eventSummary, presetId, providerProfileId: effectiveProviderId, customVariables: customVarValues, controls },
+      variantCount,
+    );
+  }
+
+  // Pull a chosen variant into the main editor, then leave compare mode.
+  function selectVariant(index: number): void {
+    const variant = variants[index];
+    if (!variant?.generation) return;
+    setActiveGeneration(variant.generation, variant.content);
+    resetVariants();
+  }
+
   // Step 1 of outline-first: produce an editable outline via one-shot completion.
   async function generateOutline(): Promise<void> {
     if (!presetId || !(await ensureProviderOk())) return;
@@ -181,7 +215,13 @@ export function GeneratorWorkspace(): React.ReactElement {
 
   function onPrimaryGenerate(): void {
     if (outlineMode) void generateOutline();
+    else if (variantCount > 1) void handleGenerateVariants();
     else void handleGenerate(false);
+  }
+
+  function cancelActive(): void {
+    if (variantsBusy) void cancelVariants();
+    else void cancel();
   }
 
   async function saveToHistory(): Promise<void> {
@@ -189,6 +229,8 @@ export function GeneratorWorkspace(): React.ReactElement {
     try {
       const { saveGenerationContent: save } = await import("@/presentation/lib/api");
       await save(activeGeneration.id, content);
+      // Editing the content invalidates any prior score — it described the old text.
+      setQualityScore(null);
       setStatus(t("savedToHistory"));
     } catch { setStatus(t("saveFailed")); }
   }
@@ -200,12 +242,14 @@ export function GeneratorWorkspace(): React.ReactElement {
 
   async function handleScore(): Promise<void> {
     if (!activeGeneration || !content.trim() || scoring) return;
+    const genId = activeGeneration.id;
     setScoring(true);
     try {
-      const score = await scoreGeneration(activeGeneration.id, { presetId, providerProfileId: effectiveProviderId });
-      setQualityScore(score);
+      const score = await scoreGeneration(genId, { presetId, providerProfileId: effectiveProviderId });
+      // Ignore a result that landed after the user switched to another generation.
+      if (activeGenIdRef.current === genId) setQualityScore(score);
     } catch {
-      setStatus(t("scoreFailed"));
+      if (activeGenIdRef.current === genId) setStatus(t("scoreFailed"));
     } finally {
       setScoring(false);
     }
@@ -269,7 +313,7 @@ export function GeneratorWorkspace(): React.ReactElement {
         customVarValues={customVarValues}
         controls={controls}
         providerError={providerError}
-        isGenerating={isGenerating || outlineBusy}
+        isGenerating={busy}
         selectedTemplate={selectedTemplate}
         selectedPreset={selectedPreset}
         onTitleChange={setTitle}
@@ -282,8 +326,10 @@ export function GeneratorWorkspace(): React.ReactElement {
         onControlChange={(patch) => setControls((prev) => ({ ...prev, ...patch }))}
         outlineMode={outlineMode}
         onOutlineModeChange={setOutlineMode}
+        variantCount={variantCount}
+        onVariantCountChange={setVariantCount}
         onGenerate={onPrimaryGenerate}
-        onCancel={() => void cancel()}
+        onCancel={cancelActive}
       />
       {outline !== null ? (
         <OutlinePanel
@@ -305,6 +351,15 @@ export function GeneratorWorkspace(): React.ReactElement {
           onRegenerate={() => void generateOutline()}
           onExpand={expandOutline}
           onCancel={() => setOutline(null)}
+        />
+      ) : variants.length > 0 ? (
+        <VariantCompare
+          variants={variants}
+          busy={variantsBusy}
+          onEditVariant={setVariantContent}
+          onSelect={selectVariant}
+          onCancel={() => void cancelVariants()}
+          onDiscard={resetVariants}
         />
       ) : (
         <OutputPanel

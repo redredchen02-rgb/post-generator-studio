@@ -41,7 +41,17 @@
     "toneFriendly": "亲切",
     "lengthShort": "简短",
     "lengthMedium": "适中",
-    "lengthLong": "详尽"
+    "lengthLong": "详尽",
+    "statusReady": "就绪",
+    "statusGenerating": "生成中…",
+    "statusRegenerating": "重新生成中…",
+    "statusStreaming": "流式响应中…",
+    "statusCompleted": "已完成",
+    "statusFailed": "失败",
+    "statusCancelled": "已取消",
+    "statusStreamFailed": "流式传输失败",
+    "errorNoPreset": "请选择 Generation Preset",
+    "errorNoStream": "无法获取流式响应"
   },
   "Output": {
     "title": "输出",
@@ -98,7 +108,10 @@
     "selectRecord": "选择一条生成记录查看",
     "reuseAriaLabel": "在生成器中重用",
     "deleteAriaLabel": "删除生成记录",
-    "refreshAriaLabel": "刷新历史"
+    "refreshAriaLabel": "刷新历史",
+    "confirmDeleteTitle": "删除这条生成记录？",
+    "confirmDeleteDesc": "该生成记录及其输出内容将被永久删除。",
+    "deleteBtn": "删除"
   },
   "Settings": {
     "refreshing": "刷新中...",
@@ -136,7 +149,9 @@
       "keyClearedMsg": "API Key 已清除",
       "saveFailed": "保存失败",
       "deleteFailed": "删除失败",
-      "clearKeyFailed": "清除密钥失败"
+      "clearKeyFailed": "清除密钥失败",
+      "confirmDeleteTitle": "删除这个 Provider 配置？",
+      "confirmDeleteDesc": "此操作不可撤销。引用该 Provider 的预设或模板可能需要重新配置。"
     },
     "templates": {
       "title": "Prompt 模板",
@@ -162,7 +177,9 @@
       "deletedMsg": "Prompt 模板已删除",
       "saveFailed": "保存失败",
       "deleteFailed": "删除失败",
-      "previewFailed": "预览失败"
+      "previewFailed": "预览失败",
+      "confirmDeleteTitle": "删除这个 Prompt 模板？",
+      "confirmDeleteDesc": "此操作不可撤销。使用该模板的预设可能需要重新配置。"
     },
     "presets": {
       "title": "生成预设",
@@ -187,7 +204,9 @@
       "updatedMsg": "生成预设已更新",
       "deletedMsg": "生成预设已删除",
       "saveFailed": "保存失败",
-      "deleteFailed": "删除失败"
+      "deleteFailed": "删除失败",
+      "confirmDeleteTitle": "删除这个生成预设？",
+      "confirmDeleteDesc": "此操作不可撤销。"
     },
     "storage": {
       "title": "存储与安全",
@@ -201,7 +220,8 @@
     "none": "无",
     "enabled": "启用",
     "disabled": "禁用",
-    "noKey": "无密钥"
+    "noKey": "无密钥",
+    "cancel": "取消"
   },
   "Editor": {
     "rewrite": "改写",
@@ -235,6 +255,24 @@
     "moveDown": "下移",
     "remove": "删除",
     "modeLabel": "大纲优先"
+  },
+  "Variant": {
+    "title": "对比变体",
+    "subtitle": "可编辑任一草稿，再选一个继续。",
+    "variantLabel": "变体 {n}",
+    "selectBtn": "选定此变体",
+    "cancelBtn": "停止",
+    "discardBtn": "放弃",
+    "streamingPlaceholder": "生成中…",
+    "words": "{count} 词",
+    "countLabel": "变体数",
+    "status": {
+      "pending": "排队中",
+      "streaming": "撰写中…",
+      "completed": "就绪",
+      "failed": "失败",
+      "cancelled": "已取消"
+    }
   },
   "Quality": {
     "scoreBtn": "质量评分",

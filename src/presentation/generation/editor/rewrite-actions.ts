@@ -7,6 +7,7 @@
  * so the result can be spliced straight back into the selection.
  */
 
+import { stripCodeFence } from "@/lib/utils";
 import type { GenerationControls } from "@/domain/schemas";
 
 export type RewriteActionId = "rewrite" | "expand" | "condense" | "tone";
@@ -96,9 +97,7 @@ export function replaceRange(doc: string, from: number, to: number, replacement:
  * would otherwise be spliced verbatim into the prose.
  */
 export function sanitizeCompletion(raw: string): string {
-  const text = raw.trim();
-  const fenced = text.match(/^```[^\n]*\n([\s\S]*?)\n?```$/);
-  return (fenced ? fenced[1] : text).trim();
+  return stripCodeFence(raw);
 }
 
 /**

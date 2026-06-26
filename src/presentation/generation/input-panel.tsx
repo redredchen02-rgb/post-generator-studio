@@ -58,6 +58,8 @@ type InputPanelProps = {
   onControlChange: (patch: Partial<GenerationControls>) => void;
   outlineMode: boolean;
   onOutlineModeChange: (value: boolean) => void;
+  variantCount: number;
+  onVariantCountChange: (value: number) => void;
   onGenerate: () => void;
   onCancel: () => void;
 };
@@ -65,6 +67,7 @@ type InputPanelProps = {
 export function InputPanel(props: InputPanelProps): React.ReactElement {
   const t = useTranslations("Generation");
   const tOutline = useTranslations("Outline");
+  const tVariant = useTranslations("Variant");
   const customVars = getCustomVars(props.selectedTemplate);
 
   return (
@@ -171,6 +174,17 @@ export function InputPanel(props: InputPanelProps): React.ReactElement {
         />
         {tOutline("modeLabel")}
       </label>
+      <Field label={tVariant("countLabel")}>
+        <NativeSelect
+          value={String(props.variantCount)}
+          disabled={props.outlineMode}
+          onChange={(e) => props.onVariantCountChange(Number(e.target.value))}
+        >
+          <option value="1">1</option>
+          <option value="2">2</option>
+          <option value="3">3</option>
+        </NativeSelect>
+      </Field>
       <div className="grid grid-cols-2 gap-2">
         <Button disabled={props.isGenerating} onClick={props.onGenerate}>
           {props.isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}

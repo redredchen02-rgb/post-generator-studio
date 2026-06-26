@@ -8,7 +8,7 @@ import {
 import { completeText } from "@/application/content/completion-service";
 import { getOrThrow } from "@/application/crud-helpers";
 import { getStorage } from "@/infrastructure/storage/sqlite-storage";
-import { nowIso } from "@/lib/utils";
+import { nowIso, stripCodeFence } from "@/lib/utils";
 
 /**
  * LLM-as-Judge quality scoring (Unit 9). Builds a strict-JSON judge prompt, runs
@@ -39,18 +39,15 @@ function buildJudgePrompt(title: string, eventSummary: string, content: string):
 
 /** Strip a single enclosing code fence, then JSON.parse + Zod. Throws an observable error on anything malformed. */
 function parseJudgeReply(raw: string) {
-  const text = raw.trim();
-  const fenced = text.match(/^```[^\n]*\n([\s\S]*?)\n?```$/);
-  const body = (fenced ? fenced[1] : text).trim();
   let json: unknown;
   try {
-    json = JSON.parse(body);
+    json = JSON.parse(stripCodeFence(raw));
   } catch {
-    throw new AppErrorException({ code: "JUDGE_PARSE_FAILED", message: "Judge model returned invalid JSON" });
+    throw new AppErrorException({ code: "JUDGE_PARSE_FAILED", message: "评分模型返回了无效的 JSON" });
   }
   const result = judgeReplySchema.safeParse(json);
   if (!result.success) {
-    throw new AppErrorException({ code: "JUDGE_PARSE_FAILED", message: "Judge reply missing required dimensions or invalid format" });
+    throw new AppErrorException({ code: "JUDGE_PARSE_FAILED", message: "评分结果缺少必要维度或格式不符" });
   }
   return result.data;
 }
@@ -60,7 +57,7 @@ async function resolvePresetId(explicit?: string): Promise<string> {
   const presets = await getStorage().generationPresets.list();
   const preset = presets.find((p) => p.isDefault) ?? presets[0];
   if (!preset) {
-    throw new AppErrorException({ code: "NO_PRESET", message: "No preset available for scoring" });
+    throw new AppErrorException({ code: "NO_PRESET", message: "没有可用于评分的预设" });
   }
   return preset.id;
 }
@@ -68,11 +65,11 @@ async function resolvePresetId(explicit?: string): Promise<string> {
 export type ScoreOptions = { presetId?: string; providerProfileId?: string };
 
 export async function scoreGeneration(generationId: string, opts: ScoreOptions = {}): Promise<QualityScore> {
-  const generation = await getOrThrow(getStorage().generations, generationId, "Generation not found");
+  const generation = await getOrThrow(getStorage().generations, generationId, "生成记录不存在");
 
   const content = generation.outputContent?.trim();
   if (!content) {
-    throw new AppErrorException({ code: "EMPTY_CONTENT", message: "No content available for scoring" });
+    throw new AppErrorException({ code: "EMPTY_CONTENT", message: "没有可评分的内容" });
   }
 
   const presetId = await resolvePresetId(opts.presetId);

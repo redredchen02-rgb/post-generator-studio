@@ -1,6 +1,6 @@
 import { desc, eq, like, sql } from "drizzle-orm";
 import { nowIso, parseJson } from "@/lib/utils";
-import { generationSchema, type Generation } from "@/domain/schemas";
+import { generationSchema, type Generation, type QualityScore } from "@/domain/schemas";
 import type { GenerationCreateInput, GenerationListOpts, GenerationListResult, GenerationRepository, GenerationUpdateInput } from "@/domain/ports/storage";
 import { notFound } from "@/infrastructure/storage/repo-utils";
 import { getDb } from "@/infrastructure/storage/db";
@@ -31,8 +31,15 @@ function generationFromRow(row: GenerationRow): Generation {
     completedAt: row.completedAt || undefined,
     createdAt: row.createdAt,
     activeDraftId: row.activeDraftId || undefined,
-    qualityScore: row.qualityScore ? parseJson(row.qualityScore, undefined) : undefined,
+    qualityScore: row.qualityScore ? parseJson<QualityScore | undefined>(row.qualityScore, undefined) : undefined,
   });
+}
+
+/** New score wins; else a content change clears the old score; else keep what's stored. */
+function resolveQualityScore(input: GenerationUpdateInput, existing: Generation): string | null {
+  if (input.qualityScore !== undefined) return JSON.stringify(input.qualityScore);
+  if (input.outputContent !== undefined && input.outputContent !== existing.outputContent) return null;
+  return existing.qualityScore ? JSON.stringify(existing.qualityScore) : null;
 }
 
 export class SqliteGenerationRepository implements GenerationRepository {
@@ -108,39 +115,36 @@ export class SqliteGenerationRepository implements GenerationRepository {
   }
 
   async update(id: string, input: GenerationUpdateInput): Promise<Generation> {
-    const existing = await this.get(id);
-    if (!existing) {
-      notFound("Generation");
-    }
-    const newStatus = input.status ?? existing.status;
-    if (!SqliteGenerationRepository.canTransition(existing.status, newStatus)) {
-      // Another request already moved this generation to a terminal state.
-      // Return the existing record unchanged (the caller will handle gracefully).
-      return existing;
-    }
     const db = await getDb();
-    await db
-      .update(generations)
-      .set({
-        outputContent: input.outputContent ?? existing.outputContent ?? null,
-        status: newStatus,
-        errorMessage: input.errorMessage ?? existing.errorMessage ?? null,
-        model: input.model ?? existing.model ?? null,
-        inputTokens: input.inputTokens ?? existing.inputTokens ?? null,
-        outputTokens: input.outputTokens ?? existing.outputTokens ?? null,
-        totalTokens: input.totalTokens ?? existing.totalTokens ?? null,
-        startedAt: input.startedAt ?? existing.startedAt ?? null,
-        completedAt: input.completedAt ?? existing.completedAt ?? null,
-        qualityScore:
-          input.qualityScore !== undefined
-            ? JSON.stringify(input.qualityScore)
-            : existing.qualityScore
-              ? JSON.stringify(existing.qualityScore)
-              : null,
-      })
-      .where(eq(generations.id, id));
-    const updated = await this.get(id);
-    return updated ?? notFound("Generation");
+    return db.transaction((tx) => {
+      const rows = tx.select().from(generations).where(eq(generations.id, id)).limit(1).all();
+      const existing = rows[0] ? generationFromRow(rows[0]) : null;
+      if (!existing) {
+        notFound("Generation");
+      }
+      const newStatus = input.status ?? existing.status;
+      if (!SqliteGenerationRepository.canTransition(existing.status, newStatus)) {
+        return existing;
+      }
+      tx.update(generations)
+        .set({
+          outputContent: input.outputContent ?? existing.outputContent ?? null,
+          status: newStatus,
+          errorMessage: input.errorMessage ?? existing.errorMessage ?? null,
+          model: input.model ?? existing.model ?? null,
+          inputTokens: input.inputTokens ?? existing.inputTokens ?? null,
+          outputTokens: input.outputTokens ?? existing.outputTokens ?? null,
+          totalTokens: input.totalTokens ?? existing.totalTokens ?? null,
+          startedAt: input.startedAt ?? existing.startedAt ?? null,
+          completedAt: input.completedAt ?? existing.completedAt ?? null,
+          qualityScore: resolveQualityScore(input, existing),
+        })
+        .where(eq(generations.id, id))
+        .run();
+      const updatedRows = tx.select().from(generations).where(eq(generations.id, id)).limit(1).all();
+      const updated = updatedRows[0] ? generationFromRow(updatedRows[0]) : null;
+      return updated ?? notFound("Generation");
+    });
   }
 
   async delete(id: string): Promise<void> {

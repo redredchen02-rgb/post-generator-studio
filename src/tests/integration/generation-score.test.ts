@@ -84,12 +84,36 @@ describe("POST /api/generations/[id]/score (integration)", () => {
     expect(reloaded?.qualityScore?.completeness.justification).toBe("A bit short.");
   });
 
+  it("rejects a malformed JSON request body with INVALID_BODY", async () => {
+    const { id } = await seed();
+    const request = new Request(`http://test/api/generations/${id}/score`, {
+      method: "POST",
+      body: "{not json",
+      headers: { "Content-Type": "application/json" },
+    });
+    const response = await POST(request, { params: Promise.resolve({ id }) });
+    expect(response.status).toBe(400);
+    const body = await response.json();
+    expect(body.error.code).toBe("INVALID_BODY");
+  });
+
+  it("clears a stale score when the content is edited afterward", async () => {
+    const { preset, id } = await seed();
+    mockJudgeReply(JSON.stringify(JUDGE_FIXTURE));
+    await postScore(id, { presetId: preset.id });
+    expect((await getStorage().generations.get(id))?.qualityScore?.overall).toBe(4);
+
+    // Editing the content invalidates the score it described.
+    await getStorage().generations.update(id, { outputContent: "A different, edited article." });
+    expect((await getStorage().generations.get(id))?.qualityScore).toBeUndefined();
+  });
+
   it("returns a structured error on a malformed judge reply without writing", async () => {
     const { preset, id } = await seed();
     mockJudgeReply("not json");
 
     const response = await postScore(id, { presetId: preset.id });
-    expect(response.status).toBeGreaterThanOrEqual(400);
+    expect(response.status).toBe(400);
     const body = await response.json();
     expect(body.error.code).toBe("JUDGE_PARSE_FAILED");
 
