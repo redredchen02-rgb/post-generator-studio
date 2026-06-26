@@ -71,8 +71,25 @@ async function validateGenerationRequest(input: unknown): Promise<ValidatedReque
   const existing = request.idempotencyKey
     ? await getStorage().generations.getByIdempotencyKey(request.idempotencyKey)
     : null;
-  if (existing?.status === "completed" && existing.outputContent) {
-    throw new CachedGenerationError(existing);
+  if (existing) {
+    // Completed → replay the cached result (true idempotent retry).
+    if (existing.status === "completed" && existing.outputContent) {
+      throw new CachedGenerationError(existing);
+    }
+    // Still in flight → a concurrent request owns this key. Reject instead of
+    // starting a duplicate stream, which would double-bill the provider and
+    // overwrite the first request's cancel controller in the registry.
+    if (existing.status === "queued" || existing.status === "streaming") {
+      throw new AppErrorException({
+        code: "GENERATION_IN_PROGRESS",
+        message: "相同 idempotencyKey 的生成正在进行中",
+      });
+    }
+    // Failed/cancelled (or completed-without-content) → supersede the stale row
+    // so the retry can claim the unique key and persist its result. Without this,
+    // create() would hit the UNIQUE constraint and return the stale terminal row,
+    // whose status guard then silently drops the new stream's writes.
+    await getStorage().generations.delete(existing.id);
   }
 
   const preset = await getStorage().generationPresets.get(request.presetId);
@@ -168,22 +185,38 @@ export async function* streamGeneration(input: unknown): AsyncIterable<Generatio
   registerGenerationController(generation.id, controller);
   yield { type: "generation", generation };
 
-  const adapter = getProviderAdapter(validated.provider.providerKind);
-  const apiKey = await readSecret(validated.provider.apiKeyRef) ?? "";
-  const validation = await adapter.validateConfig(validated.provider, { apiKey, abortSignal: controller.signal });
-  if (!validation.ok) {
+  try {
+    const adapter = getProviderAdapter(validated.provider.providerKind);
+    const apiKey = await readSecret(validated.provider.apiKeyRef) ?? "";
+    const validation = await adapter.validateConfig(validated.provider, { apiKey, abortSignal: controller.signal });
+    if (!validation.ok) {
+      const failed = await getStorage().generations.update(generation.id, {
+        status: "failed",
+        errorMessage: validation.error?.message || "Provider 配置无效",
+        completedAt: nowIso(),
+      });
+      yield { type: "error", message: validation.error?.message || "Provider 配置无效", retryable: validation.error?.retryable };
+      yield { type: "final", generation: failed, content: "" };
+      return;
+    }
+
+    yield* streamToProvider(adapter, validated, generation, context, rendered, enabledSteps, apiKey, controller);
+  } catch (error) {
+    // Setup between registration and streaming can throw — e.g. a corrupt secret
+    // file or an AES key mismatch makes readSecret throw (not just return ""). Without
+    // this the row would stay "queued" forever and the controller would leak in the
+    // registry. (streamToProvider handles its own errors and never throws here.)
+    const message = error instanceof Error ? error.message : "生成失败";
     const failed = await getStorage().generations.update(generation.id, {
       status: "failed",
-      errorMessage: validation.error?.message || "Provider 配置无效",
+      errorMessage: message,
       completedAt: nowIso(),
     });
-    yield { type: "error", message: validation.error?.message || "Provider 配置无效", retryable: validation.error?.retryable };
+    yield { type: "error", message, retryable: true };
     yield { type: "final", generation: failed, content: "" };
+  } finally {
     releaseGenerationController(generation.id);
-    return;
   }
-
-  yield* streamToProvider(adapter, validated, generation, context, rendered, enabledSteps, apiKey, controller);
 }
 
 async function* streamToProvider(
@@ -254,10 +287,19 @@ async function* streamToProvider(
       }
     }
   } catch (error) {
-    const current = await getStorage().generations.get(generation.id);
-    if (current?.status === "cancelled") {
+    // A user cancel aborts THIS generation's registered controller; a provider
+    // timeout aborts only base-adapter's internal timeout signal, so the user
+    // controller stays unset. Detect cancel by the signal — not by a DB status
+    // that cancelGeneration may not have committed yet — otherwise a deliberate
+    // cancel races into a retryable "failed" (failed→cancelled is then blocked).
+    if (controller.signal.aborted) {
+      const cancelled = await getStorage().generations.update(generation.id, {
+        status: "cancelled",
+        errorMessage: "生成请求被取消",
+        completedAt: nowIso(),
+      });
       yield { type: "error", message: "生成请求被取消", retryable: false };
-      yield { type: "final", generation: current, content: accumulated };
+      yield { type: "final", generation: cancelled, content: accumulated };
       return;
     }
     const message = error instanceof Error ? error.message : "生成失败";
