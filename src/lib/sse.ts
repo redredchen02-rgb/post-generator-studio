@@ -43,6 +43,9 @@ export async function* parseSSEStream(body: ReadableStream<Uint8Array> | null): 
       }
     }
   } finally {
-    reader.releaseLock();
+    // cancel() releases the lock AND signals the source to free the underlying
+    // network connection on early exit (the consumer stops reading after the
+    // terminal [DONE]/final event). A bare releaseLock() would pin the socket.
+    await reader.cancel().catch(() => {});
   }
 }

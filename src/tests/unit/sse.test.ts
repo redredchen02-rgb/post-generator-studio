@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { parseSSEStream } from "@/lib/sse";
 
 function streamFromText(text: string): ReadableStream<Uint8Array> {
@@ -87,5 +87,27 @@ describe("parseSSEStream", () => {
   it("parses data from incomplete final chunk", async () => {
     const messages = await collect(streamFromText("data: final\n"));
     expect(messages).toEqual([{ data: "final" }]);
+  });
+
+  it("cancels the underlying stream when the consumer stops reading early", async () => {
+    // Regression: the finally only called reader.releaseLock(), which leaves the
+    // underlying fetch connection pinned. cancel() frees it on early exit.
+    const cancelSpy = vi.fn();
+    const encoder = new TextEncoder();
+    let i = 0;
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        controller.enqueue(encoder.encode(`data: msg${i++}\n\n`));
+      },
+      cancel(reason) {
+        cancelSpy(reason);
+      },
+    });
+
+    for await (const _msg of parseSSEStream(stream)) {
+      break; // stop after the first message — triggers the generator's finally
+    }
+
+    expect(cancelSpy).toHaveBeenCalled();
   });
 });

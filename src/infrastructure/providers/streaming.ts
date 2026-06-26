@@ -39,9 +39,10 @@ export async function* parseJsonLines(response: Response): AsyncIterable<unknown
       yield safeJsonParse(tail);
     }
   } finally {
-    // Release the lock even when the consumer aborts early (break/throw out of
-    // the for-await), so a cancelled stream never leaves the body reader locked.
-    reader.releaseLock();
+    // cancel() releases the lock AND frees the underlying network connection when
+    // the consumer aborts early (break/throw out of the for-await) or stops after
+    // the terminal chunk. A bare releaseLock() leaves the socket pinned until GC.
+    await reader.cancel().catch(() => {});
   }
 }
 
