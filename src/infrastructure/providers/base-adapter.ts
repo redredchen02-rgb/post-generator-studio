@@ -216,8 +216,17 @@ export abstract class BaseAdapter implements LLMProviderAdapter {
   }
 
   /**
-   * Guard parseChunk so a non-object or malformed chunk surfaces an observable
-   * error event instead of throwing out of the stream or being silently dropped.
+   * Adapter-specific chunk shape guard. Override to detect API error responses
+   * that arrive inside a streaming JSON line (HTTP 200 with `{"error":...}`).
+   * Return an error message string when the shape is invalid, or null to proceed.
+   */
+  protected validateChunkShape(_raw: Record<string, unknown>): string | null {
+    return null; // no-op by default
+  }
+
+  /**
+   * Guard parseChunk so a non-object, malformed, or shape-invalid chunk surfaces
+   * an observable error event instead of throwing or being silently dropped.
    * `fatal` marks a parse/structure failure so the caller can stop the stream
    * after one error rather than emitting an error per garbage line.
    */
@@ -227,6 +236,10 @@ export abstract class BaseAdapter implements LLMProviderAdapter {
   ): ChunkParseResult & { fatal?: boolean } {
     if (raw === null || typeof raw !== "object") {
       return { events: [responseError(`${this.id} 返回了非预期的响应结构`, false)], fatal: true };
+    }
+    const shapeError = this.validateChunkShape(raw as Record<string, unknown>);
+    if (shapeError) {
+      return { events: [responseError(shapeError, false)], fatal: true };
     }
     try {
       return this.parseChunk(raw, request);

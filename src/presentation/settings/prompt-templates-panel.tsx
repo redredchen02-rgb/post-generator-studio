@@ -17,6 +17,7 @@ import { extractTemplateVariables } from "@/application/prompt/renderer";
 import { fetchJson } from "@/presentation/lib/api";
 import { useVarMemoryStore } from "@/presentation/store/var-memory-store";
 import { Header } from "./settings-workspace";
+import { ConfirmDialog } from "@/presentation/components/ui/confirm-dialog";
 
 const STANDARD_VARS = new Set(["TITLE", "EVENT_SUMMARY", "DATE", "TIME", "LOCALE"]);
 
@@ -44,6 +45,7 @@ export function PromptTemplatesPanel({
 }): React.ReactElement {
   const t = useTranslations("Settings.templates");
   const [editingId, setEditingId] = React.useState<string | null>(null);
+  const [pendingDeleteId, setPendingDeleteId] = React.useState<string | null>(null);
   const form = useForm<TemplateForm>({
     resolver: zodResolver(promptTemplateCreateSchema),
     defaultValues: CREATE_DEFAULTS,
@@ -240,7 +242,7 @@ export function PromptTemplatesPanel({
                 <Pencil className="h-4 w-4" />
                 {t("editBtn")}
               </Button>
-              <Button variant="destructive" size="sm" onClick={() => void remove(template.id)}>
+              <Button variant="destructive" size="sm" onClick={() => setPendingDeleteId(template.id)}>
                 <Trash2 className="h-4 w-4" />
                 {t("deleteBtn")}
               </Button>
@@ -248,6 +250,18 @@ export function PromptTemplatesPanel({
           </div>
         ))}
       </div>
+      <ConfirmDialog
+        open={pendingDeleteId !== null}
+        onOpenChange={(open) => { if (!open) setPendingDeleteId(null); }}
+        title={t("confirmDeleteTitle")}
+        description={t("confirmDeleteDesc")}
+        confirmLabel={t("deleteBtn")}
+        onConfirm={async () => {
+          if (pendingDeleteId) await remove(pendingDeleteId);
+          setPendingDeleteId(null);
+        }}
+        variant="destructive"
+      />
     </div>
   );
 }

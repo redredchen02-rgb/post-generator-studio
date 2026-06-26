@@ -290,7 +290,7 @@ export function GeneratorWorkspace(): React.ReactElement {
       }
     }
     setScoring(false);
-  }, [activeGeneration, content, scoring, presetId, effectiveProviderId, t]);
+  }, [activeGeneration, content, scoring, presetId, effectiveProviderId, t, setStatus]);
 
   async function copyMarkdown(): Promise<void> {
     try {

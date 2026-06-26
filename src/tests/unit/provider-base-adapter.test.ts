@@ -108,6 +108,63 @@ describe("BaseAdapter hardening (via GeminiAdapter)", () => {
   });
 });
 
+describe("BaseAdapter validateChunkShape (error chunk detection via GeminiAdapter)", () => {
+  it("surfaces an error when the API sends a Gemini-style error object", async () => {
+    global.fetch = (async () =>
+      sse('data: {"error":{"code":429,"message":"Rate limit exceeded","status":"RESOURCE_EXHAUSTED"}}')) as typeof fetch;
+    const events = await collect(new GeminiAdapter());
+    const error = events.find((e) => e.type === "error");
+    expect(error).toBeDefined();
+    expect((error as { message?: string }).message).toContain("Rate limit exceeded");
+  });
+
+  it("surfaces an error when the API sends an OpenAI-style error object", async () => {
+    global.fetch = (async () =>
+      sse('data: {"error":{"message":"Insufficient quota","type":"insufficient_quota"}}')) as typeof fetch;
+    const adapter = new OpenAICompatibleAdapter({ id: "test-openai", defaultBaseUrl: "http://x", requiresApiKey: false });
+    const events: GenerationEvent[] = [];
+    for await (const event of adapter.generate(request, makeProfile())) {
+      events.push(event);
+    }
+    const error = events.find((e) => e.type === "error");
+    expect(error).toBeDefined();
+    expect((error as { message?: string }).message).toContain("Insufficient quota");
+  });
+
+  it("surfaces an error when the API sends an Anthropic-style error object", async () => {
+    global.fetch = (async () =>
+      sse('data: {"error":{"message":"Invalid API key","type":"authentication_error"}}')) as typeof fetch;
+    const events: GenerationEvent[] = [];
+    for await (const event of new AnthropicAdapter().generate(request, makeProfile(), { apiKey: "k" })) {
+      events.push(event);
+    }
+    const error = events.find((e) => e.type === "error");
+    expect(error).toBeDefined();
+    expect((error as { message?: string }).message).toContain("Invalid API key");
+  });
+
+  it("surfaces an error when the API sends an Ollama-style error string", async () => {
+    global.fetch = (async () =>
+      sse('data: {"error":"model not found"}')) as typeof fetch;
+    const events: GenerationEvent[] = [];
+    const ollamaProfile = { ...makeProfile(), baseUrl: "http://localhost:11434" };
+    for await (const event of new OllamaAdapter().generate(request, ollamaProfile)) {
+      events.push(event);
+    }
+    const error = events.find((e) => e.type === "error");
+    expect(error).toBeDefined();
+    expect((error as { message?: string }).message).toContain("model not found");
+  });
+
+  it("rejects a chunk with an unknown shape that is parseable JSON but has none of the expected fields", async () => {
+    global.fetch = (async () =>
+      sse('data: {"unexpectedField":true}')) as typeof fetch;
+    const events = await collect(new GeminiAdapter());
+    const error = events.find((e) => e.type === "error");
+    expect(error).toBeDefined();
+  });
+});
+
 // A bare adapter that does not opt into completion (supportsCompletion defaults false).
 class NoCompletionAdapter extends BaseAdapter {
   readonly id = "no-completion";

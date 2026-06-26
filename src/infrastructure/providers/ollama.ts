@@ -67,6 +67,14 @@ export class OllamaAdapter extends BaseAdapter {
     };
   }
 
+  protected validateChunkShape(raw: Record<string, unknown>): string | null {
+    if (typeof raw.error === "string") return raw.error;
+    if (typeof raw.message !== "object" && typeof raw.done !== "boolean" && typeof raw.error !== "string") {
+      return `${this.id}: 意外的数据块结构`;
+    }
+    return null;
+  }
+
   protected parseChunk(raw: unknown, _request: NormalizedGenerationRequest): ChunkParseResult {
     const chunk = raw as OllamaChunk;
     const events: GenerationEvent[] = [];
