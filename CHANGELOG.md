@@ -1,67 +1,78 @@
 # Changelog
 
-## 0.0.2 — 2026-06-25
+All notable changes to Post Generator Studio will be documented in this file.
 
-### Added
-- **Language switching (EN / 简体中文)**: UI now fully supports English and Simplified
-  Chinese. A language switcher in the header writes a `NEXT_LOCALE` cookie and
-  refreshes server components; all 11 presentation components use `next-intl`
-  translation keys with 162-key parity across both message files.
-- **Dark mode flash prevention**: an inline script in `<head>` reads localStorage
-  before first paint and applies `.dark` on the root element, eliminating the
-  white flash on hard reload when dark mode is active.
+The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
+
+## [Unreleased]
 
 ### Fixed
-- **OpenAI-compatible providers**: the API key field now appears in the provider
-  form (was hidden), and `/v1` is no longer doubled when a base URL already ends
-  with `/v1` (e.g. `https://host/v1/chat/completions` instead of `/v1/v1/`).
-- **Locale switcher UX**: rapid double-click is guarded by an `isRefreshing` flag;
-  buttons are disabled during the RSC refresh window. Skeleton renders both labels
-  as neutral (no premature active highlight before hydration).
+- SQLite busy_timeout for concurrent write safety
+- ReactMarkdown XSS prevention with allowedElements whitelist
+- Content-Security-Policy header added
+- SSE ReadableStream reader lock properly released
+- LIKE wildcard escaping in search input
+- CodeMirror handleUpdate callback stability (diff ref)
+- Variant token batch buffering for streaming performance
+- Escape key conflict with CodeMirror editor
+- VariantCard metrics memoization
+- React.memo added to InputPanel, OutputPanel, ConfigSidebar
+- QualityBadge memo penetration (handleScore useCallback)
+- CodeMirror dynamic import for code splitting
+- DELETE responses unified to 204 No Content
+- PATCH Zod schema validation for generations
+
+### Security
+- Gemini API key via header instead of URL query parameter
+- Export API no longer exposes server filesystem path
+- Logger x-api-key and x-goog-api-key redaction patterns
+- Security response headers (X-Content-Type-Options, X-Frame-Options, Referrer-Policy, CSP)
+
+### Performance
+- Token batch update mechanism (100ms flush) for streaming
+- CodeMirror lazy loading via next/dynamic
+- optimizePackageImports for lucide-react and Radix UI
+
+## [0.0.2] - 2026-06-25
+
+### Added
+- Quality scoring system (LLM-as-Judge with 5 dimensions)
+- Multi-variant comparison (Unit 10)
+- Version history UI with autosave and version compare (Unit 11)
+- CodeMirror 6 editor with selection rewrite toolbar
+- Outline-first generation workflow
+- Custom template variable memory
+- Generation drafts with working draft and snapshots
+- Request-level controls (tone, length, audience, custom instruction)
+- Outline panel with drag-and-drop reordering
+- Quality badge component
+- Shared constants (DEFAULT_TEMPERATURE, DEFAULT_MAX_TOKENS)
 
 ### Changed
-- `NextIntlClientProvider` wraps the app body; `<html lang>` is now dynamic
-  (`lang="en"` or `lang="zh-CN"` based on active locale).
-- Zustand `ui-store` extended with `locale` field; cookie-to-store sync on mount
-  recovers from localStorage-cleared divergence.
-- Three sequential `await` calls in `RootLayout` parallelized via `Promise.all`
-  (reduces server component TTFB).
-- Language switcher buttons carry `aria-current` for the active locale;
-  pre-mount skeleton marked `aria-busy` for screen readers.
+- Upgraded to Next.js 15, React 19, TypeScript 5
+- Migrated to Zustand 5 with persist middleware
+- Updated README with current features and project structure
+- Updated ARCHITECTURE.md with quality scoring and editor modules
 
-### Tests
-- Added `i18n-request.test.ts` (12 cases), `ui-store.test.ts` (4 cases),
-  `language-switcher.test.tsx` (6 cases), and extended
-  `openai-compatible-adapter.test.ts` (9 cases). Total: 172 tests across 32 files.
+### Fixed
+- Clipboard API error handling
+- setTimeout cleanup in language-switcher and settings-workspace
+- URL.revokeObjectURL timing issue
+- deleteGenerationRecord response check
+- isErrorPayload structural validation
+- OpenRouter dynamic Referer from NEXT_PUBLIC_APP_URL
+- Server error messages in English for i18n
 
-## 0.0.1 — First preliminary release
+## [0.0.1] - 2026-06-20
 
-First baseline that is considered usable. This release consolidates the codebase
-into a single canonical tree and hardens the core input → generate → archive
-pipeline. No new AI features.
-
-### Consolidation
-- Single canonical source tree (`src/`); removed the unused `packages/` monorepo
-  staging area and `pnpm-workspace.yaml`. The app runs as one Next.js process with
-  same-origin `/api/*` routes.
-- Landed the generator refactor: `generator-workspace` split into
-  `input-panel` / `output-panel` / `config-sidebar`, with `bootstrap-store`,
-  `preview-prompt`, and centralized `DEFAULT_ENABLED_STEPS`.
-
-### Reliability & security
-- Secrets: deleting or overwriting an API key now invalidates the in-memory cache,
-  so a revoked key can no longer be read back within the cache TTL.
-- Providers: requests are bounded by a configurable timeout
-  (`POST_GENERATOR_PROVIDER_TIMEOUT_MS`, default 120s); timeouts and network errors
-  surface as retryable error events instead of hanging.
-- Providers: malformed or non-object stream chunks now surface an observable error
-  instead of being silently dropped.
-- History: a selection that leaves the list (after search or delete) resets instead
-  of going stale; out-of-order fetches can no longer overwrite newer results.
-
-### Type safety & tests
-- Extracted a shared `notFound()` storage helper (was duplicated across four repos).
-- Added coverage for the secrets cache contract, the `useApi` race guard, the
-  `useGenerationStream` SSE state machine, provider timeout / chunk hardening, and a
-  cancel integration test. End-to-end test verifies generate, export, and history
-  search on `src/`.
+### Added
+- Initial release
+- Multi-provider support (OpenAI, Anthropic, Gemini, Ollama, OpenRouter)
+- Prompt template management with versioning
+- Generation presets
+- Streaming generation with SSE
+- API key encryption (AES-256-GCM)
+- Multi-language interface (EN / zh-CN)
+- Dark mode support
+- Generation history with export (Markdown / Plain text)
+- Real-time text metrics (word count, reading time, ARI readability)
