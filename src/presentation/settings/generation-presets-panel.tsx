@@ -16,6 +16,7 @@ import { NativeSelect } from "@/presentation/components/ui/native-select";
 import { fetchJson } from "@/presentation/lib/api";
 import { Header } from "./settings-workspace";
 import { DEFAULT_TEMPERATURE, DEFAULT_MAX_TOKENS } from "@/domain/constants";
+import { ConfirmDialog } from "@/presentation/components/ui/confirm-dialog";
 
 type PresetForm = z.infer<typeof generationPresetCreateSchema>;
 
@@ -48,6 +49,7 @@ export function GenerationPresetsPanel({
 }): React.ReactElement {
   const t = useTranslations("Settings.presets");
   const [editingId, setEditingId] = React.useState<string | null>(null);
+  const [pendingDeleteId, setPendingDeleteId] = React.useState<string | null>(null);
   const form = useForm<PresetForm>({
     resolver: zodResolver(generationPresetCreateSchema),
     defaultValues: makeDefaults(providers, templates),
@@ -199,7 +201,7 @@ export function GenerationPresetsPanel({
                 <Pencil className="h-4 w-4" />
                 {t("editBtn")}
               </Button>
-              <Button variant="destructive" size="sm" onClick={() => void remove(preset.id)}>
+              <Button variant="destructive" size="sm" onClick={() => setPendingDeleteId(preset.id)}>
                 <Trash2 className="h-4 w-4" />
                 {t("deleteBtn")}
               </Button>
@@ -207,6 +209,18 @@ export function GenerationPresetsPanel({
           </div>
         ))}
       </div>
+      <ConfirmDialog
+        open={pendingDeleteId !== null}
+        onOpenChange={(open) => { if (!open) setPendingDeleteId(null); }}
+        title={t("confirmDeleteTitle")}
+        description={t("confirmDeleteDesc")}
+        confirmLabel={t("deleteBtn")}
+        onConfirm={async () => {
+          if (pendingDeleteId) await remove(pendingDeleteId);
+          setPendingDeleteId(null);
+        }}
+        variant="destructive"
+      />
     </div>
   );
 }

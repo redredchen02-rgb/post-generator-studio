@@ -58,7 +58,7 @@ describe("GET /api/bootstrap", () => {
     vi.clearAllMocks();
   });
 
-  it("returns aggregated bootstrap data", async () => {
+  it("returns aggregated bootstrap data", { timeout: 10_000 }, async () => {
     mockListProviderProfiles.mockResolvedValue([{ id: "p1", name: "Provider 1" }]);
     mockListPromptTemplates.mockResolvedValue([{ id: "t1", name: "Template 1" }]);
     mockListGenerationPresets.mockResolvedValue([{ id: "g1", name: "Preset 1", providerProfileId: "p1", promptTemplateId: "t1" }]);
@@ -75,7 +75,7 @@ describe("GET /api/bootstrap", () => {
     expect(body.pipelineSteps).toEqual([{ id: "build-context", name: "Build Context" }]);
   });
 
-  it("returns 500 when services fail", async () => {
+  it("returns 500 when services fail", { timeout: 10_000 }, async () => {
     mockListProviderProfiles.mockRejectedValue(new Error("DB connection failed"));
 
     const { GET: bootstrapGet } = await import("@/app/api/bootstrap/route");

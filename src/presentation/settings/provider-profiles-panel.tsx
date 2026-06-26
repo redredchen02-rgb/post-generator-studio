@@ -15,6 +15,7 @@ import { NativeSelect } from "@/presentation/components/ui/native-select";
 import { fetchJson, testProviderProfile } from "@/presentation/lib/api";
 import { Header } from "./settings-workspace";
 import { DEFAULT_TEMPERATURE, DEFAULT_MAX_TOKENS } from "@/domain/constants";
+import { ConfirmDialog } from "@/presentation/components/ui/confirm-dialog";
 
 type ProviderForm = z.infer<typeof providerProfileCreateSchema>;
 
@@ -52,6 +53,7 @@ export function ProviderProfilesPanel({
   const t = useTranslations("Settings.providers");
   const tCommon = useTranslations("Common");
   const [editingId, setEditingId] = React.useState<string | null>(null);
+  const [pendingDeleteId, setPendingDeleteId] = React.useState<string | null>(null);
   const [testStatus, setTestStatus] = React.useState<Record<string, "idle" | "testing" | "ok" | "error">>({});
   const [testMessage, setTestMessage] = React.useState<Record<string, string>>({});
   const form = useForm<ProviderForm>({
@@ -266,7 +268,7 @@ export function ProviderProfilesPanel({
                   {t("clearKeyBtn")}
                 </Button>
               ) : null}
-              <Button variant="destructive" size="sm" onClick={() => void remove(profile.id)}>
+              <Button variant="destructive" size="sm" onClick={() => setPendingDeleteId(profile.id)}>
                 <Trash2 className="h-4 w-4" />
                 {t("deleteBtn")}
               </Button>
@@ -274,6 +276,18 @@ export function ProviderProfilesPanel({
           </div>
         ))}
       </div>
+      <ConfirmDialog
+        open={pendingDeleteId !== null}
+        onOpenChange={(open) => { if (!open) setPendingDeleteId(null); }}
+        title={t("confirmDeleteTitle")}
+        description={t("confirmDeleteDesc")}
+        confirmLabel={t("deleteBtn")}
+        onConfirm={async () => {
+          if (pendingDeleteId) await remove(pendingDeleteId);
+          setPendingDeleteId(null);
+        }}
+        variant="destructive"
+      />
     </div>
   );
 }

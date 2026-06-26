@@ -87,6 +87,17 @@ export class OpenAICompatibleAdapter extends BaseAdapter {
     };
   }
 
+  protected validateChunkShape(raw: Record<string, unknown>): string | null {
+    if (typeof raw.error === "object" && raw.error !== null) {
+      const err = raw.error as Record<string, unknown>;
+      if (typeof err.message === "string") return err.message;
+    }
+    if (!Array.isArray(raw.choices) && typeof raw.usage !== "object" && typeof raw.model !== "string") {
+      return `${this.id}: 意外的数据块结构`;
+    }
+    return null;
+  }
+
   protected parseChunk(raw: unknown, _request: NormalizedGenerationRequest): ChunkParseResult {
     const parsed = raw as ChatCompletionChunk;
     const events: GenerationEvent[] = [];

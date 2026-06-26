@@ -144,7 +144,7 @@ export function CodeMirrorEditor({
         refreshSelection(update.view);
       }
     },
-    [refreshSelection],
+    [refreshSelection, setDiff],
   );
 
   const runAction = React.useCallback(
@@ -166,7 +166,7 @@ export function CodeMirrorEditor({
         (text) => setDiff({ from, to, original, suggestion: text }),
       );
     },
-    [selection, title, executeCompletion, t],
+    [selection, title, executeCompletion, t, setDiff],
   );
 
   const runContinue = React.useCallback(() => {
@@ -209,7 +209,7 @@ export function CodeMirrorEditor({
         setDiff({ from: range.from, to: range.to, original, suggestion: text });
       },
     );
-  }, [title, executeCompletion, t]);
+  }, [title, executeCompletion, t, setDiff]);
 
   const acceptDiff = React.useCallback(() => {
     const view = viewRef.current;
@@ -225,11 +225,11 @@ export function CodeMirrorEditor({
     view.dispatch({ changes: { from: diff.from, to: diff.to, insert: diff.suggestion } });
     setDiff(null);
     setSelection(null);
-  }, [diff, t]);
+  }, [diff, t, setDiff]);
 
   const rejectDiff = React.useCallback(() => {
     setDiff(null);
-  }, []);
+  }, [setDiff]);
 
   return (
     <div ref={containerRef} className="relative h-full">
