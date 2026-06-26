@@ -70,9 +70,7 @@ describe("Provider Profiles API", () => {
   it("DELETE /api/provider-profiles/[id] deletes provider", async () => {
     const { DELETE } = await import("@/app/api/provider-profiles/[id]/route");
     const res = await DELETE(new Request("http://localhost"), routeContext("p1"));
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.ok).toBe(true);
+    expect(res.status).toBe(204);
   });
 
   it("POST /api/provider-profiles/[id]/test tests provider", async () => {
@@ -140,7 +138,7 @@ describe("Prompt Templates API", () => {
   it("DELETE /api/prompt-templates/[id] deletes template", async () => {
     const { DELETE } = await import("@/app/api/prompt-templates/[id]/route");
     const res = await DELETE(new Request("http://localhost"), routeContext("t1"));
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(204);
   });
 
   it("POST /api/prompt-templates/preview previews prompt", async () => {
@@ -211,7 +209,7 @@ describe("Generation Presets API", () => {
   it("DELETE /api/generation-presets/[id] deletes preset", async () => {
     const { DELETE } = await import("@/app/api/generation-presets/[id]/route");
     const res = await DELETE(new Request("http://localhost"), routeContext("g1"));
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(204);
   });
 });
 

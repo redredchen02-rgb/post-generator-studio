@@ -4,9 +4,14 @@ import * as React from "react";
 import ReactMarkdown from "react-markdown";
 import { Clipboard, Download, FileText, RotateCcw, Save } from "lucide-react";
 import { useTranslations } from "next-intl";
+import dynamic from "next/dynamic";
 import { Button } from "@/presentation/components/ui/button";
-import { CodeMirrorEditor } from "@/presentation/generation/editor/codemirror-editor";
 import { QualityBadge } from "@/presentation/generation/quality-badge";
+
+const CodeMirrorEditor = dynamic(() => import("@/presentation/generation/editor/codemirror-editor").then((m) => m.CodeMirrorEditor), {
+  ssr: false,
+  loading: () => <div className="h-[540px] animate-pulse rounded-md bg-muted" />,
+});
 import { computeTextMetrics } from "@/lib/text-metrics";
 import type { Generation, QualityScore } from "@/domain/schemas";
 
@@ -47,7 +52,7 @@ type OutputPanelProps = {
   onFontSizeChange: (v: number) => void;
 };
 
-export function OutputPanel(props: OutputPanelProps): React.ReactElement {
+export const OutputPanel = React.memo(function OutputPanel(props: OutputPanelProps): React.ReactElement {
   const t = useTranslations("Output");
   const metrics = React.useMemo(() => computeTextMetrics(props.content), [props.content]);
 
@@ -149,4 +154,4 @@ export function OutputPanel(props: OutputPanelProps): React.ReactElement {
       </div>
     </section>
   );
-}
+});

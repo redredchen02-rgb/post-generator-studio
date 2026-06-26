@@ -22,6 +22,7 @@ import { useVariantGeneration } from "./use-variant-generation";
 import { DraftSwitcher } from "./draft-switcher";
 import { VersionCompare } from "./version-compare";
 import { useDraftVersions } from "./use-draft-versions";
+import { useRestoreFromHistory } from "./use-restore-from-history";
 import { ConfigSidebar } from "./config-sidebar";
 import { requestCompletion } from "@/presentation/lib/api";
 import { buildOutlinePrompt, parseOutline, serializeOutline } from "./editor/rewrite-actions";
@@ -77,6 +78,19 @@ export function GeneratorWorkspace(): React.ReactElement {
     content,
     isGenerating,
     onRestoreContent: setContent,
+  });
+
+  // Restore-from-History: arriving with ?generationId= loads that generation and
+  // its active draft so the user can keep editing where they left off (Unit 12).
+  useRestoreFromHistory({
+    generationId: searchParams.get("generationId"),
+    onRestore: ({ generation, content: restored, presetId: restoredPresetId }) => {
+      setTitle(generation.title);
+      setEventSummary(generation.eventSummary);
+      if (restoredPresetId) setPresetId(restoredPresetId);
+      setActiveGeneration(generation, restored);
+    },
+    onError: () => setStatus(t("restoreFailed")),
   });
 
   // Tracks the currently-active generation id so async handlers can detect a
@@ -259,7 +273,7 @@ export function GeneratorWorkspace(): React.ReactElement {
     setQualityScore(activeGeneration?.qualityScore ?? null);
   }, [activeGeneration?.id, activeGeneration?.qualityScore]);
 
-  async function handleScore(): Promise<void> {
+  const handleScore = React.useCallback(async () => {
     if (!activeGeneration || !content.trim() || scoring) return;
     const genId = activeGeneration.id;
     setScoring(true);
@@ -272,7 +286,7 @@ export function GeneratorWorkspace(): React.ReactElement {
     } finally {
       setScoring(false);
     }
-  }
+  }, [activeGeneration, content, scoring, presetId, effectiveProviderId, t]);
 
   async function copyMarkdown(): Promise<void> {
     try {

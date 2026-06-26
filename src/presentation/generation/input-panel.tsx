@@ -64,7 +64,7 @@ type InputPanelProps = {
   onCancel: () => void;
 };
 
-export function InputPanel(props: InputPanelProps): React.ReactElement {
+export const InputPanel = React.memo(function InputPanel(props: InputPanelProps): React.ReactElement {
   const t = useTranslations("Generation");
   const tOutline = useTranslations("Outline");
   const tVariant = useTranslations("Variant");
@@ -197,4 +197,4 @@ export function InputPanel(props: InputPanelProps): React.ReactElement {
       </div>
     </section>
   );
-}
+});

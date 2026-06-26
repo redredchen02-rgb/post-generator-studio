@@ -1,9 +1,14 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { errorResponse } from "@/application/errors";
 import { deleteGeneration, getGeneration, updateGenerationContent } from "@/application/generation/generation-service";
 import type { RouteContext } from "@/app/api/types";
 
 export const runtime = "nodejs";
+
+const patchSchema = z.object({
+  outputContent: z.string().min(1).max(500_000),
+});
 
 export async function GET(_request: Request, context: RouteContext): Promise<NextResponse> {
   try {
@@ -17,14 +22,12 @@ export async function GET(_request: Request, context: RouteContext): Promise<Nex
 export async function PATCH(request: Request, context: RouteContext): Promise<NextResponse> {
   try {
     const { id } = await context.params;
-    const body = (await request.json()) as { outputContent?: string };
-    if (typeof body.outputContent !== "string") {
-      return NextResponse.json({ error: "outputContent is required" }, { status: 400 });
+    const raw = await request.json();
+    const parsed = patchSchema.safeParse(raw);
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0]?.message || "Invalid input" }, { status: 400 });
     }
-    if (body.outputContent.length > 500_000) {
-      return NextResponse.json({ error: "outputContent too large" }, { status: 413 });
-    }
-    return NextResponse.json(await updateGenerationContent(id, body.outputContent));
+    return NextResponse.json(await updateGenerationContent(id, parsed.data.outputContent));
   } catch (error) {
     return errorResponse(error);
   }

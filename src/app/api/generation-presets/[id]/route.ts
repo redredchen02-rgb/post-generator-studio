@@ -34,7 +34,7 @@ export async function DELETE(_request: Request, context: RouteContext): Promise<
   try {
     const { id } = await context.params;
     await deleteGenerationPreset(id);
-    return NextResponse.json({ ok: true });
+    return new NextResponse(null, { status: 204 });
   } catch (error) {
     return errorResponse(error);
   }
