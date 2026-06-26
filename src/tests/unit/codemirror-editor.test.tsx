@@ -1,0 +1,47 @@
+// @vitest-environment jsdom
+import { describe, expect, it, vi } from "vitest";
+import { render } from "@testing-library/react";
+import * as React from "react";
+import { CodeMirrorEditor } from "@/presentation/generation/editor/codemirror-editor";
+
+describe("CodeMirrorEditor", () => {
+  it("renders the controlled value as editable document text", () => {
+    const { container } = render(
+      <CodeMirrorEditor value="# Hello world" onChange={() => {}} />,
+    );
+    const content = container.querySelector(".cm-content");
+    expect(content).not.toBeNull();
+    expect(content?.textContent).toContain("Hello world");
+    // Editable by default.
+    expect(content?.getAttribute("contenteditable")).toBe("true");
+  });
+
+  it("is read-only while generating (tokens appended programmatically, D7)", () => {
+    const { container } = render(
+      <CodeMirrorEditor value="streaming…" onChange={() => {}} readOnly />,
+    );
+    const content = container.querySelector(".cm-content");
+    expect(content?.getAttribute("contenteditable")).toBe("false");
+    expect(content?.textContent).toContain("streaming");
+  });
+
+  it("reflects external value updates (streaming token append stays visible)", () => {
+    const onChange = vi.fn();
+    const { container, rerender } = render(
+      <CodeMirrorEditor value="one" onChange={onChange} readOnly />,
+    );
+    rerender(<CodeMirrorEditor value="one two" onChange={onChange} readOnly />);
+    const content = container.querySelector(".cm-content");
+    expect(content?.textContent).toContain("one two");
+    // Programmatic external updates must not fire user onChange.
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("shows the placeholder when empty", () => {
+    const { container } = render(
+      <CodeMirrorEditor value="" onChange={() => {}} placeholder="Start writing…" />,
+    );
+    const placeholder = container.querySelector(".cm-placeholder");
+    expect(placeholder?.textContent).toContain("Start writing");
+  });
+});

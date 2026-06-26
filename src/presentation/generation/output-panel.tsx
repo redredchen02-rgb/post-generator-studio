@@ -5,7 +5,7 @@ import ReactMarkdown from "react-markdown";
 import { Clipboard, Download, FileText, RotateCcw, Save } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/presentation/components/ui/button";
-import { Textarea } from "@/presentation/components/ui/textarea";
+import { CodeMirrorEditor } from "@/presentation/generation/editor/codemirror-editor";
 import { computeTextMetrics } from "@/lib/text-metrics";
 import type { Generation } from "@/domain/schemas";
 
@@ -53,12 +53,13 @@ export function OutputPanel(props: OutputPanelProps): React.ReactElement {
       {props.error ? <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm">{props.error}</div> : null}
       <div className="min-h-0 overflow-hidden rounded-md border bg-background">
         {props.rawMode ? (
-          <Textarea
+          <CodeMirrorEditor
             value={props.content}
-            onChange={(e) => props.onContentChange(e.target.value)}
+            onChange={props.onContentChange}
+            readOnly={props.isGenerating}
+            fontSize={props.editorFontSize}
             placeholder={t("streamingPlaceholder")}
-            className="h-full min-h-[540px] resize-none border-0 font-mono shadow-none focus-visible:ring-0"
-            style={{ fontSize: props.editorFontSize }}
+            className="h-full min-h-[540px] overflow-auto text-sm"
           />
         ) : (
           <article className="prose prose-neutral max-w-none overflow-auto p-4 dark:prose-invert">
