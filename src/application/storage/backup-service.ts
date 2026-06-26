@@ -57,21 +57,23 @@ export async function createBackup(): Promise<BackupMeta> {
     fs.chmodSync(targetDbPath, 0o600);
 
     // 2. Secrets — copy the whole secrets dir (API keys live here, not in the DB).
+    // Only write a bundle `secrets/` dir when there are actual key files. A fresh
+    // install has an empty secrets dir; writing an empty `secrets/` here would make
+    // a later restore's existence-based swap WIPE the user's current keys even
+    // though meta.includesSecrets is false. Existence must imply includesSecrets.
     const secretsDir = getSecretsDir();
-    let includesSecrets = false;
-    if (fs.existsSync(secretsDir)) {
+    const secretFiles = fs.existsSync(secretsDir)
+      ? fs.readdirSync(secretsDir).filter((e) => fs.statSync(path.join(secretsDir, e)).isFile())
+      : [];
+    const includesSecrets = secretFiles.length > 0;
+    if (includesSecrets) {
       const secretsTarget = path.join(tempDir, "secrets");
       fs.mkdirSync(secretsTarget, { mode: 0o700 });
-      const entries = fs.readdirSync(secretsDir).filter((e) => {
-        const p = path.join(secretsDir, e);
-        return fs.existsSync(p) && fs.statSync(p).isFile();
-      });
-      for (const entry of entries) {
+      for (const entry of secretFiles) {
         const dest = path.join(secretsTarget, entry);
         fs.copyFileSync(path.join(secretsDir, entry), dest);
         fs.chmodSync(dest, 0o600);
       }
-      includesSecrets = entries.length > 0;
     }
 
     // 3. meta.json — completion marker, written last.
@@ -130,23 +132,36 @@ export function listBackups(): BackupMeta[] {
   return backups.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 }
 
-/** Resolve a backup id to an absolute dir, rejecting path traversal and missing bundles. */
+/**
+ * Resolve a backup id to an absolute dir, rejecting path traversal and missing
+ * bundles. The id must resolve to a *child* of the backups dir — an id that
+ * collapses to the backups root itself (".", "foo/..") is rejected, otherwise a
+ * later rmSync(root) would wipe every backup.
+ */
 function resolveBackupPath(id: string): string {
-  const backupsDir = getBackupsDir();
-  const resolved = path.resolve(path.join(backupsDir, id));
-  const backupsAbs = path.resolve(backupsDir);
-  if (resolved !== backupsAbs && !resolved.startsWith(backupsAbs + path.sep)) {
-    throw new Error("Invalid backup ID");
-  }
+  const resolved = isInsideBackups(id);
   if (!fs.existsSync(resolved)) {
     throw new Error("Backup not found");
   }
   return resolved;
 }
 
+/** Returns the absolute path iff `id` is strictly inside the backups dir; else throws. */
+function isInsideBackups(id: string): string {
+  const backupsAbs = path.resolve(getBackupsDir());
+  const resolved = path.resolve(path.join(backupsAbs, id));
+  if (!resolved.startsWith(backupsAbs + path.sep)) {
+    throw new Error("Invalid backup ID");
+  }
+  return resolved;
+}
+
 /** Validate a bundle DB with PRAGMA checks, closing the inspection connection cleanly. */
 function validateBackupDb(dbPath: string): void {
-  const db = new Database(dbPath, { readonly: false });
+  // Read-only: integrity_check / foreign_key_check never write. Opening
+  // read-write could trigger journal recovery/checkpoint that mutates the user's
+  // backup file and spawns -wal/-shm sidecars.
+  const db = new Database(dbPath, { readonly: true });
   try {
     const integrity = db.pragma("integrity_check", { simple: true }) as string;
     if (integrity !== "ok") {
@@ -231,7 +246,8 @@ export async function restoreBackup(id: string): Promise<void> {
       throw new Error(
         "Restore failed and automatic rollback also failed. " +
           `Your previous data is safe at ${selfBackupDir}. ` +
-          "Stop the app, copy that bundle's files back manually, then restart.",
+          "Stop the app, copy that bundle's files back manually, then restart. " +
+          `(original cause: ${String(error)})`,
       );
     }
     throw error;
@@ -242,12 +258,7 @@ export async function restoreBackup(id: string): Promise<void> {
 
 /** Delete a backup by id (path-traversal guarded). Returns false when absent. */
 export function deleteBackup(id: string): boolean {
-  const backupsDir = getBackupsDir();
-  const resolved = path.resolve(path.join(backupsDir, id));
-  const backupsAbs = path.resolve(backupsDir);
-  if (resolved !== backupsAbs && !resolved.startsWith(backupsAbs + path.sep)) {
-    throw new Error("Invalid backup ID");
-  }
+  const resolved = isInsideBackups(id); // rejects ids that escape or collapse to the root
   if (!fs.existsSync(resolved)) return false;
   fs.rmSync(resolved, { recursive: true, force: true });
   logger.info("Backup deleted", { id });

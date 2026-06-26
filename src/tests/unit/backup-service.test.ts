@@ -13,7 +13,7 @@ process.env.POST_GENERATOR_DB_PATH = path.join(home, "post-generator.db");
 import { providerProfiles } from "@/infrastructure/storage/schema";
 import { getDb, closeDb } from "@/infrastructure/storage/db";
 import { getBackupsDir, getSecretsDir } from "@/infrastructure/config/paths";
-import { saveSecret } from "@/infrastructure/security/secrets";
+import { saveSecret, readSecret } from "@/infrastructure/security/secrets";
 import {
   createBackup,
   listBackups,
@@ -95,6 +95,45 @@ describe("backup-service", () => {
     await expect(restoreBackup(meta.id)).resolves.toBeUndefined();
   });
 
+  it("an empty-but-present secrets dir produces no bundle secrets dir (includesSecrets=false)", async () => {
+    // Fresh install: ensureStorageDirectories created an empty secrets dir.
+    fs.rmSync(getSecretsDir(), { recursive: true, force: true });
+    fs.mkdirSync(getSecretsDir(), { recursive: true });
+    const meta = await createBackup();
+    expect(meta.includesSecrets).toBe(false);
+    expect(fs.existsSync(path.join(getBackupsDir(), meta.id, "secrets"))).toBe(false);
+  });
+
+  it("restoring a no-secrets backup does NOT wipe keys added later (HIGH regression)", async () => {
+    // Backup taken before any API key exists.
+    fs.rmSync(getSecretsDir(), { recursive: true, force: true });
+    fs.mkdirSync(getSecretsDir(), { recursive: true });
+    const meta = await createBackup();
+    expect(meta.includesSecrets).toBe(false);
+
+    // User adds an API key afterwards.
+    const { ref } = await saveSecret("key-added-after-backup");
+    expect(await readSecret(ref)).toBe("key-added-after-backup");
+
+    // Restoring the older (no-secrets) backup must leave the live key intact.
+    await restoreBackup(meta.id);
+    expect(await readSecret(ref)).toBe("key-added-after-backup");
+  });
+
+  it("restoring a secrets-bearing backup replaces live secrets with the bundle's", async () => {
+    const { ref: oldRef } = await saveSecret("original-key");
+    const meta = await createBackup(); // captures original-key
+    expect(meta.includesSecrets).toBe(true);
+
+    // Change the live secret after the backup.
+    const { ref: newRef } = await saveSecret("rotated-key");
+    expect(await readSecret(newRef)).toBe("rotated-key");
+
+    await restoreBackup(meta.id);
+    // The backed-up secret file is restored.
+    expect(await readSecret(oldRef)).toBe("original-key");
+  });
+
   it("listBackups ignores dirs without a valid meta.json and sorts newest-first", async () => {
     const a = await createBackup();
     const b = await createBackup();
@@ -114,6 +153,22 @@ describe("backup-service", () => {
   it("rejects path traversal in resolve and delete", async () => {
     await expect(restoreBackup("../../etc")).rejects.toThrow(/Invalid backup ID/);
     expect(() => deleteBackup("../../../tmp")).toThrow(/Invalid backup ID/);
+  });
+
+  it("rejects ids that collapse to the backups root (would wipe all backups)", async () => {
+    // Seed a couple of real backups so a root-delete would be catastrophic.
+    await createBackup();
+    await createBackup();
+    const countBefore = listBackups().length;
+    expect(countBefore).toBeGreaterThan(0);
+
+    for (const evil of [".", "foo/..", "../backups", ""]) {
+      expect(() => deleteBackup(evil)).toThrow(/Invalid backup ID/);
+    }
+    await expect(restoreBackup(".")).rejects.toThrow(/Invalid backup ID/);
+
+    // The backups directory and its contents survive.
+    expect(listBackups().length).toBe(countBefore);
   });
 
   it("rejects a bundle whose schemaVer is newer than the app, leaving live data intact", async () => {

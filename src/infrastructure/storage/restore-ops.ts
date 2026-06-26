@@ -42,8 +42,16 @@ export function readRestoreMarker(): RestoreMarker | null {
 }
 
 export function clearRestoreMarker(): void {
-  const p = markerPath();
-  if (fs.existsSync(p)) fs.unlinkSync(p);
+  // Best-effort: a failed unlink must not propagate. In the restore success path
+  // the swap is already committed; letting this throw would drop into the catch
+  // and spuriously roll a successful restore back. A stale marker is self-healing
+  // — boot recovery re-applies the (now-current) self-backup idempotently.
+  try {
+    const p = markerPath();
+    if (fs.existsSync(p)) fs.unlinkSync(p);
+  } catch {
+    // ignore
+  }
 }
 
 function unlinkSidecars(dbPath: string): void {
@@ -134,11 +142,15 @@ export function recoverInterruptedRestore(): void {
       selfBackupId: marker.selfBackupId,
     });
   } catch (error) {
-    logger.error("Interrupted-restore recovery failed — manual recovery may be required", {
-      selfBackupId: marker.selfBackupId,
-      selfBackupDir,
-      error: String(error),
-    });
-    throw error;
+    // Never brick boot: if auto-recovery fails (e.g. a partially-damaged
+    // self-backup, disk full), clear the marker and let the app start anyway.
+    // Re-throwing here would leave the marker in place so every subsequent boot
+    // re-runs recovery, re-fails, and the app can never open. The self-backup
+    // files remain on disk for manual recovery.
+    logger.error(
+      "Interrupted-restore auto-recovery failed — booting anyway; manual recovery may be required",
+      { selfBackupId: marker.selfBackupId, selfBackupDir, error: String(error) },
+    );
+    clearRestoreMarker();
   }
 }
