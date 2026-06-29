@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import type * as schemaType from "@/infrastructure/storage/schema";
 import { generationPresets, promptTemplates, providerProfiles } from "@/infrastructure/storage/schema";
@@ -60,25 +60,62 @@ const pipelineSteps = JSON.stringify([
   "format-output",
 ]);
 
+// Replacement for the removed Ollama provider: a local, key-less, enabled-by-default
+// profile that preserves the "works out of the box" experience.
+const LOCAL_DEFAULT_PROFILE_ID = "provider_local_openai_compatible";
+
+function localDefaultProfile(now: string) {
+  return {
+    id: LOCAL_DEFAULT_PROFILE_ID,
+    name: "Local (OpenAI-Compatible)",
+    providerKind: "openai-compatible" as const,
+    baseUrl: "http://localhost:8000",
+    model: "local-model",
+    apiKeyRef: null,
+    keyMasked: null,
+    defaultTemperature: 0.7,
+    defaultMaxTokens: 3000,
+    enabled: true,
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+// One-time, idempotent cleanup for installs that still carry the removed Ollama provider.
+// `provider_kind` is read back through zod (provider-profile-repo), so a stale "ollama" row
+// would make the whole provider list throw. Repoint any presets onto the local default first
+// (the preset->profile FK is RESTRICT), then delete the ollama rows.
+async function migrateAwayFromOllama(db: BetterSQLite3Database<typeof schemaType>, now: string): Promise<void> {
+  const ollamaRows = await db
+    .select({ id: providerProfiles.id })
+    .from(providerProfiles)
+    .where(eq(providerProfiles.providerKind, "ollama"));
+  if (ollamaRows.length === 0) return;
+  const ollamaIds = ollamaRows.map((row) => row.id);
+
+  const replacement = await db
+    .select({ id: providerProfiles.id })
+    .from(providerProfiles)
+    .where(eq(providerProfiles.id, LOCAL_DEFAULT_PROFILE_ID))
+    .limit(1);
+  if (replacement.length === 0) {
+    await db.insert(providerProfiles).values(localDefaultProfile(now));
+  }
+
+  await db
+    .update(generationPresets)
+    .set({ providerProfileId: LOCAL_DEFAULT_PROFILE_ID, updatedAt: now })
+    .where(inArray(generationPresets.providerProfileId, ollamaIds));
+  await db.delete(providerProfiles).where(inArray(providerProfiles.id, ollamaIds));
+}
+
 export async function seedDefaults(db: BetterSQLite3Database<typeof schemaType>): Promise<void> {
   const now = new Date().toISOString();
+  await migrateAwayFromOllama(db, now);
   const existingProviders = await db.select({ id: providerProfiles.id }).from(providerProfiles).limit(1);
   if (existingProviders.length === 0) {
     await db.insert(providerProfiles).values([
-      {
-        id: "provider_ollama_local",
-        name: "Ollama Local",
-        providerKind: "ollama",
-        baseUrl: "http://localhost:11434",
-        model: "llama3.1",
-        apiKeyRef: null,
-        keyMasked: null,
-        defaultTemperature: 0.7,
-        defaultMaxTokens: 3000,
-        enabled: true,
-        createdAt: now,
-        updatedAt: now,
-      },
+      localDefaultProfile(now),
       {
         id: "provider_openai",
         name: "OpenAI",
@@ -160,7 +197,7 @@ export async function seedDefaults(db: BetterSQLite3Database<typeof schemaType>)
     const presets = ["新闻写作", "SEO 长文", "小红书文案", "Threads 短文", "专业博客", "品牌故事"].map((name, index) => ({
       id: `preset_${index + 1}`,
       name,
-      providerProfileId: "provider_ollama_local",
+      providerProfileId: LOCAL_DEFAULT_PROFILE_ID,
       promptTemplateId: "template_news_writing",
       temperature: index === 1 ? 0.6 : 0.7,
       maxTokens: index === 3 ? 1200 : 3000,

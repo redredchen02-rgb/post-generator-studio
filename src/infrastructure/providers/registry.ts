@@ -2,7 +2,6 @@ import type { LLMProviderAdapter } from "@/domain/ports/provider";
 import type { ProviderKind } from "@/domain/schemas";
 import { AnthropicAdapter } from "@/infrastructure/providers/anthropic";
 import { GeminiAdapter } from "@/infrastructure/providers/gemini";
-import { OllamaAdapter } from "@/infrastructure/providers/ollama";
 import { OpenAICompatibleAdapter } from "@/infrastructure/providers/openai-compatible";
 
 const adapterFactories: Record<ProviderKind, () => LLMProviderAdapter> = {
@@ -13,7 +12,6 @@ const adapterFactories: Record<ProviderKind, () => LLMProviderAdapter> = {
   }),
   anthropic: () => new AnthropicAdapter(),
   gemini: () => new GeminiAdapter(),
-  ollama: () => new OllamaAdapter(),
   openrouter: () => new OpenAICompatibleAdapter({
     id: "openrouter",
     defaultBaseUrl: "https://openrouter.ai/api",

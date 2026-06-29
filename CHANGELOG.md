@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Removed
+- Ollama provider (adapter, registry entry, `ollama` provider kind, settings UI metadata, and dedicated tests)
+
+### Changed
+- Default seeded provider is now a local OpenAI-Compatible profile (`localhost:8000`, key-less, enabled) replacing the removed Ollama seed; all default presets repoint to it
+- One-time idempotent startup migration removes any stale `ollama` provider rows and repoints their presets onto the local default, so existing installs don't fail provider-profile validation after the removal
+
 ## [0.1.0] - 2026-06-26
 
 ### Added

@@ -45,14 +45,14 @@ pnpm start:clean
 ### 首次使用
 
 1. 进入 **Settings** 页面
-2. 配置一个 Provider Profile（Ollama 本地已预配置）
+2. 配置一个 Provider Profile（本地 OpenAI-Compatible 已预配置）
 3. 如果使用云端 Provider（OpenAI / Anthropic / Gemini），填入 API Key
 4. 回到 **Generate** 页面，输入标题和事件摘要，点击 Generate
 
 ## 功能
 
 - **流式生成** — SSE 实时输出，支持取消，Token 批量渲染优化
-- **多 Provider** — OpenAI、Anthropic、Gemini、Ollama、OpenRouter、自定义兼容 API
+- **多 Provider** — OpenAI、Anthropic、Gemini、OpenRouter、Grok、自定义兼容 API
 - **Prompt 模板** — 版本化管理，支持 `{{TITLE}}`、`{{EVENT_SUMMARY}}`、`{{DATE}}`、`{{TIME}}`、`{{LOCALE}}` 变量 + 自定义变量
 - **生成预设** — 组合 Provider + 模板 + 参数 + Pipeline 步骤
 - **大纲生成** — 先生成可编辑大纲，确认后再展开全文
@@ -79,7 +79,7 @@ pnpm start:clean
 
 ### Provider 配置
 
-在 Settings 页面配置 Provider Profile。Ollama 默认启用，云端 Provider 默认禁用，配置 API Key 后启用。
+在 Settings 页面配置 Provider Profile。本地 OpenAI-Compatible（localhost:8000）默认启用，云端 Provider 默认禁用，配置 API Key 后启用。
 
 API Key 加密存储在 `~/.post-generator/secrets/`，浏览器只接收掩码标签。
 

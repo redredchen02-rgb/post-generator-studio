@@ -6,8 +6,8 @@ import { createId } from "@/lib/utils";
 
 describe("foreign key constraints (integration, seeded DB)", () => {
   it("blocks deleting a provider profile that a preset still references", async () => {
-    // Seed creates preset_1 -> provider_ollama_local, so the delete must be refused.
-    await expect(getStorage().providerProfiles.delete("provider_ollama_local")).rejects.toThrow(
+    // Seed creates preset_1 -> provider_local_openai_compatible, so the delete must be refused.
+    await expect(getStorage().providerProfiles.delete("provider_local_openai_compatible")).rejects.toThrow(
       /无法删除/,
     );
   });
@@ -23,8 +23,8 @@ describe("foreign key constraints (integration, seeded DB)", () => {
     await getStorage().providerProfiles.create({
       id,
       name: "Unreferenced",
-      providerKind: "ollama",
-      model: "llama3.1",
+      providerKind: "openai-compatible",
+      model: "local-model",
       defaultTemperature: 0.7,
       defaultMaxTokens: 3000,
       enabled: false,
