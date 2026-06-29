@@ -17,3 +17,6 @@ data/
 *.tsbuildinfo
 next-env.d.ts
 Start Dev.command
+
+# Local artifacts from the kilo code tool
+.kilo/
