@@ -39,7 +39,7 @@ const bootstrap = {
       maxTokens: 3000,
       locale: "zh-CN",
       outputFormat: "markdown",
-      enabledPipelineSteps: ["build-context", "render-prompt", "generate-content", "clean-content", "format-output", "persist-generation"],
+      enabledPipelineSteps: ["build-context", "render-prompt", "apply-controls", "clean-content", "format-output"],
       isDefault: true,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),

@@ -1,4 +1,5 @@
 import type { PipelineStep } from "@/domain/ports/pipeline";
+import { PIPELINE_STEPS } from "@/domain/pipeline-steps";
 import { cleanGeneratedContent, formatOutput } from "@/application/content/cleaner";
 import { renderTemplate } from "@/application/prompt/renderer";
 import { resolvePromptVariables } from "@/application/prompt/variables";
@@ -18,7 +19,7 @@ export type RenderedPromptPayload = {
 };
 
 export const buildContextStep: PipelineStep<GenerationRequest, ContextPayload> = {
-  id: "build-context",
+  id: PIPELINE_STEPS.BUILD_CONTEXT,
   name: "Build Context",
   async execute(context, input) {
     return {
@@ -29,7 +30,7 @@ export const buildContextStep: PipelineStep<GenerationRequest, ContextPayload> =
 };
 
 export const renderPromptStep: PipelineStep<ContextPayload, RenderedPromptPayload> = {
-  id: "render-prompt",
+  id: PIPELINE_STEPS.RENDER_PROMPT,
   name: "Render Prompt",
   async execute(context, input) {
     const systemPrompt = renderTemplate(context.template.systemPrompt, input.variables).content;
@@ -55,7 +56,7 @@ export const renderPromptStep: PipelineStep<ContextPayload, RenderedPromptPayloa
  * prompt. No-ops when no controls are set, so it's safe to run unconditionally.
  */
 export const applyControlsStep: PipelineStep<RenderedPromptPayload, RenderedPromptPayload> = {
-  id: "apply-controls",
+  id: PIPELINE_STEPS.APPLY_CONTROLS,
   name: "Apply Controls",
   async execute(_context, input) {
     const adjusted = applyControlsToPrompts(
@@ -77,7 +78,7 @@ export const applyControlsStep: PipelineStep<RenderedPromptPayload, RenderedProm
 };
 
 export const cleanContentStep: PipelineStep<{ content: string; title: string }, string> = {
-  id: "clean-content",
+  id: PIPELINE_STEPS.CLEAN_CONTENT,
   name: "Clean Content",
   async execute(_context, input) {
     return cleanGeneratedContent(input.content, input.title);
@@ -85,7 +86,7 @@ export const cleanContentStep: PipelineStep<{ content: string; title: string }, 
 };
 
 export const formatOutputStep: PipelineStep<string, string> = {
-  id: "format-output",
+  id: PIPELINE_STEPS.FORMAT_OUTPUT,
   name: "Format Output",
   async execute(context, input) {
     return formatOutput(input, context.preset.outputFormat);

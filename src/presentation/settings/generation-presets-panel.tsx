@@ -7,7 +7,7 @@ import { useForm } from "react-hook-form";
 import { useTranslations } from "next-intl";
 import type { GenerationPreset, PromptTemplate, ProviderProfile } from "@/domain/schemas";
 import { generationPresetCreateSchema } from "@/domain/schemas";
-import { ALL_PIPELINE_STEPS } from "@/domain/pipeline-steps";
+import { ALL_PIPELINE_STEPS, isPipelineStepId } from "@/domain/pipeline-steps";
 import type { z } from "zod";
 import { Button } from "@/presentation/components/ui/button";
 import { Field } from "@/presentation/components/ui/field";
@@ -76,7 +76,9 @@ export function GenerationPresetsPanel({
       maxTokens: preset.maxTokens ?? 3000,
       locale: preset.locale,
       outputFormat: preset.outputFormat,
-      enabledPipelineSteps: preset.enabledPipelineSteps,
+      // Read type is the lenient string[]; narrow to known step ids for the strict
+      // write form (also drops any stale id a tolerated row may still carry).
+      enabledPipelineSteps: preset.enabledPipelineSteps.filter(isPipelineStepId),
       isDefault: preset.isDefault,
     });
   }
