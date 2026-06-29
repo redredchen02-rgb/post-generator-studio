@@ -1,4 +1,5 @@
 import type {
+  ContentPort,
   HotspotOptions,
   HotspotPort,
   HotspotSidecarHealth,
@@ -6,16 +7,21 @@ import type {
 } from "@/domain/ports/hotspot-port";
 import {
   AppErrorException,
+  contentVerdictSchema,
   hotspotAlertsSchema,
   localScoreSchema,
+  type ContentVerdict,
   type HotspotAlert,
   type LocalScore,
 } from "@/domain/schemas";
 import {
+  getContentImageTimeoutMs,
+  getContentVideoTimeoutMs,
   getHotspotSidecarSecret,
   getHotspotSidecarUrl,
   getScoringTimeoutMs,
 } from "@/infrastructure/config/hotspot-sidecar";
+import { z } from "zod";
 import { classifyFetchFailure, combineSignals } from "@/infrastructure/http/with-timeout";
 
 /**
@@ -26,7 +32,7 @@ import { classifyFetchFailure, combineSignals } from "@/infrastructure/http/with
  * One class fronts the whole sidecar (scoring today; hotspot/content extend it
  * later) since it is a single service with one health endpoint and one auth gate.
  */
-export class HotspotAdapter implements ScoringPort, HotspotPort {
+export class HotspotAdapter implements ScoringPort, HotspotPort, ContentPort {
   protected async call<T>(
     path: string,
     body: unknown,
@@ -151,5 +157,21 @@ export class HotspotAdapter implements ScoringPort, HotspotPort {
       throw new AppErrorException({ code: "SIDECAR_ERROR", message: "热点告警结构非预期" });
     }
     return parsed.data;
+  }
+
+  async analyze(
+    absPath: string,
+    kind: "image" | "video",
+    options?: HotspotOptions,
+  ): Promise<ContentVerdict[]> {
+    const timeoutMs = kind === "video" ? getContentVideoTimeoutMs() : getContentImageTimeoutMs();
+    const raw = await this.call<unknown>("/content/analyze", { path: absPath, kind }, timeoutMs, options);
+    // Image returns a single verdict object; video returns a list of frame verdicts.
+    const schema = kind === "video" ? z.array(contentVerdictSchema) : contentVerdictSchema;
+    const parsed = schema.safeParse(raw);
+    if (!parsed.success) {
+      throw new AppErrorException({ code: "SIDECAR_ERROR", message: "内容检测结构非预期" });
+    }
+    return Array.isArray(parsed.data) ? parsed.data : [parsed.data];
   }
 }

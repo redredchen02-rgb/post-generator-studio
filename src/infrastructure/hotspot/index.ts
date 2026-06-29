@@ -1,4 +1,4 @@
-import type { ScoringPort } from "@/domain/ports/hotspot-port";
+import type { ContentPort, HotspotPort, ScoringPort } from "@/domain/ports/hotspot-port";
 import { HotspotAdapter } from "@/infrastructure/hotspot/hotspot-adapter";
 
 let cached: HotspotAdapter | undefined;
@@ -11,6 +11,16 @@ export function getHotspotAdapter(): HotspotAdapter {
 
 /** Narrowed accessor for the scoring capability. */
 export function getScoringAdapter(): ScoringPort {
+  return getHotspotAdapter();
+}
+
+/** Narrowed accessor for the hotspot-ranking capability. */
+export function getRankingAdapter(): HotspotPort {
+  return getHotspotAdapter();
+}
+
+/** Narrowed accessor for the content-analysis capability. */
+export function getContentAdapter(): ContentPort {
   return getHotspotAdapter();
 }
 

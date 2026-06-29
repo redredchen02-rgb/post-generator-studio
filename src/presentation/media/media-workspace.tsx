@@ -1,14 +1,16 @@
 "use client";
 
 import * as React from "react";
-import { AlertTriangle, Download, Loader2, RefreshCw, ScanSearch } from "lucide-react";
+import { AlertTriangle, Download, Loader2, RefreshCw, ScanSearch, ShieldCheck } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/presentation/components/ui/button";
 import { Field } from "@/presentation/components/ui/field";
 import { NativeSelect } from "@/presentation/components/ui/native-select";
 import { useWatermark, type DetectResponse } from "@/presentation/media/use-watermark";
+import { analyzeMediaSafety, getHotspotHealth } from "@/presentation/lib/api";
+import type { ContentAnalysis } from "@/domain/schemas";
 
-type Mode = "image" | "video" | "detect";
+type Mode = "image" | "video" | "detect" | "safety";
 
 export function MediaWorkspace(): React.ReactElement {
   const t = useTranslations("MediaWatermark");
@@ -25,7 +27,7 @@ export function MediaWorkspace(): React.ReactElement {
       <HealthBanner state={wm.healthState} health={wm.health} onRetry={wm.checkHealth} t={t} />
 
       <div className="my-4 flex gap-1 rounded-md border p-1 text-sm">
-        {(["image", "video", "detect"] as Mode[]).map((m) => (
+        {(["image", "video", "detect", "safety"] as Mode[]).map((m) => (
           <button
             key={m}
             type="button"
@@ -49,6 +51,7 @@ export function MediaWorkspace(): React.ReactElement {
       {mode === "image" ? <ImageForm wm={wm} t={t} /> : null}
       {mode === "video" ? <VideoForm wm={wm} t={t} /> : null}
       {mode === "detect" ? <DetectForm wm={wm} t={t} /> : null}
+      {mode === "safety" ? <SafetyForm t={t} /> : null}
     </div>
   );
 }
@@ -195,6 +198,86 @@ function DetectForm({ wm, t }: { wm: WM; t: T }): React.ReactElement {
             {wm.busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
             {t("action.delogo")}
           </Button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * NSFW / content safety check. Powered by the SEPARATE hotspot sidecar (not omniwm),
+ * so it tracks its own availability — `/media` can have watermarking up while safety
+ * is down, and vice versa. Verdicts are transient and never carry the file path.
+ */
+function SafetyForm({ t }: { t: T }): React.ReactElement {
+  const [available, setAvailable] = React.useState<boolean | null>(null);
+  const [busy, setBusy] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+  const [result, setResult] = React.useState<ContentAnalysis | null>(null);
+
+  const probe = React.useCallback(() => {
+    setAvailable(null);
+    getHotspotHealth().then(
+      (h) => setAvailable(Boolean(h.ok && h.capabilities.content)),
+      () => setAvailable(false),
+    );
+  }, []);
+  React.useEffect(() => probe(), [probe]);
+
+  async function onSubmit(e: React.FormEvent<HTMLFormElement>): Promise<void> {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    setResult(null);
+    try {
+      setResult(await analyzeMediaSafety(new FormData(e.currentTarget)));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("safety.failed"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (available === false) {
+    return (
+      <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm">
+        <p className="flex items-center gap-2 font-medium text-amber-700 dark:text-amber-500">
+          <AlertTriangle className="h-4 w-4" /> {t("safety.unavailable")}
+        </p>
+        <p className="mt-1 text-muted-foreground">{t("safety.unavailableHint")}</p>
+        <Button variant="outline" size="sm" className="mt-2" onClick={probe}>
+          <RefreshCw className="mr-1 h-3.5 w-3.5" /> {t("health.retry")}
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid gap-3">
+      <p className="text-sm text-muted-foreground">{t("safety.hint")}</p>
+      <form onSubmit={onSubmit} className="grid gap-3">
+        <FileInput name="source" accept="image/*,video/*" label={t("safety.source")} />
+        <Button type="submit" disabled={available !== true || busy} className="mt-2">
+          {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-2 h-4 w-4" />}
+          {t("safety.run")}
+        </Button>
+      </form>
+
+      {error ? <p className="text-sm text-destructive">{error}</p> : null}
+
+      {result ? (
+        <div className="grid gap-2 rounded-md border p-3 text-sm">
+          <p className="font-medium">{t("safety.framesAnalyzed", { n: result.verdicts.length })}</p>
+          {result.verdicts.map((v, i) => (
+            <div key={i} className="grid grid-cols-[1fr_auto] items-center gap-2 border-t pt-2 first:border-t-0 first:pt-0">
+              <span className="text-muted-foreground">
+                {t("safety.nsfw")}: <strong className={v.nsfwScore >= 0.5 ? "text-destructive" : ""}>{v.nsfwScore.toFixed(2)}</strong>
+                {"  "}· {t("safety.action")}: {v.actionScore.toFixed(2)}
+              </span>
+              <span className="tabular-nums text-xs text-muted-foreground">#{i + 1}</span>
+            </div>
+          ))}
+          <p className="text-[11px] text-muted-foreground">{t("safety.clipCaveat")}</p>
         </div>
       ) : null}
     </div>

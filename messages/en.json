@@ -378,7 +378,8 @@
     "mode": {
       "image": "Image watermark",
       "video": "Video watermark",
-      "detect": "Detect / Delogo"
+      "detect": "Detect / Delogo",
+      "safety": "Safety check"
     },
     "health": {
       "checking": "Checking watermark service…",
@@ -404,6 +405,18 @@
     },
     "detect": {
       "found": "Source {w}×{h}. Detected regions:"
+    },
+    "safety": {
+      "source": "Image or video",
+      "run": "Check content",
+      "hint": "Detect NSFW / cover signals in an image or video. The file is analyzed in a temp dir and not stored.",
+      "failed": "Content check failed.",
+      "unavailable": "Content check unavailable",
+      "unavailableHint": "Start the hotspot sidecar (pnpm sidecar:hotspot) with the [content] extra installed.",
+      "framesAnalyzed": "{n} frame(s) analyzed",
+      "nsfw": "NSFW",
+      "action": "Action",
+      "clipCaveat": "Action score uses a nudenet proxy — supply CLIP weights for full cover-action fidelity."
     }
   }
 }

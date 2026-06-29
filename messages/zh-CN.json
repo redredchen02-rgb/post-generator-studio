@@ -378,7 +378,8 @@
     "mode": {
       "image": "图片水印",
       "video": "视频水印",
-      "detect": "检测 / 去标"
+      "detect": "检测 / 去标",
+      "safety": "内容检测"
     },
     "health": {
       "checking": "正在检测水印服务…",
@@ -404,6 +405,18 @@
     },
     "detect": {
       "found": "源 {w}×{h}。检测到的区域："
+    },
+    "safety": {
+      "source": "图片或视频",
+      "run": "检测内容",
+      "hint": "检测图片/视频的 NSFW 与封面信号。文件在临时目录分析、不会留存。",
+      "failed": "内容检测失败。",
+      "unavailable": "内容检测不可用",
+      "unavailableHint": "请启动 hotspot 边车（pnpm sidecar:hotspot）并装好 [content] extra。",
+      "framesAnalyzed": "已分析 {n} 帧",
+      "nsfw": "NSFW",
+      "action": "动作",
+      "clipCaveat": "动作分用 nudenet 代理——需 CLIP 权重才有完整封面动作精度。"
     }
   }
 }

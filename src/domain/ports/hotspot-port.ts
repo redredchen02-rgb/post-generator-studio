@@ -1,4 +1,4 @@
-import type { HotspotAlert, LocalScore } from "@/domain/schemas";
+import type { ContentVerdict, HotspotAlert, LocalScore } from "@/domain/schemas";
 
 /**
  * Health snapshot of the hotspot-sdk sidecar, surfaced to the UI for degradation.
@@ -39,4 +39,13 @@ export interface HotspotPort {
    * primes the baseline (empty alerts). State is per-process and shared.
    */
   processSnapshot(ranking: Record<string, number>, options?: HotspotOptions): Promise<HotspotAlert[]>;
+}
+
+export interface ContentPort {
+  /**
+   * Analyze a media file for NSFW / cover signals (`POST /content/analyze`). `absPath`
+   * is a server-generated path inside the media root (never client-supplied). Returns
+   * one verdict for an image, several (one per key frame) for a video.
+   */
+  analyze(absPath: string, kind: "image" | "video", options?: HotspotOptions): Promise<ContentVerdict[]>;
 }

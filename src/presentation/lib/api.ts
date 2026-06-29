@@ -1,5 +1,6 @@
 import type {
   AppError,
+  ContentAnalysis,
   Generation,
   GenerationDraft,
   GenerationPreset,
@@ -210,6 +211,15 @@ export async function submitHotspotSnapshot(
 /** Hotspot sidecar health (capabilities map). Throws/`ok:false` when the sidecar is down. */
 export async function getHotspotHealth(signal?: AbortSignal): Promise<HotspotSidecarHealth> {
   return fetchJson<HotspotSidecarHealth>("/api/hotspot/health", { method: "GET", signal });
+}
+
+/** NSFW / content safety check for an uploaded media file (multipart). */
+export async function analyzeMediaSafety(form: FormData, signal?: AbortSignal): Promise<ContentAnalysis> {
+  const response = await fetch("/api/media/safety", { method: "POST", body: form, signal });
+  const data = (await response.json()) as ContentAnalysis | { error: AppError };
+  if (isErrorPayload(data)) throw new ApiClientError(data.error);
+  if (!response.ok) throw new ApiClientError({ code: "HTTP_ERROR", message: `HTTP ${response.status}` });
+  return data as ContentAnalysis;
 }
 
 /** One-shot, non-streaming completion (selection rewrite, continue, etc.). */

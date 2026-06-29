@@ -12,7 +12,16 @@
 
 import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
+import os from "node:os";
 import path from "node:path";
+
+// Mirror src/infrastructure/config/paths.ts::getMediaDir() so /content/analyze reads
+// the SAME media root Node writes job dirs into (the shared-path deployment contract).
+function defaultMediaRoot() {
+  if (process.env.OMNIWM_MEDIA_DIR) return process.env.OMNIWM_MEDIA_DIR.replace(/^~/, os.homedir());
+  const home = (process.env.POST_GENERATOR_HOME || "~/.post-generator").replace(/^~/, os.homedir());
+  return path.join(home, "media");
+}
 
 const SIDECAR = path.resolve(process.cwd(), "hotspot-sidecar");
 const VENV = path.join(SIDECAR, ".venv");
@@ -57,11 +66,12 @@ function run() {
   } catch {
     /* best-effort */
   }
-  console.log(`→ starting hotspot sidecar on 127.0.0.1:${PORT} …`);
+  const mediaRoot = process.env.HOTSPOT_MEDIA_ROOT || defaultMediaRoot();
+  console.log(`→ starting hotspot sidecar on 127.0.0.1:${PORT} (media root: ${mediaRoot}) …`);
   execFileSync(VENV_PY, ["run.py"], {
     cwd: SIDECAR,
     stdio: "inherit",
-    env: { ...process.env, HOTSPOT_PORT: String(PORT) },
+    env: { ...process.env, HOTSPOT_PORT: String(PORT), HOTSPOT_MEDIA_ROOT: mediaRoot },
   });
 }
 
