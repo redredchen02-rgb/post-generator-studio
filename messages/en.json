@@ -352,6 +352,26 @@
     "noSignals": "No matched signals.",
     "slopCaveat": "Reads as AI slop — consider rewriting the flagged openers/connectors."
   },
+  "Hotspot": {
+    "title": "Hotspot topics",
+    "hint": "Paste a keyword leaderboard (one per line), then diff it against the last one for jump / new / drop signals.",
+    "placeholder": "1. keyword A\n2. keyword B\n3. keyword C",
+    "analyzeBtn": "Find hotspots",
+    "emptyInput": "No keywords parsed — check the pasted format.",
+    "failed": "Hotspot lookup failed.",
+    "baselinePrimed": "Baseline established. Paste a newer leaderboard to see rises and drops.",
+    "sharedBaselineCaveat": "One shared baseline per running sidecar — mixing different leaderboards (or a restart) makes the diff unreliable.",
+    "deltaJump": "+{delta} ranks",
+    "useBtn": "Use this",
+    "overwriteConfirm": "Replace the current title and summary with this hotspot topic?",
+    "seedSummaryJump": "Hotspot “{keyword}” jumped +{delta} ranks to #{rank}.",
+    "seedSummaryNew": "“{keyword}” is a new entry at #{rank}.",
+    "seedSummaryDrop": "“{keyword}” dropped to #{rank}.",
+    "kind": {
+      "drop": "dropped",
+      "new_entry": "new"
+    }
+  },
   "MediaWatermark": {
     "title": "Media Watermark",
     "subtitle": "Upload an image or video — add a watermark, detect, or remove (delogo).",

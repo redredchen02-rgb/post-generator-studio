@@ -352,6 +352,26 @@
     "noSignals": "未匹配到信号。",
     "slopCaveat": "读起来像 AI 八股——建议改写被标记的开头/连接词。"
   },
+  "Hotspot": {
+    "title": "热点选题",
+    "hint": "粘贴一份关键词排行榜（每行一个），与上一次对比出跳升/新词/掉榜信号。",
+    "placeholder": "1. 关键词A\n2. 关键词B\n3. 关键词C",
+    "analyzeBtn": "查热点",
+    "emptyInput": "未解析出关键词——检查粘贴格式。",
+    "failed": "热点查询失败。",
+    "baselinePrimed": "基线已建立。稍后粘贴更新的排行榜即可看涨跌。",
+    "sharedBaselineCaveat": "每个 sidecar 进程只有一份共享基线——混用不同榜单（或重启）会让对比不准。",
+    "deltaJump": "+{delta} 名",
+    "useBtn": "用这个写",
+    "overwriteConfirm": "用这个热点选题替换当前的标题和摘要？",
+    "seedSummaryJump": "热词“{keyword}”跳升 +{delta} 名至第 {rank} 名。",
+    "seedSummaryNew": "“{keyword}”新上榜，位列第 {rank} 名。",
+    "seedSummaryDrop": "“{keyword}”掉至第 {rank} 名。",
+    "kind": {
+      "drop": "掉榜",
+      "new_entry": "新词"
+    }
+  },
   "MediaWatermark": {
     "title": "媒体水印",
     "subtitle": "上传图片或视频——加水印、检测、或去标(delogo)。",

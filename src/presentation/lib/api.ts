@@ -3,11 +3,13 @@ import type {
   Generation,
   GenerationDraft,
   GenerationPreset,
+  HotspotAlert,
   LocalScore,
   PromptTemplate,
   ProviderProfile,
   QualityScore,
 } from "@/domain/schemas";
+import type { HotspotSidecarHealth } from "@/domain/ports/hotspot-port";
 
 export type BootstrapData = {
   providerProfiles: ProviderProfile[];
@@ -191,6 +193,23 @@ export async function scoreGeneration(
 /** Local, vocabulary-based copy score for a generation (hotspot-sdk sidecar). Not persisted. */
 export async function localScoreGeneration(id: string, signal?: AbortSignal): Promise<LocalScore> {
   return fetchJson<LocalScore>(`/api/generations/${id}/local-score`, { method: "POST", signal });
+}
+
+/** Submit a leaderboard snapshot; returns jump/drop/new-entry alerts vs the prior snapshot. */
+export async function submitHotspotSnapshot(
+  ranking: Record<string, number>,
+  signal?: AbortSignal,
+): Promise<HotspotAlert[]> {
+  return fetchJson<HotspotAlert[]>("/api/hotspot/snapshot", {
+    method: "POST",
+    body: JSON.stringify({ ranking }),
+    signal,
+  });
+}
+
+/** Hotspot sidecar health (capabilities map). Throws/`ok:false` when the sidecar is down. */
+export async function getHotspotHealth(signal?: AbortSignal): Promise<HotspotSidecarHealth> {
+  return fetchJson<HotspotSidecarHealth>("/api/hotspot/health", { method: "GET", signal });
 }
 
 /** One-shot, non-streaming completion (selection rewrite, continue, etc.). */

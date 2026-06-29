@@ -10,7 +10,8 @@ import { useBootstrapStore } from "@/presentation/store/bootstrap-store";
 import { useGenerationStream } from "./use-generation-stream";
 import { useKeyboard } from "@/presentation/lib/use-keyboard";
 import { useSearchParams } from "next/navigation";
-import { localScoreGeneration, scoreGeneration, testProviderProfile } from "@/presentation/lib/api";
+import { getHotspotHealth, localScoreGeneration, scoreGeneration, testProviderProfile } from "@/presentation/lib/api";
+import { TopicPanel } from "@/presentation/hotspot/topic-panel";
 import { computePromptPreview } from "@/presentation/lib/preview-prompt";
 import { stripMarkdown } from "@/lib/utils";
 import type { GenerationControls, LocalScore, QualityScore } from "@/domain/schemas";
@@ -33,6 +34,7 @@ const sampleSummary = "- 连续30天开发AI产品\n- 使用 Claude Code 与 Ope
 export function GeneratorWorkspace(): React.ReactElement {
   const t = useTranslations("Generation");
   const tVersions = useTranslations("Versions");
+  const tHotspot = useTranslations("Hotspot");
   const searchParams = useSearchParams();
   const bootstrap = useBootstrapStore((s) => s.data);
   const bootstrapLoading = useBootstrapStore((s) => s.loading);
@@ -55,6 +57,7 @@ export function GeneratorWorkspace(): React.ReactElement {
   const [localScore, setLocalScore] = React.useState<LocalScore | null>(null);
   const [localScoring, setLocalScoring] = React.useState(false);
   const [localScoreError, setLocalScoreError] = React.useState<string | null>(null);
+  const [hotspotAvailable, setHotspotAvailable] = React.useState(false);
   const [providerError, setProviderError] = React.useState<string | null>(null);
   const [promptPreview, setPromptPreview] = React.useState<{ systemPrompt: string; userPrompt: string } | null>(null);
   const [promptPreviewOpen, setPromptPreviewOpen] = React.useState(false);
@@ -288,6 +291,28 @@ export function GeneratorWorkspace(): React.ReactElement {
     setLocalScoreError(null);
   }, [activeGeneration?.id]);
 
+  // Probe hotspot sidecar once on mount (no polling — matches the omniwm pattern).
+  React.useEffect(() => {
+    let cancelled = false;
+    getHotspotHealth().then(
+      (h) => { if (!cancelled) setHotspotAvailable(Boolean(h.ok && h.capabilities.hotspot)); },
+      () => { if (!cancelled) setHotspotAvailable(false); },
+    );
+    return () => { cancelled = true; };
+  }, []);
+
+  // Seed the form from a hotspot alert, guarding against clobbering real user input.
+  const handleSeedTopic = React.useCallback(
+    (seedTitle: string, seedSummary: string): boolean => {
+      const hasUserInput = title.trim() !== "" && title.trim() !== sampleTitle;
+      if (hasUserInput && !window.confirm(tHotspot("overwriteConfirm"))) return false;
+      setTitle(seedTitle);
+      setEventSummary(seedSummary);
+      return true;
+    },
+    [title, tHotspot],
+  );
+
   const handleLocalScore = React.useCallback(async () => {
     if (!activeGeneration || !content.trim() || localScoring) return;
     const genId = activeGeneration.id;
@@ -452,6 +477,7 @@ export function GeneratorWorkspace(): React.ReactElement {
         />
       ) : (
         <div className="grid content-start gap-3">
+          <TopicPanel available={hotspotAvailable} onSeed={handleSeedTopic} />
           {activeGeneration ? (
             <DraftSwitcher
               versions={versions}

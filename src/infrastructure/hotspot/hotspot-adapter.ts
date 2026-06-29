@@ -1,9 +1,16 @@
 import type {
   HotspotOptions,
+  HotspotPort,
   HotspotSidecarHealth,
   ScoringPort,
 } from "@/domain/ports/hotspot-port";
-import { AppErrorException, localScoreSchema, type LocalScore } from "@/domain/schemas";
+import {
+  AppErrorException,
+  hotspotAlertsSchema,
+  localScoreSchema,
+  type HotspotAlert,
+  type LocalScore,
+} from "@/domain/schemas";
 import {
   getHotspotSidecarSecret,
   getHotspotSidecarUrl,
@@ -19,7 +26,7 @@ import { classifyFetchFailure, combineSignals } from "@/infrastructure/http/with
  * One class fronts the whole sidecar (scoring today; hotspot/content extend it
  * later) since it is a single service with one health endpoint and one auth gate.
  */
-export class HotspotAdapter implements ScoringPort {
+export class HotspotAdapter implements ScoringPort, HotspotPort {
   protected async call<T>(
     path: string,
     body: unknown,
@@ -130,6 +137,18 @@ export class HotspotAdapter implements ScoringPort {
     const parsed = localScoreSchema.safeParse(raw);
     if (!parsed.success) {
       throw new AppErrorException({ code: "SIDECAR_ERROR", message: "评分结果结构非预期" });
+    }
+    return parsed.data;
+  }
+
+  async processSnapshot(
+    ranking: Record<string, number>,
+    options?: HotspotOptions,
+  ): Promise<HotspotAlert[]> {
+    const raw = await this.call<unknown>("/hotspot/snapshot", { ranking }, getScoringTimeoutMs(), options);
+    const parsed = hotspotAlertsSchema.safeParse(raw);
+    if (!parsed.success) {
+      throw new AppErrorException({ code: "SIDECAR_ERROR", message: "热点告警结构非预期" });
     }
     return parsed.data;
   }

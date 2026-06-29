@@ -1,4 +1,4 @@
-import type { LocalScore } from "@/domain/schemas";
+import type { HotspotAlert, LocalScore } from "@/domain/schemas";
 
 /**
  * Health snapshot of the hotspot-sdk sidecar, surfaced to the UI for degradation.
@@ -30,4 +30,13 @@ export interface ScoringPort {
 
   /** Vocabulary-driven copy score (`POST /score`). Pure; should return sub-second. */
   score(text: string, options?: HotspotOptions): Promise<LocalScore>;
+}
+
+export interface HotspotPort {
+  /**
+   * Submit a leaderboard snapshot (`POST /hotspot/snapshot`) and get back the
+   * jump/drop/new-entry alerts vs the sidecar's prior snapshot. The first call only
+   * primes the baseline (empty alerts). State is per-process and shared.
+   */
+  processSnapshot(ranking: Record<string, number>, options?: HotspotOptions): Promise<HotspotAlert[]>;
 }
