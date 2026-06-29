@@ -1,0 +1,4 @@
+# hotspot-sdk sidecar deps — installs the vendored wheel with the content + server
+# extras (NSFW/cover analysis needs nudenet/opencv/scenedetect; HTTP service needs
+# fastapi/uvicorn). Telegram extra is intentionally omitted (not integrated).
+./vendor/hotspot_sdk-0.1.0-py3-none-any.whl[content,server]
