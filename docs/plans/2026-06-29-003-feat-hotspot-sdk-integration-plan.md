@@ -1,7 +1,7 @@
 ---
 title: "feat: Integrate hotspot-sdk (scoring + hotspot + media) via dedicated Python sidecar"
 type: feat
-status: active
+status: completed
 date: 2026-06-29
 deepened: 2026-06-29
 ---
@@ -355,7 +355,7 @@ flowchart TB
 
 ### Phase 3 — 媒体识别(NSFW)
 
-- [ ] **Unit 7: ContentPort + analyze adapter + /media 安全检测**
+- [x] **Unit 7: ContentPort + analyze adapter + /media 安全检测**
 
 **Goal:** 用户能在 `/media` 页对一个媒体文件触发 NSFW/内容检测,拿到结构化判定;缺 CLIP 权重时封面动作评分明确降级。
 
