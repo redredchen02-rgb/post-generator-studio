@@ -110,7 +110,8 @@ export function GenerationPresetsPanel({
 
   async function remove(id: string): Promise<void> {
     try {
-      await fetch(`/api/generation-presets/${id}`, { method: "DELETE" });
+      const response = await fetch(`/api/generation-presets/${id}`, { method: "DELETE" });
+      if (!response.ok) throw new Error(`Delete failed: ${response.status}`);
       if (editingId === id) cancelEdit();
       await refresh();
       notify(t("deletedMsg"));
