@@ -9,6 +9,7 @@ import {
   type ProviderValidationResult,
 } from "@/domain/schemas";
 import { parseServerSentEvents, parseJsonLines, providerFailure, responseError } from "@/infrastructure/providers/streaming";
+import { combineSignals } from "@/infrastructure/http/with-timeout";
 
 export type RequestBuildResult = {
   url: string;
@@ -37,26 +38,6 @@ function completionTimeoutMs(): number {
   const raw = process.env.POST_GENERATOR_COMPLETION_TIMEOUT_MS;
   const parsed = raw ? Number(raw) : Number.NaN;
   return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_COMPLETION_TIMEOUT_MS;
-}
-
-/**
- * Combine a user abort signal with the timeout signal. Uses AbortSignal.any
- * when available (Node 20.3+/modern browsers) and falls back to manual wiring
- * so older runtimes don't crash with "AbortSignal.any is not a function".
- */
-function combineSignals(userSignal: AbortSignal | undefined, timeout: AbortSignal): AbortSignal {
-  if (!userSignal) return timeout;
-  if (typeof AbortSignal.any === "function") return AbortSignal.any([userSignal, timeout]);
-  const controller = new AbortController();
-  const onAbort = (reason: unknown) => controller.abort(reason);
-  for (const sig of [userSignal, timeout]) {
-    if (sig.aborted) {
-      controller.abort(sig.reason);
-      break;
-    }
-    sig.addEventListener("abort", () => onAbort(sig.reason), { once: true });
-  }
-  return controller.signal;
 }
 
 export abstract class BaseAdapter implements LLMProviderAdapter {
