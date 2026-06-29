@@ -7,7 +7,6 @@ export const providerKindSchema = z.enum([
   "openai",
   "anthropic",
   "gemini",
-  "ollama",
   "openrouter",
   "openai-compatible",
   "grok",

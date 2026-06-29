@@ -77,7 +77,6 @@ providers/
   openai-compatible.ts  OpenAI / OpenRouter / 兼容 API
   anthropic.ts          Anthropic Claude
   gemini.ts             Google Gemini
-  ollama.ts             Ollama 本地模型
   registry.ts           Provider 注册中心
   streaming.ts          SSE / JSON Lines 解析工具
 storage/

@@ -31,7 +31,6 @@ const PROVIDER_META: Record<ProviderKind, ProviderMeta> = {
   openai: { baseUrl: "https://api.openai.com", model: "gpt-4o-mini", requiresApiKey: true, displayName: "OpenAI", apiKeyUrl: "https://platform.openai.com/api-keys" },
   anthropic: { model: "claude-sonnet-4-6", requiresApiKey: true, displayName: "Anthropic", apiKeyUrl: "https://console.anthropic.com/settings/keys" },
   gemini: { model: "gemini-2.0-flash", requiresApiKey: true, displayName: "Google Gemini", apiKeyUrl: "https://aistudio.google.com/app/apikey" },
-  ollama: { baseUrl: "http://localhost:11434", model: "llama3.2", requiresApiKey: false, displayName: "Ollama (Local)" },
   openrouter: { baseUrl: "https://openrouter.ai/api/v1", model: "openrouter/auto", requiresApiKey: true, displayName: "OpenRouter", apiKeyUrl: "https://openrouter.ai/keys" },
   "openai-compatible": { baseUrl: "http://localhost:8000", model: "", requiresApiKey: true, displayName: "OpenAI-Compatible" },
   grok: { baseUrl: "https://api.x.ai", model: "grok-3", requiresApiKey: true, displayName: "Grok (xAI)", apiKeyUrl: "https://console.x.ai/" },

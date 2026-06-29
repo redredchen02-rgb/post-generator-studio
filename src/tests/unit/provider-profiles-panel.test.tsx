@@ -60,12 +60,12 @@ describe("ProviderProfilesPanel — provider kind dropdown", () => {
     expect(labels).not.toContain("grok");
   });
 
-  it("shows 'Ollama (Local)' instead of raw kind 'ollama'", () => {
+  it("no longer offers the removed 'ollama' provider kind", () => {
     renderPanel();
     const options = screen.getAllByRole("option");
     const labels = options.map((o) => o.textContent);
-    expect(labels).toContain("Ollama (Local)");
-    expect(labels).not.toContain("ollama");
+    expect(labels).not.toContain("Ollama (Local)");
+    expect(labels.some((l) => /ollama/i.test(l ?? ""))).toBe(false);
   });
 });
 
@@ -89,13 +89,6 @@ describe("ProviderProfilesPanel — API key guidance link", () => {
 
   it("shows no link for openai-compatible (no apiKeyUrl defined)", () => {
     renderPanel();
-    expect(screen.queryByRole("link", { name: /Get API key/i })).toBeNull();
-  });
-
-  it("shows no link for ollama (requiresApiKey = false)", () => {
-    renderPanel();
-    const select = screen.getByRole("combobox");
-    fireEvent.change(select, { target: { value: "ollama" } });
     expect(screen.queryByRole("link", { name: /Get API key/i })).toBeNull();
   });
 
@@ -130,12 +123,6 @@ describe("ProviderProfilesPanel — API key show/hide toggle", () => {
     expect(screen.getByRole("button", { name: /show key/i })).toBeTruthy();
   });
 
-  it("does not show the toggle when requiresApiKey is false (ollama)", () => {
-    renderPanel();
-    const select = screen.getByRole("combobox");
-    fireEvent.change(select, { target: { value: "ollama" } });
-    expect(screen.queryByRole("button", { name: /show key|hide key/i })).toBeNull();
-  });
 });
 
 describe("ProviderProfilesPanel — profile cards", () => {

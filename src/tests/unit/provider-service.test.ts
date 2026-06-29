@@ -11,9 +11,9 @@ describe("provider-service", () => {
   it("creates and retrieves a provider without API key", async () => {
     const created = await createProviderProfile({
       name: "No Key Provider",
-      providerKind: "ollama",
-      baseUrl: "http://localhost:11434",
-      model: "llama3",
+      providerKind: "openai-compatible",
+      baseUrl: "http://localhost:8000",
+      model: "local-model",
       defaultTemperature: 0.7,
       defaultMaxTokens: 3000,
       enabled: true,

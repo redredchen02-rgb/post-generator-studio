@@ -6,8 +6,9 @@ describe("provider registry", () => {
     const kinds = listProviderAdapters().map((entry) => entry.kind);
 
     expect(kinds).toEqual(
-      expect.arrayContaining(["openai", "anthropic", "gemini", "ollama", "openrouter", "openai-compatible"]),
+      expect.arrayContaining(["openai", "anthropic", "gemini", "openrouter", "openai-compatible", "grok"]),
     );
+    expect(kinds).not.toContain("ollama");
     expect(getProviderAdapter("openai-compatible").capabilities().supportsStreaming).toBe(true);
   });
 });

@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { GeminiAdapter } from "@/infrastructure/providers/gemini";
 import { AnthropicAdapter } from "@/infrastructure/providers/anthropic";
-import { OllamaAdapter } from "@/infrastructure/providers/ollama";
 import { OpenAICompatibleAdapter } from "@/infrastructure/providers/openai-compatible";
 import {
   BaseAdapter,
@@ -143,12 +142,12 @@ describe("BaseAdapter validateChunkShape (error chunk detection via GeminiAdapte
     expect((error as { message?: string }).message).toContain("Invalid API key");
   });
 
-  it("surfaces an error when the API sends an Ollama-style error string", async () => {
+  it("surfaces an error when the API sends a bare error string in a chunk", async () => {
     global.fetch = (async () =>
       sse('data: {"error":"model not found"}')) as typeof fetch;
     const events: GenerationEvent[] = [];
-    const ollamaProfile = { ...makeProfile(), baseUrl: "http://localhost:11434" };
-    for await (const event of new OllamaAdapter().generate(request, ollamaProfile)) {
+    const adapter = new OpenAICompatibleAdapter({ id: "openai-compatible", defaultBaseUrl: "http://x", requiresApiKey: false });
+    for await (const event of adapter.generate(request, { ...makeProfile(), providerKind: "openai-compatible", baseUrl: "http://x.local" })) {
       events.push(event);
     }
     const error = events.find((e) => e.type === "error");
@@ -251,9 +250,14 @@ describe("complete() hardening", () => {
     expect(result.outputTokens).toBe(4);
   });
 
-  it("Ollama complete() throws on empty content", async () => {
-    global.fetch = (async () => jsonResponse({ message: { content: "" }, model: "m" })) as typeof fetch;
-    await expect(new OllamaAdapter().complete(request, profileFor("ollama"))).rejects.toThrow("空补全");
+  it("OpenAI-compatible complete() throws on empty content", async () => {
+    global.fetch = (async () => jsonResponse({ choices: [{ message: { content: "" } }], model: "m" })) as typeof fetch;
+    await expect(
+      new OpenAICompatibleAdapter({ id: "openai-compatible", defaultBaseUrl: "http://x", requiresApiKey: false }).complete(
+        request,
+        profileFor("openai-compatible"),
+      ),
+    ).rejects.toThrow("空补全");
   });
 
   it("guards a non-object JSON payload with an observable error", async () => {

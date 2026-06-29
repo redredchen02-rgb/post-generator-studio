@@ -12,15 +12,19 @@ describe("domain schemas", () => {
   it("validates provider profiles", () => {
     const profile = providerProfileCreateSchema.parse({
       name: "Local",
-      providerKind: "ollama",
-      baseUrl: "http://localhost:11434",
-      model: "llama3.1",
+      providerKind: "openai-compatible",
+      baseUrl: "http://localhost:8000",
+      model: "local-model",
       defaultTemperature: 0.7,
       defaultMaxTokens: 3000,
       enabled: true,
     });
 
-    expect(profile.providerKind).toBe("ollama");
+    expect(profile.providerKind).toBe("openai-compatible");
+  });
+
+  it("rejects the removed ollama provider kind", () => {
+    expect(() => providerKindSchema.parse("ollama")).toThrow();
   });
 
   it("rejects unsafe model parameters", () => {
