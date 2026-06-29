@@ -141,9 +141,9 @@ test("user generates, copies, exports, and views history", async ({ page, contex
 
   // Search wiring: a matching query keeps the record, a non-matching one clears it
   // (and the stale selection must not linger in the detail pane).
-  await page.getByPlaceholder("搜索标题...").fill("不存在的标题xyz");
+  await page.getByPlaceholder("Search titles...").fill("不存在的标题xyz");
   await expect(page.getByRole("button", { name: /台湾男子连续30天挑战AI创业/ })).toHaveCount(0);
-  await page.getByPlaceholder("搜索标题...").fill("台湾");
+  await page.getByPlaceholder("Search titles...").fill("台湾");
   await expect(page.getByRole("button", { name: /台湾男子连续30天挑战AI创业/ })).toBeVisible();
 
   // Continue editing: restore the generation + active draft into the editor (Unit 12).
