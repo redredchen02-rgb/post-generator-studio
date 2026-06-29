@@ -1,12 +1,28 @@
 import { desc, eq } from "drizzle-orm";
 import { nowIso, parseJson } from "@/lib/utils";
 import { generationPresetSchema, type GenerationPreset, type GenerationPresetCreate, type GenerationPresetUpdate } from "@/domain/schemas";
+import { isPipelineStepId } from "@/domain/pipeline-steps";
 import type { GenerationPresetRepository } from "@/domain/ports/storage";
 import { notFound } from "@/infrastructure/storage/repo-utils";
 import { getDb } from "@/infrastructure/storage/db";
 import { generationPresets } from "@/infrastructure/storage/schema";
+import { logger } from "@/infrastructure/logging/logger";
 
 type PresetRow = typeof generationPresets.$inferSelect;
+
+/**
+ * Tolerate stale/unknown step ids in a stored row: keep only known steps, warn on
+ * any dropped. Throwing here (e.g. a strict enum on the read schema) would brick the
+ * entire preset list for one bad row — unacceptable for local-first DBs we can't migrate.
+ */
+function sanitizeEnabledSteps(raw: string[], presetId: string): string[] {
+  const kept = raw.filter(isPipelineStepId);
+  if (kept.length !== raw.length) {
+    const dropped = raw.filter((s) => !isPipelineStepId(s));
+    logger.warn("Dropped unknown pipeline step ids from preset", { presetId, dropped });
+  }
+  return kept;
+}
 
 function presetFromRow(row: PresetRow): GenerationPreset {
   return generationPresetSchema.parse({
@@ -18,7 +34,7 @@ function presetFromRow(row: PresetRow): GenerationPreset {
     maxTokens: row.maxTokens ?? undefined,
     locale: row.locale,
     outputFormat: row.outputFormat,
-    enabledPipelineSteps: parseJson<string[]>(row.enabledPipelineSteps, []),
+    enabledPipelineSteps: sanitizeEnabledSteps(parseJson<string[]>(row.enabledPipelineSteps, []), row.id),
     isDefault: row.isDefault,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
