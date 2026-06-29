@@ -144,7 +144,7 @@ flowchart TB
 
 ### Phase 0 — Sidecar 地基(共通管线)
 
-- [ ] **Unit 1: Vendor hotspot-sdk + sidecar 脚本与环境**
+- [x] **Unit 1: Vendor hotspot-sdk + sidecar 脚本与环境**
 
 **Goal:** 在 repo 内可一键建立 hotspot sidecar 运行环境并起进程,不依赖 `~/Downloads`。
 
@@ -178,7 +178,7 @@ flowchart TB
 
 ---
 
-- [ ] **Unit 2: Node 侧 sidecar 配置 + health 端口/路由 + 降级**
+- [x] **Unit 2: Node 侧 sidecar 配置 + health 端口/路由 + 降级**
 
 **Goal:** Node 能定位 hotspot sidecar、查 health、并在挂掉时优雅降级。这是三条能力共用的地基。
 
@@ -213,7 +213,7 @@ flowchart TB
 
 ### Phase 1 — 文案评分(MVP,最高价值)
 
-- [ ] **Unit 3: ScoringPort + 评分 adapter + scoreCopy 服务**
+- [x] **Unit 3: ScoringPort + 评分 adapter + scoreCopy 服务**
 
 **Goal:** Node 能对任意文案调用 sidecar `/score`,拿到 `{score, breakdown, flags}` 的 zod 校验结果。
 
@@ -247,7 +247,7 @@ flowchart TB
 
 ---
 
-- [ ] **Unit 4: 本地评分 API 路由 + QualityBadge UI**
+- [x] **Unit 4: 本地评分 API 路由 + QualityBadge UI**
 
 **Goal:** 用户能在生成结果旁一键拿到本地词库分,与 LLM 评审并列;并能对编辑中的草稿即时评分。
 
@@ -287,7 +287,7 @@ flowchart TB
 
 ### Phase 2 — 热点选题
 
-- [ ] **Unit 5: HotspotPort + 快照排名 adapter/服务/路由**
+- [x] **Unit 5: HotspotPort + 快照排名 adapter/服务/路由**
 
 **Goal:** Node 能把一份排行榜快照(`{keyword: rank}`)喂给 sidecar 的有状态排名器,拿到跳升/新词/掉榜告警。
 
@@ -322,7 +322,7 @@ flowchart TB
 
 ---
 
-- [ ] **Unit 6: 选题面板 UI → 带词入生成**
+- [x] **Unit 6: 选题面板 UI → 带词入生成**
 
 **Goal:** 用户能在 UI 粘贴一份**文本**热词排行 → 解析成 ranking → 看告警 → 一键把某热词(带名次/涨跌上下文)带入生成。
 
