@@ -207,7 +207,7 @@ Phase 1（Unit 1–2）與 Phase 3（Unit 5–6）彼此獨立，可並行於不
 
 ---
 
-- [ ] **Unit 2: 兩段式顯式 pipeline 執行函式**
+- [x] **Unit 2: 兩段式顯式 pipeline 執行函式**
 
 **Goal:** 把散在 service 的手動步驟編排，集中成 `buildRenderedPrompt`（串流前）+ `postProcessContent`（串流後）兩個顯式函式（gated by enabled 集合，順序寫死於函式內）；service 改為呼叫它們。
 

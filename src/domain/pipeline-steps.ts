@@ -17,7 +17,11 @@ export const PIPELINE_STEPS = {
 
 export type PipelineStepId = (typeof PIPELINE_STEPS)[keyof typeof PIPELINE_STEPS];
 
-/** All pipeline step IDs as an array (order matters — it's the execution order). */
+/**
+ * All pipeline step IDs as an array. Feeds the enabled-gating set and bootstrap
+ * display only — runtime execution order lives explicitly in plugins/pipeline/execute.ts,
+ * not here.
+ */
 export const ALL_PIPELINE_STEPS: readonly PipelineStepId[] = [
   PIPELINE_STEPS.BUILD_CONTEXT,
   PIPELINE_STEPS.RENDER_PROMPT,

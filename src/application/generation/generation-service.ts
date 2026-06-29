@@ -1,4 +1,3 @@
-import { PIPELINE_STEPS } from "@/domain/pipeline-steps";
 import { createId, nowIso } from "@/lib/utils";
 import type { Generation, GenerationEvent, NormalizedGenerationRequest } from "@/domain/schemas";
 import { AppErrorException, generationRequestSchema } from "@/domain/schemas";
@@ -6,7 +5,7 @@ import { getStorage } from "@/infrastructure/storage/sqlite-storage";
 import { readSecret } from "@/infrastructure/security/secrets";
 import { getProviderAdapter } from "@/infrastructure/providers/registry";
 import { logger } from "@/infrastructure/logging/logger";
-import { applyControlsStep, buildContextStep, cleanContentStep, formatOutputStep, renderPromptStep } from "@/plugins/pipeline/registry";
+import { buildRenderedPrompt, postProcessContent } from "@/plugins/pipeline/execute";
 import type { PipelineContext } from "@/domain/ports/pipeline";
 import { registerGenerationController, releaseGenerationController, cancelGenerationController } from "@/application/generation/cancel-registry";
 import type { StoragePort } from "@/domain/ports/storage";
@@ -125,29 +124,9 @@ async function prepareGeneration(
     abortSignal: controller.signal,
   };
   const enabledSteps = new Set(preset.enabledPipelineSteps);
-  const contextPayload = enabledSteps.has(PIPELINE_STEPS.BUILD_CONTEXT)
-    ? await buildContextStep.execute(context, request)
-    : { request, variables: {} };
-  const renderedBase = enabledSteps.has(PIPELINE_STEPS.RENDER_PROMPT)
-    ? await renderPromptStep.execute(context, contextPayload)
-    : {
-        request: contextPayload.request,
-        systemPrompt: "",
-        userPrompt: "",
-        normalizedRequest: {
-          systemPrompt: "",
-          userPrompt: "",
-          model: provider.model,
-          temperature: preset.temperature ?? provider.defaultTemperature,
-          maxTokens: preset.maxTokens ?? provider.defaultMaxTokens,
-          stream: true as const,
-        },
-      };
-  // Request-level controls (tone/length/audience/instruction); no-ops when unset.
-  // Preset-gated like every other step (registry is the single source of truth).
-  const rendered = enabledSteps.has(PIPELINE_STEPS.APPLY_CONTROLS)
-    ? await applyControlsStep.execute(context, renderedBase)
-    : renderedBase;
+  // Pre-stream prompt assembly (build-context → render-prompt → apply-controls),
+  // gated by enabledSteps. Persistence stays here in the service.
+  const rendered = await buildRenderedPrompt(context, request, enabledSteps);
   const generation = await getStorage().generations.create({
     id: generationId,
     idempotencyKey: request.idempotencyKey,
@@ -273,15 +252,14 @@ async function* streamToProvider(ctx: StreamContext): AsyncIterable<GenerationSt
         yield { type: "final", generation: failed, content: accumulated };
         return; // finally will release the controller
       } else {
-        let formatted = accumulated;
-        if (enabledSteps.has(PIPELINE_STEPS.CLEAN_CONTENT)) {
-          const cleaned = await cleanContentStep.execute(pipelineContext, { content: accumulated, title: validated.request.title });
-          formatted = enabledSteps.has(PIPELINE_STEPS.FORMAT_OUTPUT)
-            ? await formatOutputStep.execute(pipelineContext, cleaned)
-            : cleaned;
-        } else if (enabledSteps.has(PIPELINE_STEPS.FORMAT_OUTPUT)) {
-          formatted = await formatOutputStep.execute(pipelineContext, accumulated);
-        }
+        // Post-stream only on the successful complete path; error/cancel branches
+        // above keep the raw accumulated content unprocessed.
+        const formatted = await postProcessContent(
+          pipelineContext,
+          accumulated,
+          validated.request.title,
+          enabledSteps,
+        );
         const completed = await getStorage().generations.update(generation.id, {
           outputContent: formatted,
           status: "completed",
