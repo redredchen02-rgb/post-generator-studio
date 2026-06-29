@@ -1,7 +1,7 @@
 ---
 title: "feat: 把 omniwm 水印 SDK 接成媒体水印功能（FastAPI 边车）"
 type: feat
-status: active
+status: completed
 date: 2026-06-29
 deepened: 2026-06-29
 ---
