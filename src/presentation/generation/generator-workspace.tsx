@@ -170,6 +170,41 @@ export function GeneratorWorkspace(): React.ReactElement {
     setCustomVarValues({ ...defaults, ...memory });
   }, [templateId, selectedTemplate?.customVariableDefaults]);
 
+  // Grouped, memoized InputPanel props — keeps the panel's React.memo effective so it
+  // doesn't re-render on every streamed token (content changes, these don't).
+  const onCustomVarChange = React.useCallback(
+    (varName: string, value: string) => setCustomVarValues((prev) => ({ ...prev, [varName]: value })),
+    [],
+  );
+  const onControlChange = React.useCallback(
+    (patch: Partial<GenerationControls>) => setControls((prev) => ({ ...prev, ...patch })),
+    [],
+  );
+  const inputForm = React.useMemo(
+    () => ({
+      title, eventSummary, presetId, selectedProfileId, customVarValues, controls,
+      providerError: controller.providerError, isGenerating: busy,
+      selectedTemplate, selectedPreset, outlineMode, variantCount,
+    }),
+    [title, eventSummary, presetId, selectedProfileId, customVarValues, controls,
+      controller.providerError, busy, selectedTemplate, selectedPreset, outlineMode, variantCount],
+  );
+  const inputHandlers = React.useMemo(
+    () => ({
+      onTitleChange: setTitle,
+      onEventSummaryChange: setEventSummary,
+      onPresetIdChange: setPresetId,
+      onProfileIdChange: setSelectedProfile,
+      onCustomVarChange,
+      onControlChange,
+      onOutlineModeChange: setOutlineMode,
+      onVariantCountChange: setVariantCount,
+      onGenerate: controller.onPrimaryGenerate,
+      onCancel: controller.cancelActive,
+    }),
+    [setSelectedProfile, onCustomVarChange, onControlChange, controller.onPrimaryGenerate, controller.cancelActive],
+  );
+
   // Live prompt preview — client-side (no API call)
   React.useEffect(() => {
     if (!templateId || !selectedTemplate) { setPromptPreview(null); return; }
@@ -211,33 +246,7 @@ export function GeneratorWorkspace(): React.ReactElement {
 
   return (
     <main className="mx-auto grid max-w-[1680px] gap-4 px-4 py-4 lg:grid-cols-[320px_minmax(0,1fr)_320px]">
-      <InputPanel
-        bootstrap={bootstrap}
-        title={title}
-        eventSummary={eventSummary}
-        presetId={presetId}
-        selectedProfileId={selectedProfileId}
-        customVarValues={customVarValues}
-        controls={controls}
-        providerError={controller.providerError}
-        isGenerating={busy}
-        selectedTemplate={selectedTemplate}
-        selectedPreset={selectedPreset}
-        onTitleChange={setTitle}
-        onEventSummaryChange={setEventSummary}
-        onPresetIdChange={setPresetId}
-        onProfileIdChange={setSelectedProfile}
-        onCustomVarChange={(varName, value) =>
-          setCustomVarValues((prev) => ({ ...prev, [varName]: value }))
-        }
-        onControlChange={(patch) => setControls((prev) => ({ ...prev, ...patch }))}
-        outlineMode={outlineMode}
-        onOutlineModeChange={setOutlineMode}
-        variantCount={variantCount}
-        onVariantCountChange={setVariantCount}
-        onGenerate={controller.onPrimaryGenerate}
-        onCancel={controller.cancelActive}
-      />
+      <InputPanel bootstrap={bootstrap} form={inputForm} handlers={inputHandlers} />
       {outline !== null ? (
         <OutlinePanel
           items={outline}

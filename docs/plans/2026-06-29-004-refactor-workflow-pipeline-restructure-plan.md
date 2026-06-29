@@ -1,7 +1,7 @@
 ---
 title: "refactor: Restructure the generation workflow — honest pipeline engine + layered decomposition"
 type: refactor
-status: active
+status: completed
 date: 2026-06-29
 deepened: 2026-06-29
 ---
@@ -427,7 +427,7 @@ buildRenderedPrompt(ctx, request, enabled):
 
 ---
 
-- [ ] **Unit 8: 收斂 InputPanel 的 prop drilling**
+- [x] **Unit 8: 收斂 InputPanel 的 prop drilling**
 
 **Goal:** 把 InputPanel 的 28 個分散 props 收成結構化分組（form 物件 + handlers 物件），降低維護面。
 
