@@ -29,7 +29,7 @@ def main() -> None:
     from hotspot_sdk.config import load_config
     from hotspot_sdk.server.app import create_app
 
-    host = os.environ.get("HOTSPOT_HOST", "127.0.0.1")
+    host = os.environ.get("HOTSPOT_HOST", "127.0.0.1").strip()
     port = int(os.environ.get("HOTSPOT_PORT", "8770"))
 
     # Hard guard: non-loopback bind MUST carry a shared secret.

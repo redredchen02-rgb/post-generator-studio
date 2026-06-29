@@ -209,7 +209,7 @@ function DetectForm({ wm, t }: { wm: WM; t: T }): React.ReactElement {
  * so it tracks its own availability — `/media` can have watermarking up while safety
  * is down, and vice versa. Verdicts are transient and never carry the file path.
  */
-function SafetyForm({ t }: { t: T }): React.ReactElement {
+export function SafetyForm({ t }: { t: T }): React.ReactElement {
   const [available, setAvailable] = React.useState<boolean | null>(null);
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);

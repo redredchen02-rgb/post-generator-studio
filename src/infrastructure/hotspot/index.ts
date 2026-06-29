@@ -1,27 +1,15 @@
-import type { ContentPort, HotspotPort, ScoringPort } from "@/domain/ports/hotspot-port";
 import { HotspotAdapter } from "@/infrastructure/hotspot/hotspot-adapter";
 
 let cached: HotspotAdapter | undefined;
 
-/** Single instance — one implementation fronting the whole sidecar, no dispatch. */
+/**
+ * Single instance fronting the whole sidecar (scoring + hotspot + content). One
+ * implementation, no dispatch — callers use this directly; the port interfaces
+ * (ScoringPort/HotspotPort/ContentPort) are the typed contracts it satisfies.
+ */
 export function getHotspotAdapter(): HotspotAdapter {
   if (!cached) cached = new HotspotAdapter();
   return cached;
-}
-
-/** Narrowed accessor for the scoring capability. */
-export function getScoringAdapter(): ScoringPort {
-  return getHotspotAdapter();
-}
-
-/** Narrowed accessor for the hotspot-ranking capability. */
-export function getRankingAdapter(): HotspotPort {
-  return getHotspotAdapter();
-}
-
-/** Narrowed accessor for the content-analysis capability. */
-export function getContentAdapter(): ContentPort {
-  return getHotspotAdapter();
 }
 
 /** Test seam: swap the adapter (mirrors setWatermarkAdapter). */

@@ -196,6 +196,11 @@ export async function localScoreGeneration(id: string, signal?: AbortSignal): Pr
   return fetchJson<LocalScore>(`/api/generations/${id}/local-score`, { method: "POST", signal });
 }
 
+/** Stateless draft scoring — score arbitrary copy with no generation record. Not persisted. */
+export async function scoreLocal(text: string, signal?: AbortSignal): Promise<LocalScore> {
+  return fetchJson<LocalScore>("/api/score", { method: "POST", body: JSON.stringify({ text }), signal });
+}
+
 /** Submit a leaderboard snapshot; returns jump/drop/new-entry alerts vs the prior snapshot. */
 export async function submitHotspotSnapshot(
   ranking: Record<string, number>,

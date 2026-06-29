@@ -370,7 +370,9 @@
     "kind": {
       "drop": "掉榜",
       "new_entry": "新词"
-    }
+    },
+    "unavailable": "热点边车不可用",
+    "retry": "重试"
   },
   "MediaWatermark": {
     "title": "媒体水印",

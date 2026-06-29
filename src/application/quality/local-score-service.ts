@@ -1,7 +1,7 @@
 import { AppErrorException, type LocalScore } from "@/domain/schemas";
 import type { HotspotSidecarHealth } from "@/domain/ports/hotspot-port";
 import { getOrThrow } from "@/application/crud-helpers";
-import { getHotspotAdapter, getScoringAdapter } from "@/infrastructure/hotspot";
+import { getHotspotAdapter } from "@/infrastructure/hotspot";
 import { getStorage } from "@/infrastructure/storage/sqlite-storage";
 
 /**
@@ -18,7 +18,7 @@ export function getHotspotHealth(signal?: AbortSignal): Promise<HotspotSidecarHe
 
 /** Score arbitrary copy (draft path) — no DB read, no DB write. */
 export function scoreCopyLocal(text: string, signal?: AbortSignal): Promise<LocalScore> {
-  return getScoringAdapter().score(text, { abortSignal: signal });
+  return getHotspotAdapter().score(text, { abortSignal: signal });
 }
 
 /** Score a generation's current output. Reads the row; does NOT persist the score. */
@@ -28,5 +28,5 @@ export async function scoreGenerationLocal(generationId: string, signal?: AbortS
   if (!content) {
     throw new AppErrorException({ code: "EMPTY_CONTENT", message: "没有可评分的内容" });
   }
-  return getScoringAdapter().score(content, { abortSignal: signal });
+  return getHotspotAdapter().score(content, { abortSignal: signal });
 }

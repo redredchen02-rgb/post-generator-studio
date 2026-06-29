@@ -291,15 +291,15 @@ export function GeneratorWorkspace(): React.ReactElement {
     setLocalScoreError(null);
   }, [activeGeneration?.id]);
 
-  // Probe hotspot sidecar once on mount (no polling — matches the omniwm pattern).
-  React.useEffect(() => {
-    let cancelled = false;
+  // Probe hotspot sidecar (no polling — matches the omniwm pattern). Exposed as a
+  // callback so the TopicPanel can offer a manual retry after the sidecar starts.
+  const probeHotspot = React.useCallback(() => {
     getHotspotHealth().then(
-      (h) => { if (!cancelled) setHotspotAvailable(Boolean(h.ok && h.capabilities.hotspot)); },
-      () => { if (!cancelled) setHotspotAvailable(false); },
+      (h) => setHotspotAvailable(Boolean(h.ok && h.capabilities.hotspot)),
+      () => setHotspotAvailable(false),
     );
-    return () => { cancelled = true; };
   }, []);
+  React.useEffect(() => probeHotspot(), [probeHotspot]);
 
   // Seed the form from a hotspot alert, guarding against clobbering real user input.
   const handleSeedTopic = React.useCallback(
@@ -477,7 +477,7 @@ export function GeneratorWorkspace(): React.ReactElement {
         />
       ) : (
         <div className="grid content-start gap-3">
-          <TopicPanel available={hotspotAvailable} onSeed={handleSeedTopic} />
+          <TopicPanel available={hotspotAvailable} onRetry={probeHotspot} onSeed={handleSeedTopic} />
           {activeGeneration ? (
             <DraftSwitcher
               versions={versions}

@@ -1,6 +1,6 @@
 import type { ContentAnalysis } from "@/domain/schemas";
 import type { Upload } from "@/application/watermark/watermark-service";
-import { getContentAdapter } from "@/infrastructure/hotspot";
+import { getHotspotAdapter } from "@/infrastructure/hotspot";
 import * as mf from "@/application/watermark/media-files";
 
 /**
@@ -20,7 +20,7 @@ export async function analyzeUploadedMedia(
   const jobId = await mf.createJob();
   try {
     const inPath = await mf.saveInput(jobId, upload.bytes, upload.filename, kind);
-    const verdicts = await getContentAdapter().analyze(inPath, kind, { abortSignal: signal });
+    const verdicts = await getHotspotAdapter().analyze(inPath, kind, { abortSignal: signal });
     return { kind, verdicts };
   } finally {
     await mf.cleanup(jobId);

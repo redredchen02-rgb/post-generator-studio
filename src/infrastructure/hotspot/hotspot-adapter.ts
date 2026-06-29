@@ -22,6 +22,20 @@ import {
   getScoringTimeoutMs,
 } from "@/infrastructure/config/hotspot-sidecar";
 import { z } from "zod";
+
+// Validated wire shape of the sidecar's GET /health, so a contract drift surfaces as
+// a structured error instead of silent `undefined` field access (parity with the
+// safeParse used by score/processSnapshot/analyze).
+const healthWireSchema = z.object({
+  status: z.string(),
+  version: z.string(),
+  capabilities: z.object({
+    scoring: z.boolean(),
+    hotspot: z.boolean(),
+    content: z.boolean(),
+    telegram: z.boolean(),
+  }),
+});
 import { classifyFetchFailure, combineSignals } from "@/infrastructure/http/with-timeout";
 
 /**
@@ -126,15 +140,15 @@ export class HotspotAdapter implements ScoringPort, HotspotPort, ContentPort {
     } catch (err) {
       throw this.fetchError(err, options?.abortSignal, timeout);
     }
-    const raw = await this.parse<{
-      status: string;
-      version: string;
-      capabilities: { scoring: boolean; hotspot: boolean; content: boolean; telegram: boolean };
-    }>(response);
+    const raw = await this.parse<unknown>(response);
+    const parsed = healthWireSchema.safeParse(raw);
+    if (!parsed.success) {
+      throw new AppErrorException({ code: "SIDECAR_ERROR", message: "健康检查结构非预期" });
+    }
     return {
-      ok: raw.status === "ok",
-      version: raw.version,
-      capabilities: raw.capabilities,
+      ok: parsed.data.status === "ok",
+      version: parsed.data.version,
+      capabilities: parsed.data.capabilities,
     };
   }
 

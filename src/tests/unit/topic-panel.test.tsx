@@ -11,6 +11,7 @@ import en from "../../../messages/en.json";
 function renderPanel(props: Partial<React.ComponentProps<typeof TopicPanel>>) {
   const merged: React.ComponentProps<typeof TopicPanel> = {
     available: true,
+    onRetry: () => {},
     onSeed: () => true,
     ...props,
   };
@@ -24,9 +25,29 @@ function renderPanel(props: Partial<React.ComponentProps<typeof TopicPanel>>) {
 afterEach(() => vi.restoreAllMocks());
 
 describe("TopicPanel", () => {
-  it("renders nothing when the capability is unavailable", () => {
-    const { container } = renderPanel({ available: false });
-    expect(container.firstChild).toBeNull();
+  it("shows a retry affordance when the capability is unavailable", () => {
+    const onRetry = vi.fn();
+    renderPanel({ available: false, onRetry });
+    fireEvent.click(screen.getByText("Retry"));
+    expect(onRetry).toHaveBeenCalled();
+  });
+
+  it("shows an error when submitHotspotSnapshot rejects", async () => {
+    vi.spyOn(api, "submitHotspotSnapshot").mockRejectedValue(new Error("热点边车未启动"));
+    renderPanel({});
+    fireEvent.click(screen.getByText("Hotspot topics"));
+    fireEvent.change(screen.getByPlaceholderText(/keyword A/), { target: { value: "1. 甲" } });
+    fireEvent.click(screen.getByText("Find hotspots"));
+    await waitFor(() => expect(screen.getByText("热点边车未启动")).toBeTruthy());
+  });
+
+  it("errors on empty/blank input without calling the API", () => {
+    const spy = vi.spyOn(api, "submitHotspotSnapshot");
+    renderPanel({});
+    fireEvent.click(screen.getByText("Hotspot topics"));
+    fireEvent.change(screen.getByPlaceholderText(/keyword A/), { target: { value: "   \n  " } });
+    fireEvent.click(screen.getByText("Find hotspots"));
+    expect(spy).not.toHaveBeenCalled();
   });
 
   it("parses a pasted leaderboard, calls the API, and renders alerts", async () => {

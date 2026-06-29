@@ -74,4 +74,9 @@ describe("HotspotAdapter.health", () => {
     expect(h.ok).toBe(true);
     expect(h.capabilities.content).toBe(false);
   });
+
+  it("rejects a malformed health payload (missing capabilities)", async () => {
+    mockFetch(() => new Response(JSON.stringify({ status: "ok", version: "0.1.0" }), { status: 200 }));
+    await expect(adapter.health()).rejects.toMatchObject({ appError: { code: "SIDECAR_ERROR" } });
+  });
 });

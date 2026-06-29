@@ -21,10 +21,12 @@ function normalizeDigits(s: string): string {
   return s.replace(/[０-９]/g, (d) => String(FULLWIDTH_DIGITS.indexOf(d)));
 }
 
-// Optional leading rank: digits then EITHER a separator (. 、 ， : ) 。 etc., incl.
-// full-width) or whitespace. Requiring one of those avoids eating a keyword that
-// merely starts with digits (e.g. "2025年发布"), while still handling "1.甲" (no space).
-const LINE_RE = /^\s*(?:([0-9０-９]+)\s*(?:[.、，:：)）．。\-]\s*|\s+))?(.+?)\s*$/;
+// Optional leading rank: digits then EITHER a non-dot separator (、 ， : ) 。 -), a
+// DOT separator NOT followed by a digit, or whitespace. The dot lookahead stops a
+// decimal like "1.5 甲" from being read as rank 1 + keyword "5 甲" (silent
+// corruption); such lines fall back to a bare keyword with a positional rank. Still
+// handles "1.甲" (no space) and "2025年发布" (digits that aren't a rank).
+const LINE_RE = /^\s*(?:([0-9０-９]+)\s*(?:[、，:：)）\-]\s*|[.．。](?![0-9０-９])\s*|\s+))?(.+?)\s*$/;
 
 export function parseLeaderboard(text: string): ParsedLeaderboard {
   const ranking: Record<string, number> = {};

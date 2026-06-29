@@ -61,6 +61,11 @@ describe("snapshotRequestSchema", () => {
   it("rejects non-positive ranks", () => {
     expect(snapshotRequestSchema.safeParse({ ranking: { a: 0 } }).success).toBe(false);
   });
+
+  it("rejects an over-long keyword (DoS amplification guard)", () => {
+    const ranking = { ["x".repeat(201)]: 1 };
+    expect(snapshotRequestSchema.safeParse({ ranking }).success).toBe(false);
+  });
 });
 
 describe("submitSnapshot service", () => {

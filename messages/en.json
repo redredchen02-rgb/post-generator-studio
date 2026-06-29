@@ -370,7 +370,9 @@
     "kind": {
       "drop": "dropped",
       "new_entry": "new"
-    }
+    },
+    "unavailable": "Hotspot sidecar unavailable",
+    "retry": "Retry"
   },
   "MediaWatermark": {
     "title": "Media Watermark",

@@ -41,7 +41,10 @@ export const hotspotAlertsSchema = z.array(hotspotAlertSchema);
  * bound is a Node-edge guard, not a client convenience.
  */
 export const snapshotRequestSchema = z.object({
-  ranking: z.record(z.string(), z.number().int().positive()).refine(
+  // Cap both entry count and per-keyword length: this unauthenticated local route
+  // mutates shared ranker state, so an oversized payload (500 × multi-MB keys) is a
+  // DoS amplifier without a length bound. Real keywords are short.
+  ranking: z.record(z.string().max(200), z.number().int().positive()).refine(
     (r) => Object.keys(r).length <= 500,
     { message: "排行榜条目过多（上限 500）" },
   ),

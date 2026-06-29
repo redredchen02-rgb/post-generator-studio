@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { ChevronDown, Flame, Loader2, TrendingDown, TrendingUp, Sparkle } from "lucide-react";
+import { ChevronDown, Flame, Loader2, RefreshCw, TrendingDown, TrendingUp, Sparkle } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/presentation/components/ui/button";
 import type { HotspotAlert } from "@/domain/schemas";
@@ -10,6 +10,8 @@ import { parseLeaderboard } from "@/presentation/hotspot/parse-leaderboard";
 
 type TopicPanelProps = {
   available: boolean;
+  /** Re-probe the hotspot sidecar (manual recovery after it starts post-page-load). */
+  onRetry: () => void;
   /** Seed the generation form. Returns false if the user declined an overwrite. */
   onSeed: (title: string, summary: string) => boolean;
 };
@@ -35,7 +37,22 @@ export const TopicPanel = React.memo(function TopicPanel(props: TopicPanelProps)
   const [warnings, setWarnings] = React.useState<string[]>([]);
   const [alerts, setAlerts] = React.useState<HotspotAlert[] | null>(null);
 
-  if (!props.available) return null;
+  // Unavailable: show a compact banner with a manual retry (parity with the /media
+  // SafetyForm) instead of vanishing — the sidecar may start after the page loads.
+  if (!props.available) {
+    return (
+      <section className="app-surface rounded-lg p-3">
+        <div className="flex items-center justify-between gap-2 text-sm">
+          <span className="inline-flex items-center gap-1.5 text-muted-foreground">
+            <Flame className="h-4 w-4" /> {t("unavailable")}
+          </span>
+          <Button variant="outline" size="sm" onClick={props.onRetry}>
+            <RefreshCw className="mr-1 h-3.5 w-3.5" /> {t("retry")}
+          </Button>
+        </div>
+      </section>
+    );
+  }
 
   async function run(): Promise<void> {
     const { ranking, warnings: w } = parseLeaderboard(text);

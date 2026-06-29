@@ -41,4 +41,11 @@ describe("parseLeaderboard", () => {
     const { ranking } = parseLeaderboard("5. 甲\n9. 乙");
     expect(ranking).toEqual({ 甲: 5, 乙: 9 });
   });
+
+  it("does not corrupt a decimal-looking line into a wrong keyword", () => {
+    // "1.5 甲" must NOT become rank 1 + keyword "5 甲"; it falls back to a bare
+    // keyword with a positional rank.
+    const { ranking } = parseLeaderboard("1.5 甲\n3. 乙");
+    expect(ranking).toEqual({ "1.5 甲": 1, 乙: 3 });
+  });
 });
