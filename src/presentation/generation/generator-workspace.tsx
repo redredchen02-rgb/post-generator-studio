@@ -23,8 +23,11 @@ import { useDraftVersions } from "./use-draft-versions";
 import { useRestoreFromHistory } from "./use-restore-from-history";
 import { ConfigSidebar } from "./config-sidebar";
 import { useScoring } from "./use-scoring";
+import { useLocalScore } from "./use-local-score";
+import { useHotspot } from "./use-hotspot";
 import { useExportActions } from "./use-export-actions";
 import { useGeneratorController } from "./use-generator-controller";
+import { TopicPanel } from "@/presentation/hotspot/topic-panel";
 
 const sampleTitle = "台湾男子连续30天挑战AI创业";
 const sampleSummary = "- 连续30天开发AI产品\n- 使用 Claude Code 与 OpenAI Agent\n- 每天公开开发日志\n- 获得大量关注";
@@ -104,8 +107,18 @@ export function GeneratorWorkspace(): React.ReactElement {
   const { qualityScore, scoring, score, clearScore } = useScoring({
     activeGeneration, content, presetId, providerProfileId: effectiveProviderId, setStatus,
   });
+  const { localScore, localScoring, localScoreError, scoreLocal, clearLocalScore } = useLocalScore({
+    activeGeneration, content,
+  });
   const { copyMarkdown, copyPlainText, exportLocal, saveToHistory } = useExportActions({
-    content, title, activeGeneration, setStatus, onSaved: clearScore,
+    content, title, activeGeneration, setStatus,
+    // Editing + saving invalidates both the LLM-judge score and the local copy score.
+    onSaved: () => { clearScore(); clearLocalScore(); },
+  });
+  const { hotspotAvailable, probeHotspot, handleSeedTopic } = useHotspot({
+    title,
+    sampleTitle,
+    onSeed: (seedTitle, seedSummary) => { setTitle(seedTitle); setEventSummary(seedSummary); },
   });
   const controller = useGeneratorController({
     bootstrap, title, eventSummary, presetId, effectiveProviderId, templateId,
@@ -287,6 +300,7 @@ export function GeneratorWorkspace(): React.ReactElement {
         />
       ) : (
         <div className="grid content-start gap-3">
+          <TopicPanel available={hotspotAvailable} onRetry={probeHotspot} onSeed={handleSeedTopic} />
           {activeGeneration ? (
             <DraftSwitcher
               versions={versions}
@@ -314,6 +328,10 @@ export function GeneratorWorkspace(): React.ReactElement {
           qualityScore={qualityScore}
           scoring={scoring}
           onScore={() => void score()}
+          localScore={localScore}
+          localScoring={localScoring}
+          localScoreError={localScoreError}
+          onLocalScore={() => void scoreLocal()}
           onRawModeChange={setRawMode}
           onContentChange={setContent}
           onCopyMarkdown={copyMarkdown}

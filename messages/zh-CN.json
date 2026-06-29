@@ -343,13 +343,45 @@
       "completeness": "完整度"
     }
   },
+  "LocalQuality": {
+    "scoreBtn": "本地评分",
+    "rescoreBtn": "重新评分",
+    "overall": "本地 {score}",
+    "overallTitle": "基于词库的文案分（离线、相对参考）",
+    "hint": "快速确定性信号——奖励钩子/开头/CTA，惩罚 AI 味八股。",
+    "noSignals": "未匹配到信号。",
+    "slopCaveat": "读起来像 AI 八股——建议改写被标记的开头/连接词。"
+  },
+  "Hotspot": {
+    "title": "热点选题",
+    "hint": "粘贴一份关键词排行榜（每行一个），与上一次对比出跳升/新词/掉榜信号。",
+    "placeholder": "1. 关键词A\n2. 关键词B\n3. 关键词C",
+    "analyzeBtn": "查热点",
+    "emptyInput": "未解析出关键词——检查粘贴格式。",
+    "failed": "热点查询失败。",
+    "baselinePrimed": "基线已建立。稍后粘贴更新的排行榜即可看涨跌。",
+    "sharedBaselineCaveat": "每个 sidecar 进程只有一份共享基线——混用不同榜单（或重启）会让对比不准。",
+    "deltaJump": "+{delta} 名",
+    "useBtn": "用这个写",
+    "overwriteConfirm": "用这个热点选题替换当前的标题和摘要？",
+    "seedSummaryJump": "热词“{keyword}”跳升 +{delta} 名至第 {rank} 名。",
+    "seedSummaryNew": "“{keyword}”新上榜，位列第 {rank} 名。",
+    "seedSummaryDrop": "“{keyword}”掉至第 {rank} 名。",
+    "kind": {
+      "drop": "掉榜",
+      "new_entry": "新词"
+    },
+    "unavailable": "热点边车不可用",
+    "retry": "重试"
+  },
   "MediaWatermark": {
     "title": "媒体水印",
     "subtitle": "上传图片或视频——加水印、检测、或去标(delogo)。",
     "mode": {
       "image": "图片水印",
       "video": "视频水印",
-      "detect": "检测 / 去标"
+      "detect": "检测 / 去标",
+      "safety": "内容检测"
     },
     "health": {
       "checking": "正在检测水印服务…",
@@ -375,6 +407,18 @@
     },
     "detect": {
       "found": "源 {w}×{h}。检测到的区域："
+    },
+    "safety": {
+      "source": "图片或视频",
+      "run": "检测内容",
+      "hint": "检测图片/视频的 NSFW 与封面信号。文件在临时目录分析、不会留存。",
+      "failed": "内容检测失败。",
+      "unavailable": "内容检测不可用",
+      "unavailableHint": "请启动 hotspot 边车（pnpm sidecar:hotspot）并装好 [content] extra。",
+      "framesAnalyzed": "已分析 {n} 帧",
+      "nsfw": "NSFW",
+      "action": "动作",
+      "clipCaveat": "动作分用 nudenet 代理——需 CLIP 权重才有完整封面动作精度。"
     }
   }
 }

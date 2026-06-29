@@ -12,6 +12,8 @@
     "build": "next build",
     "sidecar": "node scripts/sidecar.mjs",
     "sidecar:setup": "node scripts/sidecar.mjs --setup",
+    "sidecar:hotspot": "node scripts/sidecar-hotspot.mjs",
+    "sidecar:hotspot:setup": "node scripts/sidecar-hotspot.mjs --setup",
     "analyze": "ANALYZE=true next build",
     "start": "node scripts/free-port.mjs 3000 && node scripts/ensure-native.mjs && next start",
     "start:clean": "node scripts/free-port.mjs 3000 && node scripts/ensure-native.mjs && pnpm db:migrate && next build && next start",

@@ -6,3 +6,6 @@ export * from "./generation";
 export * from "./completion";
 export * from "./quality";
 export * from "./watermark";
+export * from "./local-score";
+export * from "./hotspot";
+export * from "./content-analyze";

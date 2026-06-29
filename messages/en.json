@@ -343,13 +343,45 @@
       "completeness": "Completeness"
     }
   },
+  "LocalQuality": {
+    "scoreBtn": "Local score",
+    "rescoreBtn": "Re-score",
+    "overall": "Local {score}",
+    "overallTitle": "Vocabulary-based copy score (offline, relative reference)",
+    "hint": "A fast, deterministic signal — rewards hooks/openers/CTA, penalizes AI slop.",
+    "noSignals": "No matched signals.",
+    "slopCaveat": "Reads as AI slop — consider rewriting the flagged openers/connectors."
+  },
+  "Hotspot": {
+    "title": "Hotspot topics",
+    "hint": "Paste a keyword leaderboard (one per line), then diff it against the last one for jump / new / drop signals.",
+    "placeholder": "1. keyword A\n2. keyword B\n3. keyword C",
+    "analyzeBtn": "Find hotspots",
+    "emptyInput": "No keywords parsed — check the pasted format.",
+    "failed": "Hotspot lookup failed.",
+    "baselinePrimed": "Baseline established. Paste a newer leaderboard to see rises and drops.",
+    "sharedBaselineCaveat": "One shared baseline per running sidecar — mixing different leaderboards (or a restart) makes the diff unreliable.",
+    "deltaJump": "+{delta} ranks",
+    "useBtn": "Use this",
+    "overwriteConfirm": "Replace the current title and summary with this hotspot topic?",
+    "seedSummaryJump": "Hotspot “{keyword}” jumped +{delta} ranks to #{rank}.",
+    "seedSummaryNew": "“{keyword}” is a new entry at #{rank}.",
+    "seedSummaryDrop": "“{keyword}” dropped to #{rank}.",
+    "kind": {
+      "drop": "dropped",
+      "new_entry": "new"
+    },
+    "unavailable": "Hotspot sidecar unavailable",
+    "retry": "Retry"
+  },
   "MediaWatermark": {
     "title": "Media Watermark",
     "subtitle": "Upload an image or video — add a watermark, detect, or remove (delogo).",
     "mode": {
       "image": "Image watermark",
       "video": "Video watermark",
-      "detect": "Detect / Delogo"
+      "detect": "Detect / Delogo",
+      "safety": "Safety check"
     },
     "health": {
       "checking": "Checking watermark service…",
@@ -375,6 +407,18 @@
     },
     "detect": {
       "found": "Source {w}×{h}. Detected regions:"
+    },
+    "safety": {
+      "source": "Image or video",
+      "run": "Check content",
+      "hint": "Detect NSFW / cover signals in an image or video. The file is analyzed in a temp dir and not stored.",
+      "failed": "Content check failed.",
+      "unavailable": "Content check unavailable",
+      "unavailableHint": "Start the hotspot sidecar (pnpm sidecar:hotspot) with the [content] extra installed.",
+      "framesAnalyzed": "{n} frame(s) analyzed",
+      "nsfw": "NSFW",
+      "action": "Action",
+      "clipCaveat": "Action score uses a nudenet proxy — supply CLIP weights for full cover-action fidelity."
     }
   }
 }
