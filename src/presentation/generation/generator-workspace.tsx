@@ -10,10 +10,10 @@ import { useBootstrapStore } from "@/presentation/store/bootstrap-store";
 import { useGenerationStream } from "./use-generation-stream";
 import { useKeyboard } from "@/presentation/lib/use-keyboard";
 import { useSearchParams } from "next/navigation";
-import { scoreGeneration, testProviderProfile } from "@/presentation/lib/api";
+import { localScoreGeneration, scoreGeneration, testProviderProfile } from "@/presentation/lib/api";
 import { computePromptPreview } from "@/presentation/lib/preview-prompt";
 import { stripMarkdown } from "@/lib/utils";
-import type { GenerationControls, QualityScore } from "@/domain/schemas";
+import type { GenerationControls, LocalScore, QualityScore } from "@/domain/schemas";
 import { InputPanel } from "./input-panel";
 import { OutputPanel } from "./output-panel";
 import { OutlinePanel } from "./outline-panel";
@@ -52,6 +52,9 @@ export function GeneratorWorkspace(): React.ReactElement {
   const [variantCount, setVariantCount] = React.useState(1);
   const [qualityScore, setQualityScore] = React.useState<QualityScore | null>(null);
   const [scoring, setScoring] = React.useState(false);
+  const [localScore, setLocalScore] = React.useState<LocalScore | null>(null);
+  const [localScoring, setLocalScoring] = React.useState(false);
+  const [localScoreError, setLocalScoreError] = React.useState<string | null>(null);
   const [providerError, setProviderError] = React.useState<string | null>(null);
   const [promptPreview, setPromptPreview] = React.useState<{ systemPrompt: string; userPrompt: string } | null>(null);
   const [promptPreviewOpen, setPromptPreviewOpen] = React.useState(false);
@@ -269,6 +272,7 @@ export function GeneratorWorkspace(): React.ReactElement {
       await save(activeGeneration.id, content);
       // Editing the content invalidates any prior score — it described the old text.
       setQualityScore(null);
+      setLocalScore(null);
       setStatus(t("savedToHistory"));
     } catch { setStatus(t("saveFailed")); }
   }
@@ -277,6 +281,29 @@ export function GeneratorWorkspace(): React.ReactElement {
   React.useEffect(() => {
     setQualityScore(activeGeneration?.qualityScore ?? null);
   }, [activeGeneration?.id, activeGeneration?.qualityScore]);
+
+  // Local score is non-persistent — clear it whenever the active generation changes.
+  React.useEffect(() => {
+    setLocalScore(null);
+    setLocalScoreError(null);
+  }, [activeGeneration?.id]);
+
+  const handleLocalScore = React.useCallback(async () => {
+    if (!activeGeneration || !content.trim() || localScoring) return;
+    const genId = activeGeneration.id;
+    setLocalScoring(true);
+    setLocalScoreError(null);
+    try {
+      const score = await localScoreGeneration(genId);
+      if (activeGenIdRef.current === genId) setLocalScore(score);
+    } catch (err) {
+      if (activeGenIdRef.current === genId) {
+        setLocalScoreError(err instanceof Error ? err.message : t("scoreFailed"));
+      }
+    } finally {
+      setLocalScoring(false);
+    }
+  }, [activeGeneration, content, localScoring, t]);
 
   const handleScore = React.useCallback(async () => {
     if (!activeGeneration || !content.trim() || scoring) return;
@@ -452,6 +479,10 @@ export function GeneratorWorkspace(): React.ReactElement {
           qualityScore={qualityScore}
           scoring={scoring}
           onScore={() => void handleScore()}
+          localScore={localScore}
+          localScoring={localScoring}
+          localScoreError={localScoreError}
+          onLocalScore={() => void handleLocalScore()}
           onRawModeChange={setRawMode}
           onContentChange={setContent}
           onCopyMarkdown={copyMarkdown}

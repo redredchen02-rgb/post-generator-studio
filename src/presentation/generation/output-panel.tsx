@@ -6,13 +6,14 @@ import { useTranslations } from "next-intl";
 import dynamic from "next/dynamic";
 import { Button } from "@/presentation/components/ui/button";
 import { QualityBadge } from "@/presentation/generation/quality-badge";
+import { LocalScoreBadge } from "@/presentation/generation/local-score-badge";
 
 const CodeMirrorEditor = dynamic(() => import("@/presentation/generation/editor/codemirror-editor").then((m) => m.CodeMirrorEditor), {
   ssr: false,
   loading: () => <div className="h-[540px] animate-pulse rounded-md bg-muted" />,
 });
 import { computeTextMetrics } from "@/lib/text-metrics";
-import type { Generation, QualityScore } from "@/domain/schemas";
+import type { Generation, LocalScore, QualityScore } from "@/domain/schemas";
 
 const ALLOWED_ELEMENTS = [
   "h1", "h2", "h3", "h4", "h5", "h6",
@@ -46,6 +47,10 @@ type OutputPanelProps = {
   qualityScore: QualityScore | null;
   scoring: boolean;
   onScore: () => void;
+  localScore: LocalScore | null;
+  localScoring: boolean;
+  localScoreError: string | null;
+  onLocalScore: () => void;
   onRawModeChange: (v: boolean) => void;
   onContentChange: (v: string) => void;
   onCopyMarkdown: () => void;
@@ -78,12 +83,19 @@ export const OutputPanel = React.memo(function OutputPanel(props: OutputPanelPro
             {t("previewBtn")}
           </Button>
         </div>
-        <div className="w-full">
+        <div className="flex w-full flex-wrap items-start gap-3">
           <QualityBadge
             score={props.qualityScore}
             scoring={props.scoring}
             disabled={!props.activeGeneration || !props.content || props.isGenerating}
             onScore={props.onScore}
+          />
+          <LocalScoreBadge
+            score={props.localScore}
+            scoring={props.localScoring}
+            error={props.localScoreError}
+            disabled={!props.activeGeneration || !props.content || props.isGenerating}
+            onScore={props.onLocalScore}
           />
         </div>
       </div>

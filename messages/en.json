@@ -343,6 +343,15 @@
       "completeness": "Completeness"
     }
   },
+  "LocalQuality": {
+    "scoreBtn": "Local score",
+    "rescoreBtn": "Re-score",
+    "overall": "Local {score}",
+    "overallTitle": "Vocabulary-based copy score (offline, relative reference)",
+    "hint": "A fast, deterministic signal — rewards hooks/openers/CTA, penalizes AI slop.",
+    "noSignals": "No matched signals.",
+    "slopCaveat": "Reads as AI slop — consider rewriting the flagged openers/connectors."
+  },
   "MediaWatermark": {
     "title": "Media Watermark",
     "subtitle": "Upload an image or video — add a watermark, detect, or remove (delogo).",

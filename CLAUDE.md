@@ -26,6 +26,10 @@ pnpm db:seed        # Seed default Provider / Template / Preset data
 # Media watermark sidecar (Python/FastAPI — powers the /media page)
 pnpm sidecar:setup  # One-time: create sidecar/.venv + install (heavy: opencv/numpy/fastapi)
 pnpm sidecar        # Reclaim :8765, run the omniwm sidecar on 127.0.0.1 (run in a 2nd terminal)
+
+# hotspot-sdk sidecar (Python/FastAPI — copy scoring + hotspot ranking + NSFW)
+pnpm sidecar:hotspot:setup  # One-time: create hotspot-sidecar/.venv + install vendored wheel (heavy: nudenet/opencv)
+pnpm sidecar:hotspot        # Reclaim :8770, run the hotspot sidecar on 127.0.0.1 (run in a 2nd terminal)
 ```
 
 ### Media watermark sidecar
@@ -43,6 +47,30 @@ over HTTP. It needs system `ffmpeg`/`ffprobe` on PATH (macOS: `brew install ffmp
 - Security boundary lives in `sidecar/app/security.py`; the frozen wire contract is
   `sidecar/CONTRACT.md` (Node zod in `src/domain/schemas/watermark.ts` mirrors it).
 - Sidecar tests: `cd sidecar && .venv/bin/python -m pytest -q`.
+
+### hotspot-sdk sidecar
+
+Copy scoring, hotspot ranking, and NSFW/cover analysis are powered by a **second,
+separate Python FastAPI process** in `hotspot-sidecar/`, which runs the vendored
+`hotspot_sdk` wheel's own server. Node calls it over HTTP, mirroring the omniwm pattern
+(`src/infrastructure/hotspot/hotspot-adapter.ts` ≈ `watermark-adapter.ts`).
+
+- Default bind `127.0.0.1:8770`. `hotspot-sidecar/run.py` **refuses to start** on a
+  non-loopback host unless `HOTSPOT_API_KEY` is set (it exposes a file-read endpoint).
+- `pnpm dev`/`start` do NOT auto-start it — run `pnpm sidecar:hotspot` separately. UI reads
+  `GET /api/hotspot/health` (mount-time only, no polling) and degrades with a banner when down.
+- **Deployment contract** (same as omniwm): same machine, same uid, and `HOTSPOT_MEDIA_ROOT`
+  must equal `getMediaDir()` / `OMNIWM_MEDIA_DIR` for `/content/analyze`.
+- Local copy score is **non-persistent by design** (recomputed on demand) — no DB column.
+- Contract: `hotspot-sidecar/README.md`. Telegram monitoring is intentionally NOT wired up.
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `HOTSPOT_SIDECAR_URL` | `http://127.0.0.1:8770` | Node → hotspot sidecar base URL |
+| `HOTSPOT_SIDECAR_PORT` | `8770` | Sidecar listen port (loopback only) |
+| `HOTSPOT_SIDECAR_SECRET` | _(unset)_ | If set, Node sends `x-api-key` (sidecar checks `HOTSPOT_API_KEY`) |
+| `HOTSPOT_MEDIA_ROOT` | _(unset)_ | Required to enable `/content/analyze`; point at `OMNIWM_MEDIA_DIR` |
+| `HOTSPOT_MAX_MEDIA_BYTES` | `268435456` | Per-file size cap for content analysis |
 
 ### Node version & the native SQLite module
 

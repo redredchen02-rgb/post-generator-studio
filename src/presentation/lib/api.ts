@@ -3,6 +3,7 @@ import type {
   Generation,
   GenerationDraft,
   GenerationPreset,
+  LocalScore,
   PromptTemplate,
   ProviderProfile,
   QualityScore,
@@ -185,6 +186,11 @@ export async function scoreGeneration(
     method: "POST",
     body: JSON.stringify(opts ?? {}),
   });
+}
+
+/** Local, vocabulary-based copy score for a generation (hotspot-sdk sidecar). Not persisted. */
+export async function localScoreGeneration(id: string, signal?: AbortSignal): Promise<LocalScore> {
+  return fetchJson<LocalScore>(`/api/generations/${id}/local-score`, { method: "POST", signal });
 }
 
 /** One-shot, non-streaming completion (selection rewrite, continue, etc.). */
