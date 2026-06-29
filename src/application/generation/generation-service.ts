@@ -1,22 +1,23 @@
-import { PIPELINE_STEPS } from "@/domain/pipeline-steps";
 import { createId, nowIso } from "@/lib/utils";
 import type { Generation, GenerationEvent, NormalizedGenerationRequest } from "@/domain/schemas";
-import { AppErrorException, generationRequestSchema } from "@/domain/schemas";
 import { getStorage } from "@/infrastructure/storage/sqlite-storage";
 import { readSecret } from "@/infrastructure/security/secrets";
 import { getProviderAdapter } from "@/infrastructure/providers/registry";
 import { logger } from "@/infrastructure/logging/logger";
-import { applyControlsStep, buildContextStep, cleanContentStep, formatOutputStep, renderPromptStep } from "@/plugins/pipeline/registry";
+import { buildRenderedPrompt, postProcessContent } from "@/plugins/pipeline/execute";
 import type { PipelineContext } from "@/domain/ports/pipeline";
-import { registerGenerationController, releaseGenerationController, cancelGenerationController } from "@/application/generation/cancel-registry";
-import type { StoragePort } from "@/domain/ports/storage";
-import { getOrThrow } from "@/application/crud-helpers";
+import { registerGenerationController, releaseGenerationController } from "@/application/generation/cancel-registry";
+import { CachedGenerationError, validateGenerationRequest, type ValidatedRequest } from "@/application/generation/generation-validation";
 
-class CachedGenerationError extends Error {
-  constructor(public generation: Generation) {
-    super("Cached generation");
-  }
-}
+// CRUD + cancel live in generation-crud; re-exported here so existing import sites
+// (route handlers, export-service) keep importing from generation-service.
+export {
+  listGenerations,
+  getGeneration,
+  updateGenerationContent,
+  deleteGeneration,
+  cancelGeneration,
+} from "@/application/generation/generation-crud";
 
 export type GenerationStreamEvent =
   | { type: "generation"; generation: Generation }
@@ -27,87 +28,6 @@ function redactSnapshot(profile: Record<string, unknown>): Record<string, unknow
   const rest = { ...profile };
   delete rest.apiKeyRef;
   return { ...rest, keyMasked: profile.keyMasked ? String(profile.keyMasked) : undefined };
-}
-
-export async function listGenerations(opts?: { search?: string; offset?: number; limit?: number }): Promise<{ items: Generation[]; total: number }> {
-  return getStorage().generations.list(opts);
-}
-
-export async function getGeneration(id: string): Promise<Generation> {
-  return getOrThrow(getStorage().generations, id, "生成记录不存在");
-}
-
-export async function updateGenerationContent(id: string, outputContent: string): Promise<Generation> {
-  await getOrThrow(getStorage().generations, id, "生成记录不存在");
-  return getStorage().generations.update(id, { outputContent });
-}
-
-export async function deleteGeneration(id: string): Promise<void> {
-  await getOrThrow(getStorage().generations, id, "生成记录不存在");
-  await getStorage().generations.delete(id);
-}
-
-export async function cancelGeneration(id: string): Promise<{ cancelled: boolean }> {
-  const cancelled = cancelGenerationController(id);
-  if (cancelled) {
-    await getStorage().generations.update(id, {
-      status: "cancelled",
-      completedAt: nowIso(),
-      errorMessage: "生成请求被取消",
-    });
-  }
-  return { cancelled };
-}
-
-type ValidatedRequest = {
-  request: ReturnType<typeof generationRequestSchema.parse>;
-  preset: NonNullable<Awaited<ReturnType<StoragePort["generationPresets"]["get"]>>>;
-  provider: NonNullable<Awaited<ReturnType<StoragePort["providerProfiles"]["get"]>>>;
-  template: NonNullable<Awaited<ReturnType<StoragePort["promptTemplates"]["get"]>>>;
-};
-
-async function validateGenerationRequest(input: unknown): Promise<ValidatedRequest> {
-  const request = generationRequestSchema.parse(input);
-  const existing = request.idempotencyKey
-    ? await getStorage().generations.getByIdempotencyKey(request.idempotencyKey)
-    : null;
-  if (existing) {
-    // Completed → replay the cached result (true idempotent retry).
-    if (existing.status === "completed" && existing.outputContent) {
-      throw new CachedGenerationError(existing);
-    }
-    // Still in flight → a concurrent request owns this key. Reject instead of
-    // starting a duplicate stream, which would double-bill the provider and
-    // overwrite the first request's cancel controller in the registry.
-    if (existing.status === "queued" || existing.status === "streaming") {
-      throw new AppErrorException({
-        code: "GENERATION_IN_PROGRESS",
-        message: "Generation with same idempotency key is in progress",
-      });
-    }
-    // Failed/cancelled (or completed-without-content) → supersede the stale row
-    // so the retry can claim the unique key and persist its result. Without this,
-    // create() would hit the UNIQUE constraint and return the stale terminal row,
-    // whose status guard then silently drops the new stream's writes.
-    await getStorage().generations.delete(existing.id);
-  }
-
-  const preset = await getStorage().generationPresets.get(request.presetId);
-  if (!preset) {
-    throw new AppErrorException({ code: "PRESET_NOT_FOUND", message: "Generation preset not found" });
-  }
-  const provider = await getStorage().providerProfiles.get(request.providerProfileId || preset.providerProfileId);
-  if (!provider) {
-    throw new AppErrorException({ code: "PROVIDER_NOT_FOUND", message: "Provider profile not found" });
-  }
-  if (!provider.enabled) {
-    throw new AppErrorException({ code: "PROVIDER_DISABLED", message: "Provider is disabled" });
-  }
-  const template = await getStorage().promptTemplates.get(preset.promptTemplateId);
-  if (!template) {
-    throw new AppErrorException({ code: "TEMPLATE_NOT_FOUND", message: "Prompt template not found" });
-  }
-  return { request, preset, provider, template };
 }
 
 async function prepareGeneration(
@@ -125,29 +45,9 @@ async function prepareGeneration(
     abortSignal: controller.signal,
   };
   const enabledSteps = new Set(preset.enabledPipelineSteps);
-  const contextPayload = enabledSteps.has(PIPELINE_STEPS.BUILD_CONTEXT)
-    ? await buildContextStep.execute(context, request)
-    : { request, variables: {} };
-  const renderedBase = enabledSteps.has(PIPELINE_STEPS.RENDER_PROMPT)
-    ? await renderPromptStep.execute(context, contextPayload)
-    : {
-        request: contextPayload.request,
-        systemPrompt: "",
-        userPrompt: "",
-        normalizedRequest: {
-          systemPrompt: "",
-          userPrompt: "",
-          model: provider.model,
-          temperature: preset.temperature ?? provider.defaultTemperature,
-          maxTokens: preset.maxTokens ?? provider.defaultMaxTokens,
-          stream: true as const,
-        },
-      };
-  // Request-level controls (tone/length/audience/instruction); no-ops when unset.
-  // Preset-gated like every other step (registry is the single source of truth).
-  const rendered = enabledSteps.has(PIPELINE_STEPS.APPLY_CONTROLS)
-    ? await applyControlsStep.execute(context, renderedBase)
-    : renderedBase;
+  // Pre-stream prompt assembly (build-context → render-prompt → apply-controls),
+  // gated by enabledSteps. Persistence stays here in the service.
+  const rendered = await buildRenderedPrompt(context, request, enabledSteps);
   const generation = await getStorage().generations.create({
     id: generationId,
     idempotencyKey: request.idempotencyKey,
@@ -273,15 +173,14 @@ async function* streamToProvider(ctx: StreamContext): AsyncIterable<GenerationSt
         yield { type: "final", generation: failed, content: accumulated };
         return; // finally will release the controller
       } else {
-        let formatted = accumulated;
-        if (enabledSteps.has(PIPELINE_STEPS.CLEAN_CONTENT)) {
-          const cleaned = await cleanContentStep.execute(pipelineContext, { content: accumulated, title: validated.request.title });
-          formatted = enabledSteps.has(PIPELINE_STEPS.FORMAT_OUTPUT)
-            ? await formatOutputStep.execute(pipelineContext, cleaned)
-            : cleaned;
-        } else if (enabledSteps.has(PIPELINE_STEPS.FORMAT_OUTPUT)) {
-          formatted = await formatOutputStep.execute(pipelineContext, accumulated);
-        }
+        // Post-stream only on the successful complete path; error/cancel branches
+        // above keep the raw accumulated content unprocessed.
+        const formatted = await postProcessContent(
+          pipelineContext,
+          accumulated,
+          validated.request.title,
+          enabledSteps,
+        );
         const completed = await getStorage().generations.update(generation.id, {
           outputContent: formatted,
           status: "completed",

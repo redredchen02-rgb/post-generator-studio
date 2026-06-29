@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { outputFormatSchema, providerKindSchema, generationStatusSchema } from "./enums";
 import { qualityScoreSchema } from "./quality";
-import { DEFAULT_ENABLED_STEPS } from "@/domain/pipeline-steps";
+import { DEFAULT_ENABLED_STEPS, pipelineStepIdSchema } from "@/domain/pipeline-steps";
 
 const snapshotSchema = z.record(z.unknown());
 
@@ -121,6 +121,10 @@ export const generationPresetSchema = z.object({
   maxTokens: z.number().int().min(1).max(200_000).optional(),
   locale: z.string().min(1),
   outputFormat: outputFormatSchema,
+  // READ schema: intentionally lenient (z.string, not the enum). A stored row may
+  // carry a stale/unknown step id; rejecting it here would throw on parse and brick
+  // the whole preset list for local-first users. Unknown ids are harmless at runtime
+  // (the gating Set never matches them) and are stripped+warned in the repo read path.
   enabledPipelineSteps: z.array(z.string()),
   isDefault: z.boolean(),
   createdAt: z.string(),
@@ -136,7 +140,9 @@ export const generationPresetCreateSchema = z.object({
   maxTokens: z.number().int().min(1).max(200_000).optional(),
   locale: z.string().min(1).default("zh-CN"),
   outputFormat: outputFormatSchema.default("markdown"),
-  enabledPipelineSteps: z.array(z.string()).default([...DEFAULT_ENABLED_STEPS]),
+  // WRITE schema: strict enum — reject typo'd / unknown steps when creating or
+  // updating a preset, so no new bad data enters. (Update schema inherits this via .partial().)
+  enabledPipelineSteps: z.array(pipelineStepIdSchema).default([...DEFAULT_ENABLED_STEPS]),
   isDefault: z.boolean().default(false),
 });
 export type GenerationPresetCreate = z.infer<typeof generationPresetCreateSchema>;

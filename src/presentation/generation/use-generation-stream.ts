@@ -2,16 +2,9 @@
 
 import * as React from "react";
 import { useTranslations } from "next-intl";
-import type { AppError, Generation, GenerationControls } from "@/domain/schemas";
+import type { Generation, GenerationControls } from "@/domain/schemas";
 import { parseSSEStream } from "@/lib/sse";
-
-type StreamPayload =
-  | { type: "generation"; generation: Generation }
-  | { type: "token"; value: string }
-  | { type: "metadata"; model?: string; inputTokens?: number; outputTokens?: number }
-  | { type: "complete" }
-  | { type: "error"; message?: string; error?: AppError; retryable?: boolean }
-  | { type: "final"; generation: Generation; content: string };
+import { buildGenerationRequestBody, type GenerationStreamPayload } from "./generation-stream-protocol";
 
 type GenerationStreamState = {
   content: string;
@@ -99,15 +92,17 @@ export function useGenerationStream() {
           method: "POST",
           signal: combinedSignal,
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            title,
-            eventSummary,
-            presetId,
-            providerProfileId: providerProfileId || undefined,
-            idempotencyKey: regenerate ? undefined : crypto.randomUUID(),
-            customVariables: customVariables && Object.keys(customVariables).length > 0 ? customVariables : undefined,
-            ...controls,
-          }),
+          body: JSON.stringify(
+            buildGenerationRequestBody({
+              title,
+              eventSummary,
+              presetId,
+              providerProfileId,
+              idempotencyKey: regenerate ? undefined : crypto.randomUUID(),
+              customVariables,
+              controls,
+            }),
+          ),
         });
 
         if (!response.ok) {
@@ -130,9 +125,9 @@ export function useGenerationStream() {
         }
 
         for await (const msg of parseSSEStream(response.body)) {
-          let payload: StreamPayload;
+          let payload: GenerationStreamPayload;
           try {
-            payload = JSON.parse(msg.data) as StreamPayload;
+            payload = JSON.parse(msg.data) as GenerationStreamPayload;
           } catch {
             setState((s) => ({ ...s, error: t("errorStreamParse"), status: t("statusFailed") }));
             return;

@@ -39,7 +39,7 @@ const bootstrap = {
       maxTokens: 3000,
       locale: "zh-CN",
       outputFormat: "markdown",
-      enabledPipelineSteps: ["build-context", "render-prompt", "generate-content", "clean-content", "format-output", "persist-generation"],
+      enabledPipelineSteps: ["build-context", "render-prompt", "apply-controls", "clean-content", "format-output"],
       isDefault: true,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -141,9 +141,9 @@ test("user generates, copies, exports, and views history", async ({ page, contex
 
   // Search wiring: a matching query keeps the record, a non-matching one clears it
   // (and the stale selection must not linger in the detail pane).
-  await page.getByPlaceholder("Search titles...").fill("不存在的标题xyz");
+  await page.getByPlaceholder(/Search titles|搜索标题/).fill("不存在的标题xyz");
   await expect(page.getByRole("button", { name: /台湾男子连续30天挑战AI创业/ })).toHaveCount(0);
-  await page.getByPlaceholder("Search titles...").fill("台湾");
+  await page.getByPlaceholder(/Search titles|搜索标题/).fill("台湾");
   await expect(page.getByRole("button", { name: /台湾男子连续30天挑战AI创业/ })).toBeVisible();
 
   // Continue editing: restore the generation + active draft into the editor (Unit 12).
