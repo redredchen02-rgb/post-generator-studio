@@ -38,7 +38,7 @@ export class AnthropicAdapter extends BaseAdapter {
     config: ProviderProfile,
     options?: GenerationOptions,
   ): Promise<RequestBuildResult> {
-    const baseUrl = (config.baseUrl || "https://api.anthropic.com").replace(/\/$/, "");
+    const baseUrl = this.getBaseUrl(config, "https://api.anthropic.com");
     return {
       url: `${baseUrl}/v1/messages`,
       init: {
@@ -61,11 +61,8 @@ export class AnthropicAdapter extends BaseAdapter {
   }
 
   protected validateChunkShape(raw: Record<string, unknown>): string | null {
-    if (typeof raw.error === "string") return raw.error;
-    if (typeof raw.error === "object" && raw.error !== null) {
-      const err = raw.error as Record<string, unknown>;
-      if (typeof err.message === "string") return err.message;
-    }
+    const error = this.detectChunkError(raw);
+    if (error) return error;
     if (typeof raw.type !== "string" && typeof raw.delta !== "object" && typeof raw.message !== "object") {
       return `${this.id}: 意外的数据块结构`;
     }

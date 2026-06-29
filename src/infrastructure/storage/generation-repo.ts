@@ -78,28 +78,33 @@ export class SqliteGenerationRepository implements GenerationRepository {
     const db = await getDb();
     const timestamp = nowIso();
     try {
-      await db.insert(generations).values({
-        id: input.id,
-        idempotencyKey: input.idempotencyKey ?? null,
-        title: input.title,
-        eventSummary: input.eventSummary,
-        providerProfileSnapshot: JSON.stringify(input.providerProfileSnapshot),
-        promptTemplateSnapshot: JSON.stringify(input.promptTemplateSnapshot),
-        generationPresetSnapshot: JSON.stringify(input.generationPresetSnapshot),
-        renderedSystemPrompt: input.renderedSystemPrompt,
-        renderedUserPrompt: input.renderedUserPrompt,
-        outputContent: null,
-        status: "queued",
-        errorMessage: null,
-        model: input.model ?? null,
-        providerKind: input.providerKind ?? null,
-        inputTokens: null,
-        outputTokens: null,
-        totalTokens: null,
-        startedAt: null,
-        completedAt: null,
-        createdAt: timestamp,
-      });
+      const createdRows = db
+        .insert(generations)
+        .values({
+          id: input.id,
+          idempotencyKey: input.idempotencyKey ?? null,
+          title: input.title,
+          eventSummary: input.eventSummary,
+          providerProfileSnapshot: JSON.stringify(input.providerProfileSnapshot),
+          promptTemplateSnapshot: JSON.stringify(input.promptTemplateSnapshot),
+          generationPresetSnapshot: JSON.stringify(input.generationPresetSnapshot),
+          renderedSystemPrompt: input.renderedSystemPrompt,
+          renderedUserPrompt: input.renderedUserPrompt,
+          outputContent: null,
+          status: "queued",
+          errorMessage: null,
+          model: input.model ?? null,
+          providerKind: input.providerKind ?? null,
+          inputTokens: null,
+          outputTokens: null,
+          totalTokens: null,
+          startedAt: null,
+          completedAt: null,
+          createdAt: timestamp,
+        })
+        .returning()
+        .all();
+      return createdRows[0] ? generationFromRow(createdRows[0]) : notFound("Generation");
     } catch (error) {
       // Idempotent retry: a concurrent request already inserted a row with this
       // idempotencyKey. Return that existing generation instead of throwing a
@@ -110,8 +115,6 @@ export class SqliteGenerationRepository implements GenerationRepository {
       }
       throw error;
     }
-    const created = await this.get(input.id);
-    return created ?? notFound("Generation");
   }
 
   /** Terminal statuses that cannot be overwritten by concurrent updates. */
@@ -141,7 +144,8 @@ export class SqliteGenerationRepository implements GenerationRepository {
       if (!SqliteGenerationRepository.canTransition(existing.status, newStatus)) {
         return existing;
       }
-      tx.update(generations)
+      const updatedRows = tx
+        .update(generations)
         .set({
           outputContent: input.outputContent ?? existing.outputContent ?? null,
           status: newStatus,
@@ -155,8 +159,8 @@ export class SqliteGenerationRepository implements GenerationRepository {
           qualityScore: resolveQualityScore(input, existing),
         })
         .where(eq(generations.id, id))
-        .run();
-      const updatedRows = tx.select().from(generations).where(eq(generations.id, id)).limit(1).all();
+        .returning()
+        .all();
       const updated = updatedRows[0] ? generationFromRow(updatedRows[0]) : null;
       return updated ?? notFound("Generation");
     });

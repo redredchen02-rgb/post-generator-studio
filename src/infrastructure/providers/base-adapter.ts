@@ -75,6 +75,14 @@ export abstract class BaseAdapter implements LLMProviderAdapter {
 
   protected supportsApiKey = true;
 
+  /**
+   * Get the base URL from config, falling back to a default value.
+   * Strips trailing slashes for consistent URL construction.
+   */
+  protected getBaseUrl(config: ProviderProfile, defaultUrl: string): string {
+    return (config.baseUrl || defaultUrl).replace(/\/$/, "");
+  }
+
   capabilities(): ProviderCapabilities {
     return {
       supportsStreaming: true,
@@ -213,6 +221,20 @@ export abstract class BaseAdapter implements LLMProviderAdapter {
   /** Parse a full (non-streaming) provider response. Implemented by completion-capable adapters. */
   protected parseCompletion(_raw: unknown): CompletionResult {
     throw new AppErrorException({ code: "COMPLETION_UNSUPPORTED", message: `${this.id} 未实现补全解析` });
+  }
+
+  /**
+   * Common error detection for streaming chunks. Checks for error responses
+   * that arrive inside a streaming JSON line (HTTP 200 with `{"error":...}`).
+   * Returns an error message string if an error is detected, or null to proceed.
+   */
+  protected detectChunkError(raw: Record<string, unknown>): string | null {
+    if (typeof raw.error === "string") return raw.error;
+    if (typeof raw.error === "object" && raw.error !== null) {
+      const err = raw.error as Record<string, unknown>;
+      if (typeof err.message === "string") return err.message;
+    }
+    return null;
   }
 
   /**

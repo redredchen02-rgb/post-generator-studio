@@ -20,7 +20,7 @@ vi.mock("@/application/presets/preset-service", () => ({
   listGenerationPresets: (...args: unknown[]) => mockListGenerationPresets(...args),
 }));
 
-vi.mock("@/application/prompts/prompt-service", () => ({
+vi.mock("@/application/prompt/prompt-service", () => ({
   listPromptTemplates: (...args: unknown[]) => mockListPromptTemplates(...args),
 }));
 
