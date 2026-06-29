@@ -398,7 +398,7 @@ buildRenderedPrompt(ctx, request, enabled):
 
 ---
 
-- [ ] **Unit 7: 統一 prompt preview 為單一權威來源**
+- [x] **Unit 7: 統一 prompt preview 為單一權威來源**
 
 **Goal:** client bridge 與 server route 共用同一 prompt preview 實作，消除雙實作漂移風險。
 

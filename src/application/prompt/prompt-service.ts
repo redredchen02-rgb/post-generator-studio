@@ -6,8 +6,8 @@ import {
   type PromptTemplate,
 } from "@/domain/schemas";
 import { getStorage } from "@/infrastructure/storage/sqlite-storage";
-import { assertSupportedVariables, renderTemplate } from "@/application/prompt/renderer";
-import { resolvePromptVariables } from "@/application/prompt/variables";
+import { assertSupportedVariables } from "@/application/prompt/renderer";
+import { buildPreviewVariables, renderPromptPair } from "@/application/prompt/preview-core";
 import { getOrThrow } from "@/application/crud-helpers";
 
 export async function listPromptTemplates(): Promise<PromptTemplate[]> {
@@ -40,10 +40,12 @@ export async function deletePromptTemplate(id: string): Promise<void> {
 
 export async function previewPrompt(input: unknown): Promise<{ systemPrompt: string; userPrompt: string }> {
   const parsed = promptPreviewRequestSchema.parse(input);
-  const variables = {
-    ...resolvePromptVariables({ title: parsed.title, eventSummary: parsed.eventSummary }, { locale: parsed.locale }),
-    ...parsed.customVariables,
-  };
+  const variables = buildPreviewVariables({
+    title: parsed.title,
+    eventSummary: parsed.eventSummary,
+    locale: parsed.locale,
+    customVariables: parsed.customVariables,
+  });
   let systemPrompt = parsed.systemPrompt || "";
   let userPromptTemplate = parsed.userPromptTemplate || "";
   if (parsed.templateId) {
@@ -51,9 +53,7 @@ export async function previewPrompt(input: unknown): Promise<{ systemPrompt: str
     systemPrompt = parsed.systemPrompt ?? template.systemPrompt;
     userPromptTemplate = parsed.userPromptTemplate ?? template.userPromptTemplate;
   }
-  return {
-    systemPrompt: renderTemplate(systemPrompt, variables).content,
-    userPrompt: renderTemplate(userPromptTemplate, variables).content,
-  };
+  const { systemPrompt: rs, userPrompt: ru } = renderPromptPair(systemPrompt, userPromptTemplate, variables);
+  return { systemPrompt: rs, userPrompt: ru };
 }
 
