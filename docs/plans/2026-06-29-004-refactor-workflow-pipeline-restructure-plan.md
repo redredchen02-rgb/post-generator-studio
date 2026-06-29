@@ -264,7 +264,7 @@ buildRenderedPrompt(ctx, request, enabled):
 
 ---
 
-- [ ] **Unit 3: 抽出驗證 + idempotency 模組**
+- [x] **Unit 3: 抽出驗證 + idempotency 模組**
 
 **Goal:** 把 `validateGenerationRequest`、idempotency 邏輯、`CachedGenerationError` 從 service 抽到專責模組。
 
@@ -296,7 +296,7 @@ buildRenderedPrompt(ctx, request, enabled):
 
 ---
 
-- [ ] **Unit 4: 抽出 CRUD，service 收斂為 orchestrator**
+- [x] **Unit 4: 抽出 CRUD，service 收斂為 orchestrator**
 
 **Goal:** 把 list/get/update/delete/cancel 抽到 `generation-crud.ts`，`generation-service.ts` 只留串流編排。
 

@@ -16,6 +16,7 @@ function makeTemplate(): PromptTemplate {
     userPromptTemplate: "Title: {{TITLE}}\nSummary: {{EVENT_SUMMARY}}",
     supportedVariables: ["TITLE", "EVENT_SUMMARY"],
     customVariableDefaults: {},
+    outputFormat: "markdown",
     version: 1,
     isDefault: true,
     createdAt: "2026-06-29T00:00:00.000Z",

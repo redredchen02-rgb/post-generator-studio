@@ -1,21 +1,23 @@
 import { createId, nowIso } from "@/lib/utils";
 import type { Generation, GenerationEvent, NormalizedGenerationRequest } from "@/domain/schemas";
-import { AppErrorException, generationRequestSchema } from "@/domain/schemas";
 import { getStorage } from "@/infrastructure/storage/sqlite-storage";
 import { readSecret } from "@/infrastructure/security/secrets";
 import { getProviderAdapter } from "@/infrastructure/providers/registry";
 import { logger } from "@/infrastructure/logging/logger";
 import { buildRenderedPrompt, postProcessContent } from "@/plugins/pipeline/execute";
 import type { PipelineContext } from "@/domain/ports/pipeline";
-import { registerGenerationController, releaseGenerationController, cancelGenerationController } from "@/application/generation/cancel-registry";
-import type { StoragePort } from "@/domain/ports/storage";
-import { getOrThrow } from "@/application/crud-helpers";
+import { registerGenerationController, releaseGenerationController } from "@/application/generation/cancel-registry";
+import { CachedGenerationError, validateGenerationRequest, type ValidatedRequest } from "@/application/generation/generation-validation";
 
-class CachedGenerationError extends Error {
-  constructor(public generation: Generation) {
-    super("Cached generation");
-  }
-}
+// CRUD + cancel live in generation-crud; re-exported here so existing import sites
+// (route handlers, export-service) keep importing from generation-service.
+export {
+  listGenerations,
+  getGeneration,
+  updateGenerationContent,
+  deleteGeneration,
+  cancelGeneration,
+} from "@/application/generation/generation-crud";
 
 export type GenerationStreamEvent =
   | { type: "generation"; generation: Generation }
@@ -26,87 +28,6 @@ function redactSnapshot(profile: Record<string, unknown>): Record<string, unknow
   const rest = { ...profile };
   delete rest.apiKeyRef;
   return { ...rest, keyMasked: profile.keyMasked ? String(profile.keyMasked) : undefined };
-}
-
-export async function listGenerations(opts?: { search?: string; offset?: number; limit?: number }): Promise<{ items: Generation[]; total: number }> {
-  return getStorage().generations.list(opts);
-}
-
-export async function getGeneration(id: string): Promise<Generation> {
-  return getOrThrow(getStorage().generations, id, "生成记录不存在");
-}
-
-export async function updateGenerationContent(id: string, outputContent: string): Promise<Generation> {
-  await getOrThrow(getStorage().generations, id, "生成记录不存在");
-  return getStorage().generations.update(id, { outputContent });
-}
-
-export async function deleteGeneration(id: string): Promise<void> {
-  await getOrThrow(getStorage().generations, id, "生成记录不存在");
-  await getStorage().generations.delete(id);
-}
-
-export async function cancelGeneration(id: string): Promise<{ cancelled: boolean }> {
-  const cancelled = cancelGenerationController(id);
-  if (cancelled) {
-    await getStorage().generations.update(id, {
-      status: "cancelled",
-      completedAt: nowIso(),
-      errorMessage: "生成请求被取消",
-    });
-  }
-  return { cancelled };
-}
-
-type ValidatedRequest = {
-  request: ReturnType<typeof generationRequestSchema.parse>;
-  preset: NonNullable<Awaited<ReturnType<StoragePort["generationPresets"]["get"]>>>;
-  provider: NonNullable<Awaited<ReturnType<StoragePort["providerProfiles"]["get"]>>>;
-  template: NonNullable<Awaited<ReturnType<StoragePort["promptTemplates"]["get"]>>>;
-};
-
-async function validateGenerationRequest(input: unknown): Promise<ValidatedRequest> {
-  const request = generationRequestSchema.parse(input);
-  const existing = request.idempotencyKey
-    ? await getStorage().generations.getByIdempotencyKey(request.idempotencyKey)
-    : null;
-  if (existing) {
-    // Completed → replay the cached result (true idempotent retry).
-    if (existing.status === "completed" && existing.outputContent) {
-      throw new CachedGenerationError(existing);
-    }
-    // Still in flight → a concurrent request owns this key. Reject instead of
-    // starting a duplicate stream, which would double-bill the provider and
-    // overwrite the first request's cancel controller in the registry.
-    if (existing.status === "queued" || existing.status === "streaming") {
-      throw new AppErrorException({
-        code: "GENERATION_IN_PROGRESS",
-        message: "Generation with same idempotency key is in progress",
-      });
-    }
-    // Failed/cancelled (or completed-without-content) → supersede the stale row
-    // so the retry can claim the unique key and persist its result. Without this,
-    // create() would hit the UNIQUE constraint and return the stale terminal row,
-    // whose status guard then silently drops the new stream's writes.
-    await getStorage().generations.delete(existing.id);
-  }
-
-  const preset = await getStorage().generationPresets.get(request.presetId);
-  if (!preset) {
-    throw new AppErrorException({ code: "PRESET_NOT_FOUND", message: "Generation preset not found" });
-  }
-  const provider = await getStorage().providerProfiles.get(request.providerProfileId || preset.providerProfileId);
-  if (!provider) {
-    throw new AppErrorException({ code: "PROVIDER_NOT_FOUND", message: "Provider profile not found" });
-  }
-  if (!provider.enabled) {
-    throw new AppErrorException({ code: "PROVIDER_DISABLED", message: "Provider is disabled" });
-  }
-  const template = await getStorage().promptTemplates.get(preset.promptTemplateId);
-  if (!template) {
-    throw new AppErrorException({ code: "TEMPLATE_NOT_FOUND", message: "Prompt template not found" });
-  }
-  return { request, preset, provider, template };
 }
 
 async function prepareGeneration(
