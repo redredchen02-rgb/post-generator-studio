@@ -193,7 +193,7 @@ graph TB
 
 ---
 
-- [ ] **Unit 1: vendor omniwm SDK + 搭 FastAPI 边车骨架**
+- [x] **Unit 1: vendor omniwm SDK + 搭 FastAPI 边车骨架**
 
 **Goal:** 在本仓库内建立 `sidecar/` Python 项目，vendor 进 omniwm，能 `import omniwm` 并起一个最小 FastAPI 应用（仅 `/health`）。
 
@@ -229,7 +229,7 @@ graph TB
 
 ---
 
-- [ ] **Unit 2: 边车四个端点 + 错误映射**
+- [x] **Unit 2: 边车四个端点 + 错误映射**
 
 **Goal:** 把 omniwm 四个高层函数包成 HTTP 端点，输入/输出走路径契约，异常映射为结构化 4xx/5xx。
 
@@ -275,7 +275,7 @@ graph TB
 
 ---
 
-- [ ] **Unit 3: Node 侧 domain port + zod schemas**
+- [x] **Unit 3: Node 侧 domain port + zod schemas**
 
 **Goal:** 定义水印能力的领域契约（端口接口 + 请求/响应/参数的 zod schema），与边车 HTTP 契约一一对应。
 
@@ -305,7 +305,7 @@ graph TB
 
 ---
 
-- [ ] **Unit 4: Node 侧 infrastructure 适配器 + 配置**
+- [x] **Unit 4: Node 侧 infrastructure 适配器 + 配置**
 
 **Goal:** 实现 `WatermarkAdapter`（`WatermarkPort` 的 HTTP 实现，调边车），并加入边车 URL / 媒体目录 / 超时的配置读取。
 
@@ -342,7 +342,7 @@ graph TB
 
 ---
 
-- [ ] **Unit 5: Node 侧 application 服务**
+- [x] **Unit 5: Node 侧 application 服务**
 
 **Goal:** 编排「落盘上传 → 调适配器 → 取回结果 → 清理临时目录」的用例服务，不含 HTTP 细节。
 
@@ -377,7 +377,7 @@ graph TB
 
 ---
 
-- [ ] **Unit 6: API 路由（multipart 上传 + 返回结果）**
+- [x] **Unit 6: API 路由（multipart 上传 + 返回结果）**
 
 **Goal:** 暴露 `/api/media/*` 路由，处理 multipart 上传、参数校验、调用服务、回传文件或结构化错误。
 
@@ -416,7 +416,7 @@ graph TB
 
 ---
 
-- [ ] **Unit 7: presentation —— 媒体水印页面 + 导航 + i18n**
+- [x] **Unit 7: presentation —— 媒体水印页面 + 导航 + i18n**
 
 **Goal:** 新增 `/media` 页与 `media-workspace`：上传、选模式（图片水印 / 视频水印 / 检测 / 去标）、填参数、提交、下载/查看结果，并在缺边车/缺 ffmpeg 时给降级提示。
 
@@ -451,7 +451,7 @@ graph TB
 
 ---
 
-- [ ] **Unit 8: 启动编排 + 健康门禁 + 文档**
+- [x] **Unit 8: 启动编排 + 健康门禁 + 文档**
 
 **Goal:** 把边车纳入 `pnpm` 启动流程与文档，开发/生产可一键拉起并健康可见。
 
@@ -481,7 +481,7 @@ graph TB
 
 ---
 
-- [ ] **Unit 9: 端到端集成测试（mock 测不出的两条契约）**
+- [x] **Unit 9: 端到端集成测试（mock 测不出的两条契约）**
 
 **Goal:** 把「共享 FS 路径契约」和「detect→delogo 同分辨率」这两条 mock 验证不了的契约，落成受测交付物，而非散落在手测里。
 

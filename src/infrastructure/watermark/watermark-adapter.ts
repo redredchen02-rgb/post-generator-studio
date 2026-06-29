@@ -3,7 +3,13 @@ import type {
   WatermarkOptions,
   WatermarkPort,
 } from "@/domain/ports/watermark-port";
-import { AppErrorException, type DetectRegions, type DetectResult } from "@/domain/schemas";
+import {
+  AppErrorException,
+  type DetectRegions,
+  type DetectResult,
+  type ImageWatermarkParams,
+  type VideoWatermarkParams,
+} from "@/domain/schemas";
 import {
   getImageTimeoutMs,
   getSidecarSecret,
@@ -117,7 +123,7 @@ export class WatermarkAdapter implements WatermarkPort {
   }
 
   watermarkImage(
-    input: { inDir: string; outDir: string; watermarkPath: string; params: import("@/domain/schemas").ImageWatermarkParams },
+    input: { inDir: string; outDir: string; watermarkPath: string; params: ImageWatermarkParams },
     options?: WatermarkOptions,
   ): Promise<{ outputs: string[]; count: number; moved: number }> {
     return this.call(
@@ -143,7 +149,7 @@ export class WatermarkAdapter implements WatermarkPort {
       outPath: string;
       watermarkPath: string;
       wmfile2?: string;
-      params: import("@/domain/schemas").VideoWatermarkParams;
+      params: VideoWatermarkParams;
     },
     options?: WatermarkOptions,
   ): Promise<{ outPath: string }> {
