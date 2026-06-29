@@ -50,8 +50,21 @@ function assertInsideMediaDir(p: string): void {
   }
 }
 
+// Opportunistic reaping: a long-running server would otherwise only reap at
+// startup. Throttled so it fires at most once an hour, in the background.
+let lastReapAt = 0;
+const REAP_INTERVAL_MS = 60 * 60 * 1000;
+
+function maybeReap(): void {
+  const now = Date.now();
+  if (now - lastReapAt < REAP_INTERVAL_MS) return;
+  lastReapAt = now;
+  void reapStaleJobs().catch(() => {});
+}
+
 /** Create in/, out/, wm/ for a fresh job and return its id. */
 export async function createJob(): Promise<string> {
+  maybeReap();
   const jobId = newJobId();
   await mkdir(inDir(jobId), { recursive: true });
   await mkdir(outDir(jobId), { recursive: true });

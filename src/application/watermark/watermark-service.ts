@@ -2,6 +2,7 @@ import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import type { SidecarHealth } from "@/domain/ports/watermark-port";
 import {
+  AppErrorException,
   type DetectRegions,
   type ImageWatermarkParams,
   type VideoWatermarkParams,
@@ -89,7 +90,13 @@ export async function detectJob(
   }
 }
 
-/** Delogo references a prior detect job by jobId (server-side session). */
+/**
+ * Delogo references a prior detect job by jobId (server-side session). Cleanup
+ * runs on success and on non-retryable failures, but a retryable failure
+ * (sidecar down / timeout) KEEPS the session so the client can retry the same
+ * jobId — otherwise the advertised `retryable` flag would be unactionable.
+ * reapStaleJobs() is the backstop for sessions that are never retried.
+ */
 export async function delogoJob(
   jobId: string,
   regions: DetectRegions,
@@ -100,9 +107,13 @@ export async function delogoJob(
     const outPath = path.join(mf.outDir(jobId), "clean.mp4");
     await getWatermarkAdapter().delogo({ inPath, outPath, regions }, { abortSignal: signal });
     const bytes = await readFile(outPath);
-    return { filename: "delogo.mp4", contentType: "video/mp4", bytes };
-  } finally {
     await mf.cleanup(jobId);
+    return { filename: "delogo.mp4", contentType: "video/mp4", bytes };
+  } catch (err) {
+    if (!(err instanceof AppErrorException && err.appError.retryable)) {
+      await mf.cleanup(jobId);
+    }
+    throw err;
   }
 }
 

@@ -45,6 +45,13 @@ describe("WatermarkAdapter", () => {
     });
   });
 
+  it("rejects a detect response whose shape is unexpected", async () => {
+    mockFetch(() => new Response(JSON.stringify({ regions: { tl: "bad-coord" }, width: 1 }), { status: 200 }));
+    await expect(adapter.detect({ inPath: "/x/in.mp4" })).rejects.toMatchObject({
+      appError: { code: "SIDECAR_ERROR" },
+    });
+  });
+
   it("sends the shared secret header when configured", async () => {
     process.env.OMNIWM_SIDECAR_SECRET = "s3cret";
     const spy = mockFetch(() => new Response(JSON.stringify({ regions: { tl: null, tr: null, bl: null, br: null }, width: 1, height: 1 }), { status: 200 }));

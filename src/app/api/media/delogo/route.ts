@@ -4,7 +4,7 @@ import { errorResponse } from "@/application/errors";
 import { detectRegionsSchema } from "@/domain/schemas";
 import { delogoJob } from "@/application/watermark/watermark-service";
 import { parseBody } from "@/app/api/parse-body";
-import { fileResponse } from "@/app/api/media/_shared";
+import { assertContentLength, fileResponse } from "@/app/api/media/_shared";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,6 +17,7 @@ const bodySchema = z.object({
 
 export async function POST(request: Request): Promise<NextResponse> {
   try {
+    assertContentLength(request);
     const { jobId, regions } = bodySchema.parse(await parseBody(request));
     const produced = await delogoJob(jobId, regions, request.signal);
     return fileResponse(produced);

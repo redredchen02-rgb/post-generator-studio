@@ -14,14 +14,34 @@ export function maxUploadBytes(): number {
 /**
  * Reject oversized uploads BEFORE buffering the body. formData() reads the whole
  * request into memory, so checking size after parsing is too late (H1).
+ *
+ * A missing Content-Length is itself rejected: legit browser uploads always send
+ * one, and accepting chunked/streamed bodies with no length would let an attacker
+ * bypass this guard and force formData() to buffer an unbounded body (M2).
  */
 export function assertContentLength(request: Request): void {
-  const len = Number(request.headers.get("content-length") || "0");
+  const header = request.headers.get("content-length");
+  if (header === null) {
+    throw new AppErrorException({ code: "LENGTH_REQUIRED", message: "缺少 Content-Length" });
+  }
+  const len = Number(header);
+  if (!Number.isFinite(len) || len < 0) {
+    throw new AppErrorException({ code: "LENGTH_REQUIRED", message: "Content-Length 非法" });
+  }
   if (len > maxUploadBytes()) {
     throw new AppErrorException({
       code: "UPLOAD_TOO_LARGE",
       message: `上传超出上限 ${Math.round(maxUploadBytes() / 1024 / 1024)}MB`,
     });
+  }
+}
+
+/** Parse a multipart body, mapping a malformed/non-multipart body to a structured 400. */
+export async function readMultipart(request: Request): Promise<FormData> {
+  try {
+    return await request.formData();
+  } catch {
+    throw new AppErrorException({ code: "INVALID_BODY", message: "请求体不是有效的 multipart 表单" });
   }
 }
 

@@ -5,6 +5,7 @@ import type {
 } from "@/domain/ports/watermark-port";
 import {
   AppErrorException,
+  detectResultSchema,
   type DetectRegions,
   type DetectResult,
   type ImageWatermarkParams,
@@ -173,8 +174,13 @@ export class WatermarkAdapter implements WatermarkPort {
     ).then((r) => ({ outPath: r.out_path }));
   }
 
-  detect(input: { inPath: string }, options?: WatermarkOptions): Promise<DetectResult> {
-    return this.call<DetectResult>("/detect", { in_path: input.inPath }, getVideoTimeoutMs(), options);
+  async detect(input: { inPath: string }, options?: WatermarkOptions): Promise<DetectResult> {
+    const raw = await this.call<unknown>("/detect", { in_path: input.inPath }, getVideoTimeoutMs(), options);
+    const parsed = detectResultSchema.safeParse(raw);
+    if (!parsed.success) {
+      throw new AppErrorException({ code: "SIDECAR_ERROR", message: "检测结果结构非预期" });
+    }
+    return parsed.data;
   }
 
   delogo(
