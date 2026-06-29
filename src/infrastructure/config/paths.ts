@@ -35,3 +35,13 @@ export function getBackupsDir(): string {
   return path.join(getDataHome(), "backups");
 }
 
+/**
+ * Media working root for the watermark feature. The omniwm sidecar MUST point at
+ * this same absolute path (shared-filesystem path contract). Override the whole
+ * data home via POST_GENERATOR_HOME, or this dir directly via OMNIWM_MEDIA_DIR.
+ */
+export function getMediaDir(): string {
+  const override = process.env.OMNIWM_MEDIA_DIR;
+  return override ? expandHome(override) : path.join(getDataHome(), "media");
+}
+

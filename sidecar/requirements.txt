@@ -1,0 +1,8 @@
+# omniwm 边车运行依赖。重 wheel（opencv/numpy）首装较慢——经 pnpm sidecar:setup 一次性安装。
+fastapi>=0.110
+uvicorn[standard]>=0.29
+python-multipart>=0.0.9
+pytest>=8.0
+httpx>=0.27
+# vendor 的 omniwm（含 Pillow/numpy/opencv-python-headless）
+-e ./vendor/omniwm-sdk

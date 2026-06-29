@@ -22,7 +22,27 @@ pnpm vitest run src/tests/unit/provider-service.test.ts
 # Database
 pnpm db:migrate     # Apply migrations
 pnpm db:seed        # Seed default Provider / Template / Preset data
+
+# Media watermark sidecar (Python/FastAPI — powers the /media page)
+pnpm sidecar:setup  # One-time: create sidecar/.venv + install (heavy: opencv/numpy/fastapi)
+pnpm sidecar        # Reclaim :8765, run the omniwm sidecar on 127.0.0.1 (run in a 2nd terminal)
 ```
+
+### Media watermark sidecar
+
+The `/media` feature (image/video watermark, detect, delogo) is powered by a **separate
+Python FastAPI process** in `sidecar/`, which wraps the vendored `omniwm` SDK. Node calls it
+over HTTP. It needs system `ffmpeg`/`ffprobe` on PATH (macOS: `brew install ffmpeg`).
+
+- `pnpm dev`/`start` do NOT auto-start the sidecar — run `pnpm sidecar` separately. The
+  `/media` page shows a degradation banner when it's unavailable.
+- **Deployment contract**: the sidecar and Next must run on the **same machine**, share the
+  **same `MEDIA_DIR` absolute path**, and run as the **same uid / with shared read-write
+  permission** (shared-filesystem path contract). Containerizing requires a shared volume with
+  identical paths.
+- Security boundary lives in `sidecar/app/security.py`; the frozen wire contract is
+  `sidecar/CONTRACT.md` (Node zod in `src/domain/schemas/watermark.ts` mirrors it).
+- Sidecar tests: `cd sidecar && .venv/bin/python -m pytest -q`.
 
 ### Node version & the native SQLite module
 
@@ -106,3 +126,9 @@ Four Zustand stores in `src/presentation/store/`:
 | `POST_GENERATOR_PROVIDER_TIMEOUT_MS` | `120000` | Streaming provider timeout |
 | `POST_GENERATOR_COMPLETION_TIMEOUT_MS` | `60000` | One-shot completion timeout |
 | `NEXT_PUBLIC_APP_URL` | `http://localhost:3000` | Used in OpenRouter Referer header |
+| `OMNIWM_SIDECAR_URL` | `http://127.0.0.1:8765` | Watermark sidecar base URL |
+| `OMNIWM_SIDECAR_PORT` | `8765` | Sidecar listen port (loopback only) |
+| `OMNIWM_SIDECAR_SECRET` | _(unset)_ | If set, Node↔sidecar require `x-omniwm-secret` header |
+| `OMNIWM_MEDIA_DIR` | `{HOME}/media` | Shared media root (Node + sidecar MUST match) |
+| `OMNIWM_MAX_UPLOAD_BYTES` | `209715200` | Max upload size (200 MB) |
+| `OMNIWM_MAX_VIDEO_SECONDS` / `OMNIWM_MAX_VIDEO_PIXELS` / `OMNIWM_MAX_IMAGE_PIXELS` | `1200` / `1e7` / `5e7` | Untrusted-media resource caps |

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { History, Settings, Sparkles } from "lucide-react";
+import { History, Settings, Sparkles, Stamp } from "lucide-react";
 import { getLocale, getMessages, getTranslations } from "next-intl/server";
 import { NextIntlClientProvider } from "next-intl";
 import "./globals.css";
@@ -41,6 +41,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
                 <nav className="flex items-center gap-1">
                   <NavLink href="/" label={t("generate")} icon={<Sparkles className="h-4 w-4" />} />
                   <NavLink href="/history" label={t("history")} icon={<History className="h-4 w-4" />} />
+                  <NavLink href="/media" label={t("media")} icon={<Stamp className="h-4 w-4" />} />
                   <NavLink href="/settings" label={t("settings")} icon={<Settings className="h-4 w-4" />} />
                   <div className="ml-1 flex items-center gap-1">
                     <LanguageSwitcher />
@@ -54,6 +55,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
               <div className="flex items-center justify-around px-4 py-2">
                 <MobileNavLink href="/" label={t("generate")} icon={<Sparkles className="h-5 w-5" />} />
                 <MobileNavLink href="/history" label={t("history")} icon={<History className="h-5 w-5" />} />
+                <MobileNavLink href="/media" label={t("media")} icon={<Stamp className="h-5 w-5" />} />
                 <MobileNavLink href="/settings" label={t("settings")} icon={<Settings className="h-5 w-5" />} />
               </div>
             </nav>

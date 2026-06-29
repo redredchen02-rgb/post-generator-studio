@@ -3,7 +3,8 @@
     "appName": "Post Generator Studio",
     "generate": "生成",
     "history": "历史",
-    "settings": "设置"
+    "settings": "设置",
+    "media": "媒体水印"
   },
   "Generation": {
     "title": "生成",
@@ -339,6 +340,40 @@
       "factuality": "真实性",
       "style": "文采",
       "completeness": "完整度"
+    }
+  },
+  "MediaWatermark": {
+    "title": "媒体水印",
+    "subtitle": "上传图片或视频——加水印、检测、或去标(delogo)。",
+    "mode": {
+      "image": "图片水印",
+      "video": "视频水印",
+      "detect": "检测 / 去标"
+    },
+    "health": {
+      "checking": "正在检测水印服务…",
+      "unavailable": "水印服务不可用",
+      "hint": "请启动 omniwm 边车：运行 `pnpm sidecar`（首次：`pnpm sidecar:setup`）。",
+      "noFfmpeg": "PATH 上找不到 ffmpeg——请安装（macOS：brew install ffmpeg）。",
+      "retry": "重试"
+    },
+    "field": {
+      "sourceImage": "源图片",
+      "sourceVideo": "源视频",
+      "watermark": "水印图片",
+      "position": "位置",
+      "wmWidth": "水印宽度 (px)",
+      "wmMode": "水印模式",
+      "resolution": "分辨率",
+      "resolutionHint": "'original' 保持源尺寸"
+    },
+    "action": {
+      "watermark": "加水印并下载",
+      "detect": "检测水印",
+      "delogo": "去标并下载"
+    },
+    "detect": {
+      "found": "源 {w}×{h}。检测到的区域："
     }
   }
 }

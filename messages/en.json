@@ -3,7 +3,8 @@
     "appName": "Post Generator Studio",
     "generate": "Generate",
     "history": "History",
-    "settings": "Settings"
+    "settings": "Settings",
+    "media": "Media"
   },
   "Generation": {
     "title": "Generate",
@@ -339,6 +340,40 @@
       "factuality": "Factuality",
       "style": "Style",
       "completeness": "Completeness"
+    }
+  },
+  "MediaWatermark": {
+    "title": "Media Watermark",
+    "subtitle": "Upload an image or video — add a watermark, detect, or remove (delogo).",
+    "mode": {
+      "image": "Image watermark",
+      "video": "Video watermark",
+      "detect": "Detect / Delogo"
+    },
+    "health": {
+      "checking": "Checking watermark service…",
+      "unavailable": "Watermark service unavailable",
+      "hint": "Start the omniwm sidecar: run `pnpm sidecar` (first time: `pnpm sidecar:setup`).",
+      "noFfmpeg": "ffmpeg not found on PATH — install it (macOS: brew install ffmpeg).",
+      "retry": "Retry"
+    },
+    "field": {
+      "sourceImage": "Source image",
+      "sourceVideo": "Source video",
+      "watermark": "Watermark image",
+      "position": "Position",
+      "wmWidth": "Watermark width (px)",
+      "wmMode": "Watermark mode",
+      "resolution": "Resolution",
+      "resolutionHint": "'original' keeps source size"
+    },
+    "action": {
+      "watermark": "Add watermark & download",
+      "detect": "Detect watermark",
+      "delogo": "Remove watermark & download"
+    },
+    "detect": {
+      "found": "Source {w}×{h}. Detected regions:"
     }
   }
 }
