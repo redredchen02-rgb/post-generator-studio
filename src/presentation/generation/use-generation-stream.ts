@@ -40,7 +40,7 @@ export function useGenerationStream() {
   const activeGenerationRef = React.useRef(state.activeGeneration);
   activeGenerationRef.current = state.activeGeneration;
   const bufferRef = React.useRef("");
-  const flushTimerRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
+  const rafRef = React.useRef<number | null>(null);
 
   const generate = React.useCallback(
     async (params: {
@@ -70,14 +70,16 @@ export function useGenerationStream() {
       const controller = new AbortController();
       abortRef.current = controller;
       bufferRef.current = "";
-      if (flushTimerRef.current) clearInterval(flushTimerRef.current);
-      flushTimerRef.current = setInterval(() => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      const flush = () => {
         if (bufferRef.current) {
           const chunk = bufferRef.current;
           bufferRef.current = "";
           setState((s) => ({ ...s, content: s.content + chunk }));
         }
-      }, 100);
+        rafRef.current = requestAnimationFrame(flush);
+      };
+      rafRef.current = requestAnimationFrame(flush);
       const timeoutSignal = AbortSignal.timeout(120_000);
       let combinedSignal: AbortSignal;
       if (typeof AbortSignal.any === "function") {
@@ -89,44 +91,52 @@ export function useGenerationStream() {
         timeoutSignal.addEventListener("abort", onAbort, { once: true });
         combinedSignal = combined.signal;
       }
-      const response = await fetch("/api/generations", {
-        method: "POST",
-        signal: combinedSignal,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title,
-          eventSummary,
-          presetId,
-          providerProfileId: providerProfileId || undefined,
-          idempotencyKey: regenerate ? undefined : crypto.randomUUID(),
-          customVariables: customVariables && Object.keys(customVariables).length > 0 ? customVariables : undefined,
-          ...controls,
-        }),
-      });
-
-      if (!response.ok) {
-        // Server returned 4xx/5xx with a non-SSE body. Surface a clear error
-        // instead of feeding the error payload into the SSE parser (which would
-        // throw a JSON parse error and read as "stream broke").
-        const detail = await response.text().catch(() => null);
-        setState((s) => ({
-          ...s,
-          error: t("errorProvider"),
-          errorDetail: detail || null,
-          status: t("statusFailed"),
-          isGenerating: false,
-        }));
-        return;
-      }
-
-      if (!response.body) {
-        setState((s) => ({ ...s, error: t("errorNoStream"), isGenerating: false }));
-        return;
-      }
-
       try {
+        // The fetch itself must be inside the try: if it rejects (server down,
+        // offline, connection reset) the finally still clears the flush interval
+        // and resets isGenerating, instead of leaving the UI stuck "Generating…".
+        const response = await fetch("/api/generations", {
+          method: "POST",
+          signal: combinedSignal,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title,
+            eventSummary,
+            presetId,
+            providerProfileId: providerProfileId || undefined,
+            idempotencyKey: regenerate ? undefined : crypto.randomUUID(),
+            customVariables: customVariables && Object.keys(customVariables).length > 0 ? customVariables : undefined,
+            ...controls,
+          }),
+        });
+
+        if (!response.ok) {
+          // Server returned 4xx/5xx with a non-SSE body. Surface a clear error
+          // instead of feeding the error payload into the SSE parser (which would
+          // throw a JSON parse error and read as "stream broke").
+          const detail = await response.text().catch(() => null);
+          setState((s) => ({
+            ...s,
+            error: t("errorProvider"),
+            errorDetail: detail || null,
+            status: t("statusFailed"),
+          }));
+          return;
+        }
+
+        if (!response.body) {
+          setState((s) => ({ ...s, error: t("errorNoStream") }));
+          return;
+        }
+
         for await (const msg of parseSSEStream(response.body)) {
-          const payload = JSON.parse(msg.data) as StreamPayload;
+          let payload: StreamPayload;
+          try {
+            payload = JSON.parse(msg.data) as StreamPayload;
+          } catch {
+            setState((s) => ({ ...s, error: t("errorStreamParse"), status: t("statusFailed") }));
+            return;
+          }
           if (payload.type === "generation") {
             setState((s) => ({ ...s, activeGeneration: payload.generation, status: t("statusStreaming") }));
           }
@@ -178,18 +188,20 @@ export function useGenerationStream() {
         }
       } catch (streamError) {
         if (!controller.signal.aborted) {
-          // Main message stays localized; the raw Error text goes to errorDetail.
+          // Covers both a mid-stream break and an initial fetch rejection (server
+          // down / offline). Main message stays localized; raw Error text → errorDetail.
           const detail = streamError instanceof Error ? streamError.message : null;
           setState((s) => ({
             ...s,
             error: t("statusStreamFailed"),
             errorDetail: detail,
+            status: t("statusFailed"),
           }));
         }
       } finally {
-        if (flushTimerRef.current) {
-          clearInterval(flushTimerRef.current);
-          flushTimerRef.current = null;
+        if (rafRef.current) {
+          cancelAnimationFrame(rafRef.current);
+          rafRef.current = null;
         }
         const remaining = bufferRef.current;
         bufferRef.current = "";

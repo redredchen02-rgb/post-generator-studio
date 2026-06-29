@@ -39,15 +39,26 @@ export function safeErrorMessage(error: unknown): string {
   return "Unexpected error";
 }
 
+const MARKDOWN_PATTERNS = {
+  codeBlock: /```[\s\S]*?```/g,
+  inlineCode: /`([^`]+)`/g,
+  image: /!\[[^\]]*]\([^)]*\)/g,
+  link: /\[([^\]]+)]\([^)]*\)/g,
+  heading: /^#{1,6}\s+/gm,
+  blockquote: /^>\s?/gm,
+  formatting: /[*_~>#-]/g,
+  newlines: /\n{3,}/g,
+};
+
 export function stripMarkdown(markdown: string): string {
   return markdown
-    .replace(/```[\s\S]*?```/g, "")
-    .replace(/`([^`]+)`/g, "$1")
-    .replace(/!\[[^\]]*]\([^)]*\)/g, "")
-    .replace(/\[([^\]]+)]\([^)]*\)/g, "$1")
-    .replace(/^#{1,6}\s+/gm, "")
-    .replace(/^>\s?/gm, "")
-    .replace(/[*_~>#-]/g, "")
-    .replace(/\n{3,}/g, "\n\n")
+    .replace(MARKDOWN_PATTERNS.codeBlock, "")
+    .replace(MARKDOWN_PATTERNS.inlineCode, "$1")
+    .replace(MARKDOWN_PATTERNS.image, "")
+    .replace(MARKDOWN_PATTERNS.link, "$1")
+    .replace(MARKDOWN_PATTERNS.heading, "")
+    .replace(MARKDOWN_PATTERNS.blockquote, "")
+    .replace(MARKDOWN_PATTERNS.formatting, "")
+    .replace(MARKDOWN_PATTERNS.newlines, "\n\n")
     .trim();
 }

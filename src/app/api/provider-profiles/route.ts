@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { errorResponse } from "@/application/errors";
+import { errorResponse } from "@/app/api/api-helpers";
 import { createProviderProfile, listProviderProfiles } from "@/application/providers/provider-service";
 import { parseBody } from "@/app/api/parse-body";
 

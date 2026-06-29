@@ -1,6 +1,6 @@
 import type { NextResponse } from "next/server";
 import { z } from "zod";
-import { errorResponse } from "@/application/errors";
+import { errorResponse } from "@/app/api/api-helpers";
 import { detectRegionsSchema } from "@/domain/schemas";
 import { delogoJob } from "@/application/watermark/watermark-service";
 import { parseBody } from "@/app/api/parse-body";

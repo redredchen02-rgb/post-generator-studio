@@ -68,8 +68,9 @@ export class OllamaAdapter extends BaseAdapter {
   }
 
   protected validateChunkShape(raw: Record<string, unknown>): string | null {
-    if (typeof raw.error === "string") return raw.error;
-    if (typeof raw.message !== "object" && typeof raw.done !== "boolean" && typeof raw.error !== "string") {
+    const error = this.detectChunkError(raw);
+    if (error) return error;
+    if (typeof raw.message !== "object" && typeof raw.done !== "boolean") {
       return `${this.id}: 意外的数据块结构`;
     }
     return null;

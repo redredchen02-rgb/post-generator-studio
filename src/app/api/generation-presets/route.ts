@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { errorResponse } from "@/application/errors";
+import { errorResponse } from "@/app/api/api-helpers";
 import { createGenerationPreset, listGenerationPresets } from "@/application/presets/preset-service";
 import { parseBody } from "@/app/api/parse-body";
 

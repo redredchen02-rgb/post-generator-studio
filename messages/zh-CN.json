@@ -57,7 +57,8 @@
     "statusStreamFailed": "流式传输失败",
     "errorNoPreset": "请选择 Generation Preset",
     "errorNoStream": "无法获取流式响应",
-    "errorProvider": "生成服务返回了错误"
+    "errorProvider": "生成服务返回了错误",
+    "errorStreamParse": "流式响应解析失败"
   },
   "Output": {
     "title": "输出",

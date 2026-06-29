@@ -1,4 +1,4 @@
-import { desc, eq, like, sql } from "drizzle-orm";
+import { desc, eq, sql } from "drizzle-orm";
 import { nowIso, parseJson } from "@/lib/utils";
 import { generationSchema, type Generation, type QualityScore } from "@/domain/schemas";
 import type { GenerationCreateInput, GenerationListOpts, GenerationListResult, GenerationRepository, GenerationUpdateInput } from "@/domain/ports/storage";
@@ -46,8 +46,11 @@ export class SqliteGenerationRepository implements GenerationRepository {
   async list(opts: GenerationListOpts = {}): Promise<GenerationListResult> {
     const { search, offset = 0, limit = 30 } = opts;
     const db = await getDb();
-    const escaped = search ? search.replace(/%/g, "\\%").replace(/_/g, "\\_") : undefined;
-    const filter = escaped ? like(generations.title, `%${escaped}%`) : undefined;
+    // Escape LIKE wildcards (and the escape char itself) AND declare ESCAPE '\':
+    // drizzle's like() emits no ESCAPE clause, so without it SQLite treats the
+    // injected backslash as a literal, breaking any search for titles with _ or %.
+    const escaped = search ? search.replace(/[\\%_]/g, (c) => `\\${c}`) : undefined;
+    const filter = escaped ? sql`${generations.title} LIKE ${`%${escaped}%`} ESCAPE '\\'` : undefined;
     const [rows, [{ total }]] = await Promise.all([
       filter
         ? db.select().from(generations).where(filter).orderBy(desc(generations.createdAt)).limit(limit).offset(offset)
@@ -75,28 +78,33 @@ export class SqliteGenerationRepository implements GenerationRepository {
     const db = await getDb();
     const timestamp = nowIso();
     try {
-      await db.insert(generations).values({
-        id: input.id,
-        idempotencyKey: input.idempotencyKey ?? null,
-        title: input.title,
-        eventSummary: input.eventSummary,
-        providerProfileSnapshot: JSON.stringify(input.providerProfileSnapshot),
-        promptTemplateSnapshot: JSON.stringify(input.promptTemplateSnapshot),
-        generationPresetSnapshot: JSON.stringify(input.generationPresetSnapshot),
-        renderedSystemPrompt: input.renderedSystemPrompt,
-        renderedUserPrompt: input.renderedUserPrompt,
-        outputContent: null,
-        status: "queued",
-        errorMessage: null,
-        model: input.model ?? null,
-        providerKind: input.providerKind ?? null,
-        inputTokens: null,
-        outputTokens: null,
-        totalTokens: null,
-        startedAt: null,
-        completedAt: null,
-        createdAt: timestamp,
-      });
+      const createdRows = db
+        .insert(generations)
+        .values({
+          id: input.id,
+          idempotencyKey: input.idempotencyKey ?? null,
+          title: input.title,
+          eventSummary: input.eventSummary,
+          providerProfileSnapshot: JSON.stringify(input.providerProfileSnapshot),
+          promptTemplateSnapshot: JSON.stringify(input.promptTemplateSnapshot),
+          generationPresetSnapshot: JSON.stringify(input.generationPresetSnapshot),
+          renderedSystemPrompt: input.renderedSystemPrompt,
+          renderedUserPrompt: input.renderedUserPrompt,
+          outputContent: null,
+          status: "queued",
+          errorMessage: null,
+          model: input.model ?? null,
+          providerKind: input.providerKind ?? null,
+          inputTokens: null,
+          outputTokens: null,
+          totalTokens: null,
+          startedAt: null,
+          completedAt: null,
+          createdAt: timestamp,
+        })
+        .returning()
+        .all();
+      return createdRows[0] ? generationFromRow(createdRows[0]) : notFound("Generation");
     } catch (error) {
       // Idempotent retry: a concurrent request already inserted a row with this
       // idempotencyKey. Return that existing generation instead of throwing a
@@ -107,8 +115,6 @@ export class SqliteGenerationRepository implements GenerationRepository {
       }
       throw error;
     }
-    const created = await this.get(input.id);
-    return created ?? notFound("Generation");
   }
 
   /** Terminal statuses that cannot be overwritten by concurrent updates. */
@@ -138,7 +144,8 @@ export class SqliteGenerationRepository implements GenerationRepository {
       if (!SqliteGenerationRepository.canTransition(existing.status, newStatus)) {
         return existing;
       }
-      tx.update(generations)
+      const updatedRows = tx
+        .update(generations)
         .set({
           outputContent: input.outputContent ?? existing.outputContent ?? null,
           status: newStatus,
@@ -152,8 +159,8 @@ export class SqliteGenerationRepository implements GenerationRepository {
           qualityScore: resolveQualityScore(input, existing),
         })
         .where(eq(generations.id, id))
-        .run();
-      const updatedRows = tx.select().from(generations).where(eq(generations.id, id)).limit(1).all();
+        .returning()
+        .all();
       const updated = updatedRows[0] ? generationFromRow(updatedRows[0]) : null;
       return updated ?? notFound("Generation");
     });

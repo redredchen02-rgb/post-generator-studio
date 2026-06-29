@@ -140,6 +140,21 @@ describe("useVariantGeneration", () => {
     expect(calls.some((u) => u.includes("/api/generations/gen_1/cancel"))).toBe(true);
   });
 
+  it("marks a variant failed (not stuck on streaming) when the server returns a non-OK response", async () => {
+    // Regression: streamOne never checked response.ok, so a non-SSE error body
+    // yielded nothing and left the slot stuck on "streaming" forever.
+    global.fetch = (async () =>
+      new Response(JSON.stringify({ error: { message: "server boom" } }), { status: 500 })) as typeof fetch;
+
+    const { result } = renderHook(() => useVariantGeneration());
+    await act(async () => {
+      await result.current.generateVariants(params, 1);
+    });
+
+    expect(result.current.variants[0].status).toBe("failed");
+    expect(result.current.isGenerating).toBe(false);
+  });
+
   it("reset clears all variants", async () => {
     global.fetch = (async () =>
       streamResponse([{ type: "final", generation: gen("gen_1", "completed"), content: "x" }])) as typeof fetch;

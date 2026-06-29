@@ -57,7 +57,8 @@
     "statusStreamFailed": "Streaming failed",
     "errorNoPreset": "Please select a Generation Preset",
     "errorNoStream": "Streaming response unavailable",
-    "errorProvider": "The generation service returned an error."
+    "errorProvider": "The generation service returned an error.",
+    "errorStreamParse": "Streaming response parse failed"
   },
   "Output": {
     "title": "Output",

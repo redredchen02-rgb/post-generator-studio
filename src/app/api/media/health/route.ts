@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { errorResponse } from "@/application/errors";
+import { errorResponse } from "@/app/api/api-helpers";
 import { getSidecarHealth } from "@/application/watermark/watermark-service";
 
 export const runtime = "nodejs";

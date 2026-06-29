@@ -38,7 +38,7 @@ export class GeminiAdapter extends BaseAdapter {
     config: ProviderProfile,
     options?: GenerationOptions,
   ): Promise<RequestBuildResult> {
-    const baseUrl = (config.baseUrl || "https://generativelanguage.googleapis.com").replace(/\/$/, "");
+    const baseUrl = this.getBaseUrl(config, "https://generativelanguage.googleapis.com");
     return {
       url: `${baseUrl}/v1beta/models/${encodeURIComponent(request.model)}:streamGenerateContent?alt=sse`,
       init: {
@@ -57,11 +57,8 @@ export class GeminiAdapter extends BaseAdapter {
   }
 
   protected validateChunkShape(raw: Record<string, unknown>): string | null {
-    if (typeof raw.error === "string") return raw.error;
-    if (typeof raw.error === "object" && raw.error !== null) {
-      const err = raw.error as Record<string, unknown>;
-      if (typeof err.message === "string") return err.message;
-    }
+    const error = this.detectChunkError(raw);
+    if (error) return error;
     if (!Array.isArray(raw.candidates) && typeof raw.usageMetadata !== "object") {
       return `${this.id}: 意外的数据块结构`;
     }
@@ -95,7 +92,7 @@ export class GeminiAdapter extends BaseAdapter {
     options?: GenerationOptions,
   ): Promise<RequestBuildResult> {
     // Non-streaming uses :generateContent (no ?alt=sse) rather than :streamGenerateContent.
-    const baseUrl = (config.baseUrl || "https://generativelanguage.googleapis.com").replace(/\/$/, "");
+    const baseUrl = this.getBaseUrl(config, "https://generativelanguage.googleapis.com");
     return {
       url: `${baseUrl}/v1beta/models/${encodeURIComponent(request.model)}:generateContent`,
       init: {
@@ -131,7 +128,7 @@ export class GeminiAdapter extends BaseAdapter {
     if (!options?.apiKey) {
       return [];
     }
-    const baseUrl = (config.baseUrl || "https://generativelanguage.googleapis.com").replace(/\/$/, "");
+    const baseUrl = this.getBaseUrl(config, "https://generativelanguage.googleapis.com");
     const response = await fetch(`${baseUrl}/v1beta/models`, {
       method: "GET",
       headers: { "x-goog-api-key": options.apiKey },

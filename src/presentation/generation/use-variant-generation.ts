@@ -95,6 +95,13 @@ export function useVariantGeneration() {
           ...params.controls,
         }),
       });
+      if (!response.ok) {
+        // A non-OK response carries a JSON/HTML error body, not SSE — the parser
+        // would yield nothing and leave the slot stuck on "streaming" forever.
+        const detail = await response.text().catch(() => null);
+        patchSlot(index, { status: "failed", error: detail || `生成失败 (HTTP ${response.status})` });
+        return;
+      }
       if (!response.body) {
         patchSlot(index, { status: "failed", error: "Streaming response unavailable" });
         return;

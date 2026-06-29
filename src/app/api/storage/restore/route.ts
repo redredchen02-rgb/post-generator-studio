@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { errorResponse } from "@/application/errors";
+import { errorResponse } from "@/app/api/api-helpers";
 import { AppErrorException } from "@/domain/schemas";
 import { restoreBackup } from "@/application/storage/backup-service";
 

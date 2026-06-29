@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { errorResponse } from "@/application/errors";
+import { errorResponse } from "@/app/api/api-helpers";
 import { createPromptTemplate, listPromptTemplates } from "@/application/prompt/prompt-service";
 import { parseBody } from "@/app/api/parse-body";
 

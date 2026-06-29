@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { errorResponse } from "@/application/errors";
+import { errorResponse } from "@/app/api/api-helpers";
 import { testProviderProfile } from "@/application/providers/provider-service";
 import type { RouteContext } from "@/app/api/types";
 

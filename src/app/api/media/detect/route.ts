@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { errorResponse } from "@/application/errors";
+import { errorResponse } from "@/app/api/api-helpers";
 import { detectJob } from "@/application/watermark/watermark-service";
 import { assertContentLength, assertKind, fileToUpload, readMultipart } from "@/app/api/media/_shared";
 

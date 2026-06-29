@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { assertContentLength, sniffMedia } from "@/app/api/media/_shared";
-import { errorResponse } from "@/application/errors";
+import { errorResponse } from "@/app/api/api-helpers";
 import { AppErrorException } from "@/domain/schemas";
 
 function req(headers: Record<string, string>): Request {

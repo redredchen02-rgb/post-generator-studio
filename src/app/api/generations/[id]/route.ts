@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { z } from "zod";
-import { errorResponse } from "@/application/errors";
+import { z, ZodError } from "zod";
+import { errorResponse } from "@/app/api/api-helpers";
 import { deleteGeneration, getGeneration, updateGenerationContent } from "@/application/generation/generation-service";
 import type { RouteContext } from "@/app/api/types";
 
@@ -25,7 +25,7 @@ export async function PATCH(request: Request, context: RouteContext): Promise<Ne
     const raw = await request.json();
     const parsed = patchSchema.safeParse(raw);
     if (!parsed.success) {
-      return NextResponse.json({ error: parsed.error.issues[0]?.message || "Invalid input" }, { status: 400 });
+      return errorResponse(new ZodError(parsed.error.issues));
     }
     return NextResponse.json(await updateGenerationContent(id, parsed.data.outputContent));
   } catch (error) {

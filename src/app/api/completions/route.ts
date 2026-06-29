@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { errorResponse } from "@/application/errors";
+import { errorResponse } from "@/app/api/api-helpers";
 import { completeText } from "@/application/content/completion-service";
 import { parseBody } from "@/app/api/parse-body";
 

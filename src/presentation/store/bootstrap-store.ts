@@ -52,6 +52,22 @@ export const useBootstrapStore = create<BootstrapState>()((set, get) => ({
     if (state.data && !isStale) return; // Fresh enough
     if (state.loading) return; // Already fetching
 
+    // If we have stale data, return immediately and refetch in background (SWR)
+    if (state.data) {
+      set({ loading: true, error: null });
+      try {
+        const data = await loadWithRetry();
+        set({ data, loadedAt: Date.now(), loading: false, error: null });
+      } catch (err) {
+        set({
+          error: err instanceof Error ? err.message : "Failed to load bootstrap",
+          loading: false,
+        });
+      }
+      return;
+    }
+
+    // No data yet — must block until loaded
     set({ loading: true, error: null });
     try {
       const data = await loadWithRetry();

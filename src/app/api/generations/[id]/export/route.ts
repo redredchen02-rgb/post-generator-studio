@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { errorResponse } from "@/application/errors";
+import { errorResponse } from "@/app/api/api-helpers";
 import { exportGeneration } from "@/application/export/export-service";
 import { contentDisposition } from "@/lib/content-disposition";
 import type { RouteContext } from "@/app/api/types";

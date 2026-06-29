@@ -6,6 +6,36 @@ import { useTranslations } from "next-intl";
 import { Button } from "@/presentation/components/ui/button";
 import { Input } from "@/presentation/components/ui/input";
 
+let nextOutlineId = 0;
+
+function useStableIds(items: string[]): string[] {
+  const idsRef = React.useRef<Map<number, string>>(new Map());
+
+  return React.useMemo(() => {
+    const newIds: string[] = [];
+    const usedIds = new Set<string>();
+
+    for (let i = 0; i < items.length; i++) {
+      const existingId = idsRef.current.get(i);
+      if (existingId && !usedIds.has(existingId)) {
+        newIds.push(existingId);
+        usedIds.add(existingId);
+      } else {
+        const id = `outline-${nextOutlineId++}`;
+        newIds.push(id);
+        usedIds.add(id);
+      }
+    }
+
+    idsRef.current.clear();
+    for (let i = 0; i < newIds.length; i++) {
+      idsRef.current.set(i, newIds[i]);
+    }
+
+    return newIds;
+  }, [items.length]);
+}
+
 type OutlinePanelProps = {
   items: string[];
   busy?: boolean;
@@ -21,6 +51,7 @@ type OutlinePanelProps = {
 export function OutlinePanel(props: OutlinePanelProps): React.ReactElement {
   const t = useTranslations("Outline");
   const hasContent = props.items.some((item) => item.trim().length > 0);
+  const stableIds = useStableIds(props.items);
 
   return (
     <section className="app-surface grid gap-3 rounded-lg p-4 slide-up" aria-label={t("title")}>
@@ -28,7 +59,7 @@ export function OutlinePanel(props: OutlinePanelProps): React.ReactElement {
 
       <ol className="grid gap-2">
         {props.items.map((item, index) => (
-          <li key={index} className="flex items-center gap-1">
+          <li key={stableIds[index]} className="flex items-center gap-1">
             <span className="w-5 text-right text-sm text-muted-foreground">{index + 1}.</span>
             <Input
               value={item}

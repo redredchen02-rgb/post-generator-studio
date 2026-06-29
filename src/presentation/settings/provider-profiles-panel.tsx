@@ -134,7 +134,8 @@ export function ProviderProfilesPanel({
 
   async function remove(id: string): Promise<void> {
     try {
-      await fetch(`/api/provider-profiles/${id}`, { method: "DELETE" });
+      const response = await fetch(`/api/provider-profiles/${id}`, { method: "DELETE" });
+      if (!response.ok) throw new Error(`Delete failed: ${response.status}`);
       if (editingId === id) cancelEdit();
       await refresh();
       notify(t("deletedMsg"));
