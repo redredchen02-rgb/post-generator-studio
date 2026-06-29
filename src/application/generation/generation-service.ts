@@ -82,7 +82,7 @@ async function validateGenerationRequest(input: unknown): Promise<ValidatedReque
     if (existing.status === "queued" || existing.status === "streaming") {
       throw new AppErrorException({
         code: "GENERATION_IN_PROGRESS",
-        message: "相同 idempotencyKey 的生成正在进行中",
+        message: "Generation with same idempotency key is in progress",
       });
     }
     // Failed/cancelled (or completed-without-content) → supersede the stale row
@@ -94,18 +94,18 @@ async function validateGenerationRequest(input: unknown): Promise<ValidatedReque
 
   const preset = await getStorage().generationPresets.get(request.presetId);
   if (!preset) {
-    throw new AppErrorException({ code: "PRESET_NOT_FOUND", message: "Generation Preset 不存在" });
+    throw new AppErrorException({ code: "PRESET_NOT_FOUND", message: "Generation preset not found" });
   }
   const provider = await getStorage().providerProfiles.get(request.providerProfileId || preset.providerProfileId);
   if (!provider) {
-    throw new AppErrorException({ code: "PROVIDER_NOT_FOUND", message: "Provider Profile 不存在" });
+    throw new AppErrorException({ code: "PROVIDER_NOT_FOUND", message: "Provider profile not found" });
   }
   if (!provider.enabled) {
-    throw new AppErrorException({ code: "PROVIDER_DISABLED", message: "Provider 未启用" });
+    throw new AppErrorException({ code: "PROVIDER_DISABLED", message: "Provider is disabled" });
   }
   const template = await getStorage().promptTemplates.get(preset.promptTemplateId);
   if (!template) {
-    throw new AppErrorException({ code: "TEMPLATE_NOT_FOUND", message: "Prompt Template 不存在" });
+    throw new AppErrorException({ code: "TEMPLATE_NOT_FOUND", message: "Prompt template not found" });
   }
   return { request, preset, provider, template };
 }

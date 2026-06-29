@@ -18,7 +18,7 @@ type SecretEnvelope = {
 /**
  * In-memory cache for decrypted secrets.
  * Avoids repeated fs.readFile + AES-256-GCM decryption for the same key.
- * TTL: 5 minutes; capped at 100 entries with insertion-order (FIFO) eviction.
+ * TTL: 5 minutes; capped at 100 entries with LRU eviction.
  */
 const CACHE_TTL_MS = 5 * 60 * 1000;
 const CACHE_MAX = 100;
@@ -37,11 +37,14 @@ function cacheGet(ref: string): string | undefined {
     secretCache.delete(ref);
     return undefined;
   }
+  // Mark as recently used by deleting and re-adding (LRU behavior)
+  secretCache.delete(ref);
+  secretCache.set(ref, entry);
   return entry.value;
 }
 
 function cacheSet(ref: string, value: string): void {
-  if (secretCache.size >= CACHE_MAX) {
+  if (secretCache.size >= CACHE_MAX && !secretCache.has(ref)) {
     const firstKey = secretCache.keys().next().value;
     if (firstKey !== undefined) secretCache.delete(firstKey);
   }
