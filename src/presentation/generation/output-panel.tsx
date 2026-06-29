@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import ReactMarkdown from "react-markdown";
 import { Clipboard, Download, FileText, RotateCcw, Save } from "lucide-react";
 import { useTranslations } from "next-intl";
 import dynamic from "next/dynamic";
@@ -25,7 +24,12 @@ const ALLOWED_ELEMENTS = [
   "strong", "em", "del", "sup", "sub",
 ];
 
-const MemoizedReactMarkdown = React.memo(ReactMarkdown);
+const MemoizedReactMarkdown = React.memo(
+  dynamic(() => import("react-markdown").then((m) => m.default), {
+    ssr: false,
+    loading: () => <div className="h-[540px] animate-pulse rounded-md bg-muted" />,
+  }),
+);
 
 type OutputPanelProps = {
   content: string;

@@ -40,7 +40,7 @@ export function useGenerationStream() {
   const activeGenerationRef = React.useRef(state.activeGeneration);
   activeGenerationRef.current = state.activeGeneration;
   const bufferRef = React.useRef("");
-  const flushTimerRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
+  const rafRef = React.useRef<number | null>(null);
 
   const generate = React.useCallback(
     async (params: {
@@ -70,14 +70,16 @@ export function useGenerationStream() {
       const controller = new AbortController();
       abortRef.current = controller;
       bufferRef.current = "";
-      if (flushTimerRef.current) clearInterval(flushTimerRef.current);
-      flushTimerRef.current = setInterval(() => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      const flush = () => {
         if (bufferRef.current) {
           const chunk = bufferRef.current;
           bufferRef.current = "";
           setState((s) => ({ ...s, content: s.content + chunk }));
         }
-      }, 100);
+        rafRef.current = requestAnimationFrame(flush);
+      };
+      rafRef.current = requestAnimationFrame(flush);
       const timeoutSignal = AbortSignal.timeout(120_000);
       let combinedSignal: AbortSignal;
       if (typeof AbortSignal.any === "function") {
@@ -128,7 +130,13 @@ export function useGenerationStream() {
         }
 
         for await (const msg of parseSSEStream(response.body)) {
-          const payload = JSON.parse(msg.data) as StreamPayload;
+          let payload: StreamPayload;
+          try {
+            payload = JSON.parse(msg.data) as StreamPayload;
+          } catch {
+            setState((s) => ({ ...s, error: t("errorStreamParse"), status: t("statusFailed") }));
+            return;
+          }
           if (payload.type === "generation") {
             setState((s) => ({ ...s, activeGeneration: payload.generation, status: t("statusStreaming") }));
           }
@@ -191,9 +199,9 @@ export function useGenerationStream() {
           }));
         }
       } finally {
-        if (flushTimerRef.current) {
-          clearInterval(flushTimerRef.current);
-          flushTimerRef.current = null;
+        if (rafRef.current) {
+          cancelAnimationFrame(rafRef.current);
+          rafRef.current = null;
         }
         const remaining = bufferRef.current;
         bufferRef.current = "";
