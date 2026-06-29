@@ -328,7 +328,7 @@ buildRenderedPrompt(ctx, request, enabled):
 
 ---
 
-- [ ] **Unit 5: 抽出共用 SSE 串流 helper，去重兩 hook**
+- [x] **Unit 5: 抽出共用 SSE 串流 helper，去重兩 hook**
 
 **Goal:** `use-generation-stream` 與 `use-variant-generation` 共用一份 SSE 行解析 + token 緩衝 util，消除重複（輕量解 #11/#12，不做服務化）。
 

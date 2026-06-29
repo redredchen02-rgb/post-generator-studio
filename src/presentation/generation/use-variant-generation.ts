@@ -3,6 +3,7 @@
 import * as React from "react";
 import type { Generation, GenerationControls } from "@/domain/schemas";
 import { parseSSEStream } from "@/lib/sse";
+import { buildGenerationRequestBody, type GenerationStreamPayload } from "./generation-stream-protocol";
 
 /**
  * Multi-variant generation (Unit 10). Runs N independent generations *serially*
@@ -25,12 +26,6 @@ export type VariantSlot = {
   /** True once the user edits this variant's content. */
   edited: boolean;
 };
-
-type StreamPayload =
-  | { type: "generation"; generation: Generation }
-  | { type: "token"; value: string }
-  | { type: "error"; message?: string; error?: { message?: string } }
-  | { type: "final"; generation: Generation; content: string };
 
 export type VariantGenerateParams = {
   title: string;
@@ -84,16 +79,7 @@ export function useVariantGeneration() {
         method: "POST",
         signal,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: params.title,
-          eventSummary: params.eventSummary,
-          presetId: params.presetId,
-          providerProfileId: params.providerProfileId || undefined,
-          idempotencyKey: crypto.randomUUID(),
-          customVariables:
-            params.customVariables && Object.keys(params.customVariables).length > 0 ? params.customVariables : undefined,
-          ...params.controls,
-        }),
+        body: JSON.stringify(buildGenerationRequestBody({ ...params, idempotencyKey: crypto.randomUUID() })),
       });
       if (!response.ok) {
         // A non-OK response carries a JSON/HTML error body, not SSE — the parser
@@ -107,7 +93,7 @@ export function useVariantGeneration() {
         return;
       }
       for await (const msg of parseSSEStream(response.body)) {
-        const payload = JSON.parse(msg.data) as StreamPayload;
+        const payload = JSON.parse(msg.data) as GenerationStreamPayload;
         if (payload.type === "generation") {
           currentGenIdRef.current = payload.generation.id;
           patchSlot(index, { generation: payload.generation });
