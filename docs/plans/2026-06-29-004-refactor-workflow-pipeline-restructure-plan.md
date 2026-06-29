@@ -362,7 +362,7 @@ buildRenderedPrompt(ctx, request, enabled):
 
 ---
 
-- [ ] **Unit 6: 拆解 GeneratorWorkspace 為 concern hooks**
+- [x] **Unit 6: 拆解 GeneratorWorkspace 為 concern hooks**
 
 **Goal:** 把生成/變體/大綱編排、評分、匯出從 535 行上帝組件抽到 concern hooks，組件縮為「組合 + 版面」。
 

@@ -10,10 +10,8 @@ import { useBootstrapStore } from "@/presentation/store/bootstrap-store";
 import { useGenerationStream } from "./use-generation-stream";
 import { useKeyboard } from "@/presentation/lib/use-keyboard";
 import { useSearchParams } from "next/navigation";
-import { scoreGeneration, testProviderProfile } from "@/presentation/lib/api";
 import { computePromptPreview } from "@/presentation/lib/preview-prompt";
-import { stripMarkdown } from "@/lib/utils";
-import type { GenerationControls, QualityScore } from "@/domain/schemas";
+import type { GenerationControls } from "@/domain/schemas";
 import { InputPanel } from "./input-panel";
 import { OutputPanel } from "./output-panel";
 import { OutlinePanel } from "./outline-panel";
@@ -24,8 +22,9 @@ import { VersionCompare } from "./version-compare";
 import { useDraftVersions } from "./use-draft-versions";
 import { useRestoreFromHistory } from "./use-restore-from-history";
 import { ConfigSidebar } from "./config-sidebar";
-import { requestCompletion } from "@/presentation/lib/api";
-import { buildOutlinePrompt, parseOutline, serializeOutline } from "@/presentation/lib/prompt-builders";
+import { useScoring } from "./use-scoring";
+import { useExportActions } from "./use-export-actions";
+import { useGeneratorController } from "./use-generator-controller";
 
 const sampleTitle = "台湾男子连续30天挑战AI创业";
 const sampleSummary = "- 连续30天开发AI产品\n- 使用 Claude Code 与 OpenAI Agent\n- 每天公开开发日志\n- 获得大量关注";
@@ -48,11 +47,7 @@ export function GeneratorWorkspace(): React.ReactElement {
   const [controls, setControls] = React.useState<GenerationControls>({});
   const [outlineMode, setOutlineMode] = React.useState(false);
   const [outline, setOutline] = React.useState<string[] | null>(null);
-  const [outlineBusy, setOutlineBusy] = React.useState(false);
   const [variantCount, setVariantCount] = React.useState(1);
-  const [qualityScore, setQualityScore] = React.useState<QualityScore | null>(null);
-  const [scoring, setScoring] = React.useState(false);
-  const [providerError, setProviderError] = React.useState<string | null>(null);
   const [promptPreview, setPromptPreview] = React.useState<{ systemPrompt: string; userPrompt: string } | null>(null);
   const [promptPreviewOpen, setPromptPreviewOpen] = React.useState(false);
   const { rawMode, setRawMode, editorFontSize, setEditorFontSize } = useUiStore();
@@ -95,17 +90,38 @@ export function GeneratorWorkspace(): React.ReactElement {
     onError: () => setStatus(t("restoreFailed")),
   });
 
-  // Tracks the currently-active generation id so async handlers can detect a
-  // generation switch that happened while their request was in flight.
-  const activeGenIdRef = React.useRef<string | undefined>(activeGeneration?.id);
-  activeGenIdRef.current = activeGeneration?.id;
+  // Derived selections from bootstrap + the current preset/provider choice.
+  const selectedPreset = bootstrap?.generationPresets.find((preset) => preset.id === presetId);
+  const selectedProvider = bootstrap?.providerProfiles.find(
+    (provider) => provider.id === (selectedProfileId ?? selectedPreset?.providerProfileId),
+  );
+  const selectedTemplate = bootstrap?.promptTemplates.find((template) => template.id === selectedPreset?.promptTemplateId);
+  const templateId = selectedPreset?.promptTemplateId;
+  const effectiveProviderId = selectedProfileId ?? selectedPreset?.providerProfileId;
 
-  const handleGenerateRef = React.useRef(onPrimaryGenerate);
-  handleGenerateRef.current = onPrimaryGenerate;
-  const cancelRef = React.useRef(cancelActive);
-  cancelRef.current = cancelActive;
+  // Concern hooks: quality scoring (state + race guard), content actions, and the
+  // generate / variant / outline orchestration. The component stays composition + layout.
+  const { qualityScore, scoring, score, clearScore } = useScoring({
+    activeGeneration, content, presetId, providerProfileId: effectiveProviderId, setStatus,
+  });
+  const { copyMarkdown, copyPlainText, exportLocal, saveToHistory } = useExportActions({
+    content, title, activeGeneration, setStatus, onSaved: clearScore,
+  });
+  const controller = useGeneratorController({
+    bootstrap, title, eventSummary, presetId, effectiveProviderId, templateId,
+    controls, customVarValues, variantCount, outlineMode, outline, setOutline,
+    stream: { generate, cancel, setActiveGeneration },
+    variant: { generateVariants, cancel: cancelVariants, variants, reset: resetVariants, busy: variantsBusy },
+  });
 
-  const busy = isGenerating || outlineBusy || variantsBusy;
+  // Keyboard: Ctrl+Enter generates, Escape cancels. Refs hold the latest handlers so
+  // the binding list only rebuilds when `busy` changes.
+  const handleGenerateRef = React.useRef(controller.onPrimaryGenerate);
+  handleGenerateRef.current = controller.onPrimaryGenerate;
+  const cancelRef = React.useRef(controller.cancelActive);
+  cancelRef.current = controller.cancelActive;
+
+  const busy = isGenerating || controller.outlineBusy || variantsBusy;
   const bindings = React.useMemo(
     () => [
       { key: "Enter", ctrl: true, handler: () => { if (!busy) handleGenerateRef.current(); } },
@@ -143,20 +159,12 @@ export function GeneratorWorkspace(): React.ReactElement {
     return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
   }, [fetchBootstrap]);
 
-  const selectedPreset = bootstrap?.generationPresets.find((preset) => preset.id === presetId);
-  const selectedProvider = bootstrap?.providerProfiles.find(
-    (provider) => provider.id === (selectedProfileId ?? selectedPreset?.providerProfileId),
-  );
-  const selectedTemplate = bootstrap?.promptTemplates.find((template) => template.id === selectedPreset?.promptTemplateId);
-  const templateId = selectedPreset?.promptTemplateId;
-  const effectiveProviderId = selectedProfileId ?? selectedPreset?.providerProfileId;
-
   // Pre-fill custom var values per template
   React.useEffect(() => {
     if (!templateId) { setCustomVarValues({}); return; }
     // Intentional one-shot read: initialise custom vars once when the template
     // changes. A reactive selector would re-run this effect after every
-    // generation (setVar at line ~202 writes varMemory), overwriting in-progress input.
+    // generation (setVar writes varMemory), overwriting in-progress input.
     const memory = useVarMemoryStore.getState().varMemory[templateId] ?? {};
     const defaults = selectedTemplate?.customVariableDefaults ?? {};
     setCustomVarValues({ ...defaults, ...memory });
@@ -174,161 +182,6 @@ export function GeneratorWorkspace(): React.ReactElement {
     }, 400);
     return () => clearTimeout(timer);
   }, [title, eventSummary, templateId, selectedTemplate, selectedPreset?.locale, customVarValues, controls]);
-
-  async function ensureProviderOk(): Promise<boolean> {
-    setProviderError(null);
-    if (effectiveProviderId && bootstrap) {
-      const profile = bootstrap.providerProfiles.find((p) => p.id === effectiveProviderId);
-      if (!profile) { setProviderError(t("providerNotFound")); return false; }
-      if (!profile.enabled) { setProviderError(t("providerDisabled")); return false; }
-      try {
-        const result = await testProviderProfile(effectiveProviderId);
-        if (!result.ok) { setProviderError(result.message); return false; }
-      } catch (err) {
-        setProviderError(err instanceof Error ? err.message : t("providerCheckFailed"));
-        return false;
-      }
-    }
-    return true;
-  }
-
-  async function handleGenerate(regenerate = false, outlineConstraint?: string): Promise<void> {
-    if (!(await ensureProviderOk())) return;
-    await generate({
-      title, eventSummary, presetId,
-      providerProfileId: effectiveProviderId ?? "", regenerate,
-      customVariables: customVarValues,
-      controls: outlineConstraint ? { ...controls, outline: outlineConstraint } : controls,
-      onSuccess: (vars) => {
-        if (!templateId) return;
-        for (const [k, v] of Object.entries(vars)) {
-          useVarMemoryStore.getState().setVar(templateId, k, v);
-        }
-      },
-    });
-  }
-
-  // Multi-variant: run N independent generations and show them side by side (Unit 10).
-  async function handleGenerateVariants(): Promise<void> {
-    if (!presetId || !(await ensureProviderOk())) return;
-    await generateVariants(
-      { title, eventSummary, presetId, providerProfileId: effectiveProviderId, customVariables: customVarValues, controls },
-      variantCount,
-    );
-  }
-
-  // Pull a chosen variant into the main editor, then leave compare mode.
-  function selectVariant(index: number): void {
-    const variant = variants[index];
-    if (!variant?.generation) return;
-    setActiveGeneration(variant.generation, variant.content);
-    resetVariants();
-  }
-
-  // Step 1 of outline-first: produce an editable outline via one-shot completion.
-  async function generateOutline(): Promise<void> {
-    if (!presetId || !(await ensureProviderOk())) return;
-    setOutlineBusy(true);
-    try {
-      const { systemPrompt, prompt } = buildOutlinePrompt({ title, eventSummary, controls });
-      const result = await requestCompletion({
-        prompt, systemPrompt, presetId, providerProfileId: effectiveProviderId || undefined,
-      });
-      const items = parseOutline(result.content);
-      setOutline(items.length > 0 ? items : [""]);
-    } catch (err) {
-      setProviderError(err instanceof Error ? err.message : t("providerCheckFailed"));
-    } finally {
-      setOutlineBusy(false);
-    }
-  }
-
-  // Step 2: inject the confirmed outline as a constraint and stream the full article.
-  function expandOutline(): void {
-    const constraint = serializeOutline(outline ?? []);
-    if (!constraint) return;
-    setOutline(null);
-    void handleGenerate(false, constraint);
-  }
-
-  function onPrimaryGenerate(): void {
-    if (outlineMode) void generateOutline();
-    else if (variantCount > 1) void handleGenerateVariants();
-    else void handleGenerate(false);
-  }
-
-  function cancelActive(): void {
-    if (variantsBusy) void cancelVariants();
-    else void cancel();
-  }
-
-  async function saveToHistory(): Promise<void> {
-    if (!activeGeneration) return;
-    try {
-      const { saveGenerationContent: save } = await import("@/presentation/lib/api");
-      await save(activeGeneration.id, content);
-      // Editing the content invalidates any prior score — it described the old text.
-      setQualityScore(null);
-      setStatus(t("savedToHistory"));
-    } catch { setStatus(t("saveFailed")); }
-  }
-
-  // Reset the badge when the active generation changes; reflect an already-scored one.
-  React.useEffect(() => {
-    setQualityScore(activeGeneration?.qualityScore ?? null);
-  }, [activeGeneration?.id, activeGeneration?.qualityScore]);
-
-  const handleScore = React.useCallback(async () => {
-    if (!activeGeneration || !content.trim() || scoring) return;
-    const genId = activeGeneration.id;
-    setScoring(true);
-    const MAX_RETRIES = 1;
-    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-      try {
-        const score = await scoreGeneration(genId, { presetId, providerProfileId: effectiveProviderId });
-        if (activeGenIdRef.current === genId) setQualityScore(score);
-        break;
-      } catch (err) {
-        // 5xx only: \b5\d\d\b matches 500–599 but not 405/415 or "5 chars"
-        // (includes("5") matched any message with the digit 5 — far too broad).
-        const isRetryable = err instanceof Error && (err.message.includes("429") || /\b5\d\d\b/.test(err.message));
-        if (isRetryable && attempt < MAX_RETRIES) continue;
-        if (activeGenIdRef.current === genId) setStatus(t("scoreFailed"));
-      }
-    }
-    setScoring(false);
-  }, [activeGeneration, content, scoring, presetId, effectiveProviderId, t, setStatus]);
-
-  async function copyMarkdown(): Promise<void> {
-    try {
-      await navigator.clipboard.writeText(content);
-      setStatus(t("markdownCopied"));
-    } catch {
-      setStatus(t("copyFailed"));
-    }
-  }
-
-  async function copyPlainText(): Promise<void> {
-    try {
-      await navigator.clipboard.writeText(stripMarkdown(content));
-      setStatus(t("plainTextCopied"));
-    } catch {
-      setStatus(t("copyFailed"));
-    }
-  }
-
-  function exportLocal(format: "md" | "txt"): void {
-    const body = format === "txt" ? stripMarkdown(content) : content;
-    const blob = new Blob([body], { type: format === "md" ? "text/markdown" : "text/plain" });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    const now = new Date();
-    const ts = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}_${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}`;
-    link.download = `${title || "generation"}_${ts}.${format}`;
-    link.click();
-    setTimeout(() => URL.revokeObjectURL(link.href), 100);
-    setStatus(t("exported", { format }));
-  }
 
   // Show spinner: actively loading, OR first render (not yet started — loading=false, error=null, data=null)
   if (bootstrapLoading || (!bootstrap && !bootstrapError)) {
@@ -366,7 +219,7 @@ export function GeneratorWorkspace(): React.ReactElement {
         selectedProfileId={selectedProfileId}
         customVarValues={customVarValues}
         controls={controls}
-        providerError={providerError}
+        providerError={controller.providerError}
         isGenerating={busy}
         selectedTemplate={selectedTemplate}
         selectedPreset={selectedPreset}
@@ -382,13 +235,13 @@ export function GeneratorWorkspace(): React.ReactElement {
         onOutlineModeChange={setOutlineMode}
         variantCount={variantCount}
         onVariantCountChange={setVariantCount}
-        onGenerate={onPrimaryGenerate}
-        onCancel={cancelActive}
+        onGenerate={controller.onPrimaryGenerate}
+        onCancel={controller.cancelActive}
       />
       {outline !== null ? (
         <OutlinePanel
           items={outline}
-          busy={outlineBusy}
+          busy={controller.outlineBusy}
           onChangeItem={(i, v) => setOutline((prev) => (prev ?? []).map((it, idx) => (idx === i ? v : it)))}
           onAddItem={() => setOutline((prev) => [...(prev ?? []), ""])}
           onRemoveItem={(i) => setOutline((prev) => (prev ?? []).filter((_, idx) => idx !== i))}
@@ -402,8 +255,8 @@ export function GeneratorWorkspace(): React.ReactElement {
               return next;
             })
           }
-          onRegenerate={() => void generateOutline()}
-          onExpand={expandOutline}
+          onRegenerate={() => void controller.generateOutline()}
+          onExpand={controller.expandOutline}
           onCancel={() => setOutline(null)}
         />
       ) : variants.length > 0 ? (
@@ -411,7 +264,7 @@ export function GeneratorWorkspace(): React.ReactElement {
           variants={variants}
           busy={variantsBusy}
           onEditVariant={setVariantContent}
-          onSelect={selectVariant}
+          onSelect={controller.selectVariant}
           onCancel={() => void cancelVariants()}
           onDiscard={resetVariants}
         />
@@ -451,7 +304,7 @@ export function GeneratorWorkspace(): React.ReactElement {
           providerProfileId={effectiveProviderId}
           qualityScore={qualityScore}
           scoring={scoring}
-          onScore={() => void handleScore()}
+          onScore={() => void score()}
           onRawModeChange={setRawMode}
           onContentChange={setContent}
           onCopyMarkdown={copyMarkdown}
@@ -459,7 +312,7 @@ export function GeneratorWorkspace(): React.ReactElement {
           onExportMd={() => exportLocal("md")}
           onExportTxt={() => exportLocal("txt")}
           onSave={saveToHistory}
-          onRegenerate={() => void handleGenerate(true)}
+          onRegenerate={() => void controller.handleGenerate(true)}
           onFontSizeChange={setEditorFontSize}
           />
         </div>
